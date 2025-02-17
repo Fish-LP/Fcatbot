@@ -7,7 +7,7 @@ from urllib.parse import urlparse, urlencode, urlunparse
 
 import websockets.client
 
-from Fbot.utils import get_log
+from ..utils import get_log
 
 # 日志工具
 _LOG = get_log('WebSocketClient')
