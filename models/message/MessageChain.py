@@ -1,0 +1,215 @@
+from typing import Union, List, Dict, Any, Iterable
+import json
+
+from .Nope import *
+
+class MessageChain:
+    """消息链类，用于管理多个消息元素"""
+    def __init__(self, elements: list = None):
+        """
+        初始化消息链
+        :param elements: 初始消息元素列表
+        """
+        self._wrap_add_methods(self.check_message_chain)
+        self.elements = []
+        if elements is not None:
+            for element in elements:
+                self.elements.append(self._guessing_type(element['data'], element['type']))
+
+    @staticmethod
+    def _guessing_type(data: dict, type_: str = None):
+        type_handlers = {
+            'text': lambda data: Text(**data),
+            'at': lambda data: At(**data),
+            'image': lambda data: Image(**data),
+            'face': lambda data: Face(**data),
+            'reply': lambda data: Reply(**data),
+            'json': lambda data: Json(**data),
+            'record': lambda data: Record(**data),
+            'video': lambda data: Video(**data),
+            'dice': lambda data: Dice(),
+            'rps': lambda data: Rps(),
+            'music': lambda data: Music(**data),
+            'custom_music': lambda data: CustomMusic(**data),
+            'markdown': lambda data: Markdown(**data),
+            'file': lambda daata: File(**data)
+        }
+        if type_ is not None:
+            try:
+                result = type_handlers[type_](data)
+                return result
+            except TypeError as e:
+                raise TypeError(f"{type_} 初始化错误 {e.args}")
+
+        for handler in type_handlers.values():
+            try:
+                result = handler(data)
+                return result
+            except (TypeError, ValueError):
+                continue
+        raise ValueError("未知的数据类型")
+
+    def add(self, element: Union[dict ,Element, Iterable[Element]]):
+        """
+        向消息链中添加新的消息元素
+        :param element: 单个消息元素或元素列表
+        """
+        if isinstance(element, Element):
+            self.elements.append(element)
+        elif isinstance(element, dict):
+            self.elements.append(self._guessing_type(element))
+        elif isinstance(element, Iterable):
+            for elem in element:
+                if not isinstance(elem, Element):
+                    self.elements.append(self._guessing_type(elem))
+                self.elements.append(elem)
+        else:
+            raise TypeError(f"添加的元素必须是消息元素或元素列表或字典，但收到类型为 {type(elem)}")
+
+    def remove(self, element_type: Union[Element, list[Element]]):
+        """
+        从消息链中移除指定类型的所有消息元素
+        :param element_type: 要移除的消息元素类型
+        """
+        if isinstance(Element, element_type): types = [element_type]
+        self.elements = [event for event in self.elements if not isinstance(event, tuple(types))]
+
+    def filter(self, element_type: Union[Element, list[Element]]):
+        """
+        从消息链中移除指定类型外的所有消息元素
+        :param element_type: 要保留的消息元素类型
+        """
+        if isinstance(Element, element_type): types = [element_type]
+        self.elements = [event for event in self.elements if isinstance(event, tuple(types))]
+
+    def to_dict(self) -> List[Dict[str, Any]]:
+        """
+        将消息链转换为可序列化的字典列表
+        """
+        return [element.to_dict() for element in self.elements]
+
+    def __str__(self) -> str:
+        """
+        返回消息链的 JSON 字符串表示
+        """
+        return json.dumps(self.to_dict(), ensure_ascii=False, indent=2)
+
+    def __call__(self) -> str:
+        """
+        直接调用时返回 JSON 字符串
+        """
+        return self.__str__()
+
+    def __iter__(self):
+        """
+        支持迭代消息链中的元素
+        """
+        return iter(self.elements)
+
+    def __len__(self) -> int:
+        """
+        返回消息链中元素的数量
+        """
+        return len(self.elements)
+
+    def __getitem__(self, index: int) -> Element:
+        """
+        根据索引获取消息链中的元素
+        """
+        return self.elements[index]
+
+    def __setitem__(self, index: int, element: Union[dict ,Element]):
+        """
+        根据索引设置消息链中的元素
+        """
+        if isinstance(element, Element):
+            self.elements[index] = element
+        elif isinstance(element, dict):
+            self.elements[index] = self._guessing_type(element)
+        else:
+            ValueError(f"添加的元素必须是消息元素或元素列表或字典，但收到类型为 {type(element)}")
+
+    def add_text(self, text: str):
+        """添加文本消息元素"""
+        self.elements.append(Text(text=text))
+
+    def add_at(self, qq: Union[int, str]):
+        """添加 @ 消息元素"""
+        self.elements.append(At(qq=qq))
+
+    def add_at_all(self):
+        """添加 @全体消息元素"""
+        self.elements.append(AtAll())
+
+    def add_image(self, file: Union[str, bytes]):
+        """添加图片消息元素"""
+        self.elements.append(Image(file=file))
+
+    def add_face(self, face_id: int):
+        """添加表情消息元素"""
+        self.elements.append(Face(face_id=face_id))
+
+    def add_reply(self, reply_to: str):
+        """添加回复消息元素"""
+        self.elements.append(Reply(reply_to=reply_to))
+
+    def add_json(self, json_msg: str):
+        """添加 JSON 消息元素"""
+        self.elements.append(Json(json_msg=json_msg))
+
+    def add_record(self, file: str):
+        """添加语音消息元素"""
+        self.elements.append(Record(file=file))
+
+    def add_video(self, file: str):
+        """添加视频消息元素"""
+        self.elements.append(Video(file=file))
+
+    def add_dice(self):
+        """添加骰子消息元素"""
+        self.elements.append(Dice())
+
+    def add_rps(self):
+        """添加猜拳消息元素"""
+        self.elements.append(Rps())
+
+    def add_music(self, music_type: str, id: str):
+        """添加音乐分享消息元素"""
+        self.elements.append(Music(music_type=music_type, id=id))
+
+    def add_custom_music(self, url: str, audio: str, title: str, image: str = "", singer: str = ""):
+        """添加自定义音乐分享消息元素"""
+        self.elements.append(CustomMusic(url=url, audio=audio, title=title, image=image, singer=singer))
+
+    def add_markdown(self, markdown: dict):
+        """添加 Markdown 消息元素"""
+        self.elements.append(Markdown(markdown=markdown))
+    
+    def check_message_chain(self, *args, **kwargs):
+        '''保证elements顺序正确'''
+        element: Element
+        behavior_handlers = {
+            Behavior.DAFAULT:   lambda elements, element: elements,
+            Behavior.TOP:       lambda elements, element: move_element_to_front(elements, element),
+            Behavior.OCCUPY:    lambda elements, element: [element]
+        }
+        def move_element_to_front(lst: list, element):
+            lst.remove(element)
+            lst.insert(0, element)
+        for element in self.elements:
+            behavior_handlers[element.behavior](self.elements, element)
+    
+    def _wrap_add_methods(cls, callback):
+        """
+        动态包装类中的所有 add_ 开头的方法，并在方法调用后执行
+        """
+        for attr_name in dir(cls):
+            if attr_name.startswith('add_'):
+                method = getattr(cls, attr_name)
+                if callable(method):
+                    def wrapped_func(self, *args, **kwargs):
+                        result = method(self, *args, **kwargs)
+                        callback(self, method.__name__, *args, **kwargs)
+                        return result
+                    # 替换原始方法
+                    setattr(cls, attr_name, wrapped_func)
