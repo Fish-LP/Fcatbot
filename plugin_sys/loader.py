@@ -1,4 +1,5 @@
 import importlib
+import asyncio
 import os
 import sys
 from collections import defaultdict, deque
@@ -19,6 +20,10 @@ from .compatible import CompatibleEnrollment
 from ..config import PLUGINS_DIR, META_CONFIG_PATH
 from ..utils import get_log
 from ..utils import UniversalDataIO
+
+import signal
+import atexit
+
 LOG = get_log('PluginLoader')
 
 class PluginLoader:
@@ -38,6 +43,9 @@ class PluginLoader:
             self.meta_data = UniversalDataIO(META_CONFIG_PATH)
         else:
             self.meta_data = {}
+        signal.signal(signal.SIGTERM, self._unload_all)
+        signal.signal(signal.SIGINT, self._unload_all)
+        atexit.register(self._unload_all)
 
     def _validate_plugin(self, plugin_cls: Type[BasePlugin]) -> bool:
         """
@@ -152,8 +160,6 @@ class PluginLoader:
                 else:
                     self.event_bus.subscribe(event_type, func, priority)
 
-
-
     async def unload_plugin(self, plugin_name: str):
         """
         卸载插件
@@ -162,7 +168,7 @@ class PluginLoader:
         if plugin_name not in self.plugins:
             return
 
-        await self.plugins[plugin_name]._unload_()
+        await self.plugins[plugin_name].__unload__()
         del self.plugins[plugin_name]
 
     async def reload_plugin(self, plugin_name: str):
@@ -214,3 +220,13 @@ class PluginLoader:
             sys.path = original_sys_path
 
         return modules
+
+    def _unload_all(self):
+        loop = asyncio.new_event_loop()
+        try:
+            asyncio.set_event_loop(loop)  # 设置为当前事件循环
+            for plugin in tuple(self.plugins.keys()):
+                loop.run_until_complete(self.unload_plugin(plugin))
+        finally:
+            loop.close()  # 关闭事件循环
+        return
