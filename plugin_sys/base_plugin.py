@@ -30,7 +30,7 @@ class BasePlugin:
             for k, v in kwd.items():
                 setattr(self, k, v)
 
-    async def _unload_(self):
+    async def __unload__(self):
         self._close_()
         await self.on_unload()
         self._save_persistent_data()
