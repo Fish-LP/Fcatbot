@@ -16,7 +16,7 @@ class Client(WebSocketClient):
         self.last_heartbeat:dict = {}
         self.ping:int = -1
 
-    async def api(self, action: str, params: dict, echo = uuid.uuid4().hex) -> dict:
+    async def api(self, action: str, param: dict = None, echo = uuid.uuid4().hex, **params) -> dict:
         '''
         :param action: 指定要调用的 API
         :param params: 用于传入参数, 可选
@@ -24,7 +24,7 @@ class Client(WebSocketClient):
         '''
         data = {
             "action": action,
-            "params": params,
+            "params": param or params,
             "echo": echo
         }
         re = json.loads(await self.send_data(data))
