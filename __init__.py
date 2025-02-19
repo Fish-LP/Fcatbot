@@ -12,8 +12,13 @@ from .client import BotClient
 from .utils import get_log, UniversalDataIO
 from .client import BotClient
 from .models import GroupMessage, PrivateMessage
-from .models.message import Nope
-from .plugin_sys import PluginLoader, Event ,CompatibleEnrollment, BasePlugin
+from .models import Nope
+from .models import MessageChain
+from .plugin_sys import PluginLoader
+from .plugin_sys import Event
+from .plugin_sys import CompatibleEnrollment
+from .plugin_sys import BasePlugin
+from .plugin_sys import EventBus
 
 LOG = get_log('Bot')
 
@@ -24,9 +29,11 @@ __all__ = [
     'UniversalDataIO',
     'GroupMessage',
     'PrivateMessage',
+    'MessageChain',
     'Nope',
     'PluginLoader',
     'BasePlugin',
     'Event',
+    'EventBus',
     'CompatibleEnrollment',
 ]

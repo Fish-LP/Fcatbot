@@ -15,7 +15,7 @@ from .custom_err import (
     PluginVersionError,
 )
 from .base_plugin import BasePlugin
-from .event import Event, EventBus
+from .event import EventBus
 from .compatible import CompatibleEnrollment
 from ..config import PLUGINS_DIR, META_CONFIG_PATH
 from ..utils import get_log
@@ -31,12 +31,12 @@ class PluginLoader:
     插件加载器,用于加载、卸载和管理插件
     """
 
-    def __init__(self):
+    def __init__(self, event_bus: EventBus):
         """
         初始化插件加载器
         """
         self.plugins: Dict[str, BasePlugin] = {}  # 存储已加载的插件
-        self.event_bus = EventBus()  # 事件总线
+        self.event_bus = event_bus  # 事件总线
         self._dependency_graph: Dict[str, Set[str]] = {}  # 插件依赖关系图
         self._version_constraints: Dict[str, Dict[str, str]] = {}  # 插件版本约束
         if META_CONFIG_PATH:

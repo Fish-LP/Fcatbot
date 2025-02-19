@@ -14,16 +14,16 @@ class Behavior(Enum):
 
 class TopElement:
     """强制置顶消息元素"""
-    behavior: str = field(default = Behavior.TOP, init=False)
+    behavior: str = Behavior.TOP
 
 class OccupyElement:
     """独占消息元素"""
-    behavior: str = field(default = Behavior.OCCUPY, init=False)
+    behavior: str = Behavior.OCCUPY
 
 class Element:
     """消息元素基类"""
     type: str = "element"
-    behavior: str = field(default = Behavior.DAFAULT, init=False)
+    behavior: str = Behavior.DAFAULT
 
     def to_dict(self) -> dict:
         """将元素转换为可序列化的字典"""

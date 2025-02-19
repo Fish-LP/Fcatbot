@@ -1,3 +1,4 @@
+import inspect
 from typing import Union, List, Dict, Any, Iterable
 import json
 
@@ -10,7 +11,7 @@ class MessageChain:
         初始化消息链
         :param elements: 初始消息元素列表
         """
-        self._wrap_add_methods(self.check_message_chain)
+        self.decorate_add_methods(self.check_message_chain)
         self.elements = []
         if elements is not None:
             for element in elements:
@@ -49,7 +50,7 @@ class MessageChain:
                 continue
         raise ValueError("未知的数据类型")
 
-    def add(self, element: Union[dict ,Element, Iterable[Element]]):
+    def add(self, element: Union[dict ,Element, Iterable[Element]]) -> 'MessageChain':
         """
         向消息链中添加新的消息元素
         :param element: 单个消息元素或元素列表
@@ -65,22 +66,25 @@ class MessageChain:
                 self.elements.append(elem)
         else:
             raise TypeError(f"添加的元素必须是消息元素或元素列表或字典，但收到类型为 {type(elem)}")
+        return self
 
-    def remove(self, element_type: Union[Element, list[Element]]):
+    def remove(self, element_type: Union[Element, list[Element]]) -> 'MessageChain':
         """
         从消息链中移除指定类型的所有消息元素
         :param element_type: 要移除的消息元素类型
         """
         if isinstance(Element, element_type): types = [element_type]
         self.elements = [event for event in self.elements if not isinstance(event, tuple(types))]
+        return self
 
-    def filter(self, element_type: Union[Element, list[Element]]):
+    def filter(self, element_type: Union[Element, list[Element]]) -> 'MessageChain':
         """
         从消息链中移除指定类型外的所有消息元素
         :param element_type: 要保留的消息元素类型
         """
         if isinstance(Element, element_type): types = [element_type]
         self.elements = [event for event in self.elements if isinstance(event, tuple(types))]
+        return self
 
     def to_dict(self) -> List[Dict[str, Any]]:
         """
@@ -129,62 +133,77 @@ class MessageChain:
         else:
             ValueError(f"添加的元素必须是消息元素或元素列表或字典，但收到类型为 {type(element)}")
 
-    def add_text(self, text: str):
+    def add_text(self, text: str) -> 'MessageChain':
         """添加文本消息元素"""
         self.elements.append(Text(text=text))
+        print(self.elements)
+        return self
 
-    def add_at(self, qq: Union[int, str]):
+    def add_at(self, qq: Union[int, str]) -> 'MessageChain':
         """添加 @ 消息元素"""
         self.elements.append(At(qq=qq))
+        return self
 
-    def add_at_all(self):
+    def add_at_all(self) -> 'MessageChain':
         """添加 @全体消息元素"""
         self.elements.append(AtAll())
+        return self
 
-    def add_image(self, file: Union[str, bytes]):
+    def add_image(self, file: Union[str, bytes]) -> 'MessageChain':
         """添加图片消息元素"""
         self.elements.append(Image(file=file))
+        return self
 
-    def add_face(self, face_id: int):
+    def add_face(self, face_id: int) -> 'MessageChain':
         """添加表情消息元素"""
         self.elements.append(Face(face_id=face_id))
+        return self
 
-    def add_reply(self, reply_to: str):
+    def add_reply(self, reply_to: str) -> 'MessageChain':
         """添加回复消息元素"""
         self.elements.append(Reply(reply_to=reply_to))
+        return self
 
-    def add_json(self, json_msg: str):
+    def add_json(self, json_msg: str) -> 'MessageChain':
         """添加 JSON 消息元素"""
         self.elements.append(Json(json_msg=json_msg))
+        return self
 
-    def add_record(self, file: str):
+    def add_record(self, file: str) -> 'MessageChain':
         """添加语音消息元素"""
         self.elements.append(Record(file=file))
+        return self
 
-    def add_video(self, file: str):
+    def add_video(self, file: str) -> 'MessageChain':
         """添加视频消息元素"""
         self.elements.append(Video(file=file))
+        return self
 
-    def add_dice(self):
+    def add_dice(self) -> 'MessageChain':
         """添加骰子消息元素"""
         self.elements.append(Dice())
+        return self
 
-    def add_rps(self):
+    def add_rps(self) -> 'MessageChain':
         """添加猜拳消息元素"""
         self.elements.append(Rps())
+        return self
 
-    def add_music(self, music_type: str, id: str):
+    def add_music(self, music_type: str, id: str) -> 'MessageChain':
         """添加音乐分享消息元素"""
         self.elements.append(Music(music_type=music_type, id=id))
+        return self
 
-    def add_custom_music(self, url: str, audio: str, title: str, image: str = "", singer: str = ""):
+    def add_custom_music(self, url: str, audio: str, title: str, image: str = "", singer: str = "") -> 'MessageChain':
         """添加自定义音乐分享消息元素"""
         self.elements.append(CustomMusic(url=url, audio=audio, title=title, image=image, singer=singer))
+        return self
 
-    def add_markdown(self, markdown: dict):
+    def add_markdown(self, markdown: dict) -> 'MessageChain':
         """添加 Markdown 消息元素"""
         self.elements.append(Markdown(markdown=markdown))
-    
+        return self
+
     def check_message_chain(self, *args, **kwargs):
         '''保证elements顺序正确'''
         element: Element
@@ -197,19 +216,26 @@ class MessageChain:
             lst.remove(element)
             lst.insert(0, element)
         for element in self.elements:
-            behavior_handlers[element.behavior](self.elements, element)
-    
-    def _wrap_add_methods(cls, callback):
+            behavior_handlers[element.behavior](self.elements, element) 
+
+    def decorate_add_methods(self, func):
         """
-        动态包装类中的所有 add_ 开头的方法，并在方法调用后执行
+        动态装饰以“add_”开头的方法，在方法执行后自动执行提供的函数 `func`
+        :param func: 方法执行后要调用的函数
         """
-        for attr_name in dir(cls):
-            if attr_name.startswith('add_'):
-                method = getattr(cls, attr_name)
-                if callable(method):
-                    def wrapped_func(self, *args, **kwargs):
-                        result = method(self, *args, **kwargs)
-                        callback(self, method.__name__, *args, **kwargs)
+        # 遍历类的实例方法
+        for method_name, method in inspect.getmembers(self, predicate=inspect.ismethod):
+            if method_name.startswith('add_'):
+                # 创建闭包装饰器
+                def wrapper(original_method):
+                    def inner_wrapper(*args, **kwargs):
+                        # 调用原始方法并等待其执行完毕
+                        result = original_method(*args, **kwargs)
+                        # 调用回调函数 `func`
+                        func()
+                        # 返回方法结果
                         return result
-                    # 替换原始方法
-                    setattr(cls, attr_name, wrapped_func)
+                    return inner_wrapper
+
+                # 替换原始方法
+                setattr(self, method_name, wrapper(method))
