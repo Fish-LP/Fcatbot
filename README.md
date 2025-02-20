@@ -1,66 +1,65 @@
 # Fbot
 
-一个基于 ncatbot 开发的聊天机器人/应用框架，支持插件扩展、日志管理等功能。
+Fbot 是一个用于构建聊天机器人的框架，核心代码均位于 [Fbot](Fbot) 目录中。
+注意：本仓库只包含 Fbot 部分，其他外部文件（如 [test.py](test.py)）仅用于本地测试。
 
-同功能项目[liyihao1110/ncatbot](https://github.com/liyihao1110/NcatBot)
+## 快速开始
 
-本项目为新手的练习之作
+1. **环境要求**
+   请确保安装 Python 3.10 或更高版本。
+2. **安装依赖**
+   在项目根目录下运行：
 
-## 项目特点
+   ```sh
+   pip install -e .
+   ```
+3. **运行测试脚本**
+   使用仓库中提供的测试文件进行快速测试：
 
-- pass
+   ```sh
+   python test.py
+   ```
+4. **启动 Fbot**
+   可直接运行 Fbot 主入口启动服务：
 
-## 安装
+   ```sh
+   python main.py
+   ```
 
-确保已安装 Python（>= 3.10）。
+## 示例代码
 
-1. 克隆仓库：
+在外部测试环境中，可以创建一个新的 Python 文件来调用 Fbot 提供的接口，例如 `external_test.py`：
 
-```sh
-git clone https://github.com/Fish-LP/FBot.git
+```python
+#!/usr/bin/env python3
+# external_test.py
+import asyncio
+from Fbot.ws import WebSocketHandler
+from Fbot import MessageChain  # 假定 MessageChain 为 Fbot 中的消息链实现
+
+async def main():
+    async with WebSocketHandler('ws://127.0.0.1:3001') as client:
+        response = await client.send_group_msg(
+            MessageChain().add_text('Hello from external test'),
+            group_id='901031378'
+        )
+        print(f"返回: {response}")
+
+if __name__ == '__main__':
+    asyncio.run(main())
 ```
 
-2. 安装(因为未发布pip包，使用开发模式安装)
+运行方式：
 
 ```sh
-pip install -e Fbot
+python external_test.py
 ```
 
-## 使用
+## 关于
 
-### 插件扩展
+- 更多详细文档请参考 README.md 内的相关说明。
+- 相关 API 接口可分别在 group.py 与 system.py 中查看。
 
-插件放置在 plugins 文件夹下
+## 许可
 
-pass
-
-### 日志配置
-
-日志相关设置在 Logger.py 中定义，通过环境变量可以调整日志级别及格式，例如：
-
-```sh
-# 设置控制台日志级别为 DEBUG
-export LOG_LEVEL=DEBUG
-
-# 设置日志文件路径、文件名格式等
-export LOG_FILE_PATH=./logs
-export LOG_FILE_NAME=bot_%Y%m%d.log
-```
-
-## 开发与测试
-
-- pass
-
-## 许可证
-
-本项目基于 MIT 许可证 开源，详细内容请参见许可证文件。
-
-## 贡献
-
-欢迎贡献代码、提交问题或提出新特性，更多详情请参考仓库中的贡献指南。（虽然还没有）
-
-## 联系方式
-
-- 作者：Fish-LP
-- 邮箱：fish.zh@outlook.com
-- 项目地址：[https://github.com/Fish-LP/FBot](https://github.com/Fish-LP/FBot)
+本项目基于 MIT 许可证，详细信息请参见 LICENSE 文件。
