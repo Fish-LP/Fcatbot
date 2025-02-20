@@ -2,7 +2,7 @@ from typing import Optional, Callable
 import asyncio
 import websockets
 import json
-from aiohttp import ClientConnectionError
+import collections  # 用于双端队列
 from urllib.parse import urlparse, urlencode, urlunparse
 
 import websockets.client
@@ -13,7 +13,7 @@ from ..utils import get_log
 _LOG = get_log('WebSocketClient')
 
 # 自定义处理器类型：接受一个字符串参数、返回 None
-MessageHandler = Callable[[str], None]  
+MessageHandler = Callable[[str], None]
 
 class WebSocketClient:
     """
@@ -22,7 +22,7 @@ class WebSocketClient:
     def __init__(
         self,
         uri: str,
-        headers: dict = None,
+        headers: dict[str, str] = {},
         initial_reconnect_interval: int = 5,  # 初始重连间隔（秒）
         max_reconnect_interval: int = 60,     # 最大重连间隔（秒）
         max_reconnect_attempts: int = 5,      # 最大重连尝试次数
@@ -40,6 +40,7 @@ class WebSocketClient:
         """
         self.uri = uri  # WebSocket 服务器地址
         self.websocket = None  # WebSocket 连接对象
+        self._connect_task = None  # 用于存储连接任务
         self.headers = headers  # 请求头
         self.running = False  # 客户端是否处于运行状态
         self.reconnect_attempt = 0  # 当前重连尝试次数
@@ -47,38 +48,39 @@ class WebSocketClient:
         self.max_reconnect_interval = max_reconnect_interval  # 最大重连间隔
         self.max_reconnect_attempts = max_reconnect_attempts  # 最大重连尝试次数
         self.message_handler = message_handler  # 自定义消息处理器
+        self._closed = False  # 连接是否已主动关闭
+        # 使用双端队列存储消息，支持获取最新或最旧消息
+        self._message_deque = collections.deque()
+        # 用于通知 recv 方法有新消息到来
+        self._message_available = asyncio.Event()
 
     async def connect(self):
         """
-        连接到 WebSocket 服务器，并支持持久化连接和自动重连。
-
-        该方法会不断尝试连接 WebSocket 服务器，如果连接失败，会根据重连策略自动重连。
+        建立 WebSocket 连接。
         """
-        self.running = True  # 设置运行状态为 True
-        while self.running:
-            try:
-                _LOG.info("尝试连接 WebSocket 服务器...")
-                self.websocket = await websockets.client.connect(
-                    self.uri,    # 连接地址
-                    logger=_LOG, # 使用自定义日志工具
-                    extra_headers=self.headers  # 自定义请求头
-                )
-                _LOG.info("连接成功！")
-                self.reconnect_attempt = 0  # 重置重连尝试次数
-                await self._handle_websocket()  # 处理 WebSocket 连接和消息
-            except websockets.InvalidHandshake as e:
-                _LOG.error(f"连接失败: {e}，尝试重连...")
-                await self._backoff_reconnect()  # 指数退避重连
-            except (ConnectionRefusedError, ClientConnectionError, OSError) as e:
-                _LOG.error(f"连接失败: {e}，尝试重连...")
-                await self._backoff_reconnect()
-            except Exception as e:
-                _LOG.error(f"发生未知错误: {e}，尝试重连...")
-                await self._backoff_reconnect()
-            finally:
-                # 如果 WebSocket 连接已建立，则确保其在异常后关闭
-                if self.websocket:
-                    await self.websocket.close()
+        try:
+            _LOG.info("尝试连接 WebSocket 服务器...")
+            self.websocket = await websockets.client.connect(
+                self.uri,
+                logger=_LOG,
+                extra_headers=self.headers
+            )
+            _LOG.info("连接成功！")
+            self._closed = False
+            return self.websocket
+        except Exception as e:
+            _LOG.error(f"连接失败: {e}")
+            if not self._closed:
+                await self._start_reconnect()
+            return None
+
+    async def _start_reconnect(self):
+        """
+        启动自动重连逻辑。
+        """
+        while self.running and not self._closed:
+            await self._backoff_reconnect()
+            await self.connect()
 
     async def _handle_websocket(self):
         """
@@ -86,6 +88,10 @@ class WebSocketClient:
         """
         async for message in self.websocket:  # 不断接收服务器发来的消息
             _LOG.debug(f"接收到消息: {message}")
+            # 将消息存入双端队列
+            self._message_deque.append(message)
+            # 通知有新消息
+            self._message_available.set()
             if self.message_handler:
                 # 如果用户提供了自定义处理器，则调用该处理器
                 await self._invoke_handler(message)
@@ -93,8 +99,8 @@ class WebSocketClient:
                 # 如果没有自定义处理器，使用默认处理器
                 self._default_message_handler(message)
         # 如果 WebSocket 连接断开，并且客户端仍处于运行状态，则尝试重连
-        if self.running:
-            await self._backoff_reconnect()
+        if self.running and not self._closed:
+            await self._start_reconnect()
 
     async def _invoke_handler(self, data: str):
         """
@@ -147,52 +153,63 @@ class WebSocketClient:
         """
         self.running = False  # 设置运行状态为 False
         if self.websocket:
-            await self.websocket.close()  # 关闭 WebSocket 连接
-            _LOG.info("WebSocket 连接已断开")
+            close_task = asyncio.create_task(self.websocket.close())  # 创建关闭连接的任务
+            # 等待连接关闭完成
+            try:
+                await asyncio.wait_for(close_task, timeout=10)
+            except asyncio.TimeoutError:
+                _LOG.warning("关闭 WebSocket 连接超时！")
+            finally:
+                self.websocket = None  # 清理连接对象
+                _LOG.info("WebSocket 连接已断开")
 
     def start(self):
         """
         启动客户端，进入事件循环并尝试连接 WebSocket 服务器。
         """
-        asyncio.run(self.connect())  # 使用 asyncio 运行异步任务
+        asyncio.run(self._start_client())
+
+    async def _start_client(self):
+        self.running = True
+        # 建立连接
+        while self.running:
+            connection = await self.connect()
+            if connection is not None:
+                # 连接成功后，处理消息
+                await self._handle_websocket()
 
     async def __aenter__(self):
-        """
-        异步上下文管理器的进入方法。
-        自动调用 connect 方法建立 WebSocket 连接。
-        """
-        await self.connect()
+        if await self.connect():
+            asyncio.create_task(self._start_client())
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """
-        异步上下文管理器的退出方法。
-        自动调用 disconnect 方法断开 WebSocket 连接。
-        """
         await self.disconnect()
 
     def __del__(self):
         """
         析构方法，在对象销毁时关闭 WebSocket 连接。
         """
-        if self.websocket:
-            asyncio.run(self.websocket.close())  # 确保 WebSocket 连接关闭
+        # 避免使用 asyncio.run，直接调用同步关闭方法
+        if self.websocket and not self.websocket.closed:
+            # 使用低级别的低层次方法关闭连接
+            # 注意：这可能无法保证完全关闭
+            self.websocket._closing_handshake = True
+            self.websocket._close_code = 1001  # 表示客户端主动关闭
 
-    async def send_data(
-        self,
-        data: str,
-        wait: bool = True,
-    ):
+            # 或者直接调用 close 方法而不关心结果
+            # 注：这可能引发警告，但可以避免异步调用问题
+            try:
+                self.websocket.transport._sock.close()
+            except:
+                pass
+
+    async def send_data(self, data: str, wait: bool = True):
         """
-        通过已建立的 WebSocket 连接发送数据。
-
-        :param data: 要发送的数据（字符串或 JSON 序列化后的数据）
-        :param wait: 等待服务器的下一次发送
-        
-        :return respons: 原始数据
+        发送数据前确保 WebSocket 连接已建立
         """
         if not self.websocket:
-            _LOG.error("WebSocket 连接尚未建立或已关闭！")
+            _LOG.error("WebSocket 连接尚未建立，请稍后再试！")
             return None
 
         try:
@@ -208,19 +225,57 @@ class WebSocketClient:
 
             _LOG.debug(f"发送数据成功: {data}")
 
-            # 等待服务器响应
-            response = None
             if wait:
-                response = await self.websocket.recv()
+                response = await self.recv(prefer = 'new',wait = True)
                 _LOG.debug(f"服务器响应: {response}")
                 return response
-
-            return True  # 发送成功
-
+            return True
         except websockets.exceptions.ConnectionClosed as e:
             _LOG.error(f"WebSocket 连接关闭: {e}")
-            await self._backoff_reconnect()
             return None
         except Exception as e:
             _LOG.error(f"发送数据时发生异常: {e}")
+            return None
+
+    async def recv(
+        self,
+        *,
+        prefer: str = 'oldest',
+        wait: bool = False
+    ) -> Optional[str]:
+        """
+        非阻塞地接收 WebSocket 消息。可以选择接收最新或最旧消息，并指定是否等待。
+
+        :param prefer: 可选参数，指定接收最新 ('latest','new') 或最旧 ('oldest','old') 消息，默认为 'oldest'。
+        :param wait: 可选参数，指定是否等待直到有消息，默认为 False（不等待）。
+        :return: 接收到的消息，如果没有消息则返回 None。
+        """
+        try:
+            if prefer in ('latest','new'):
+                # 获取最新消息，即双端队列的末尾元素
+                message = self._message_deque[-1] if self._message_deque else None
+            else:  # 默认为 oldest
+                # 获取最旧消息，即双端队列的头部元素
+                message = self._message_deque[0] if self._message_deque else None
+
+            if message is not None:
+                # 如果需要等待，则等待下一个消息
+                if wait:
+                    await self._message_available.wait()
+                    # 获取消息后重置事件
+                    self._message_available.clear()
+                return message
+            else:
+                # 如果没有消息，且需要等待，则等待
+                if wait:
+                    await self._message_available.wait()
+                    # 重新获取消息
+                    await self.recv(prefer=prefer)
+                else:
+                    return None
+        except IndexError:
+            # 队列为空时返回 None
+            return None
+        except Exception as e:
+            _LOG.error(f"接收消息时发生异常: {e}")
             return None
