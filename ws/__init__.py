@@ -1,7 +1,7 @@
-from .handler import Client
+from .handler import WebSocketHandler
 from .client import WebSocketClient
 
 __all__ = [
-    'Client',
+    'WebSocketHandler',
     'WebSocketClient',
 ]

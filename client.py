@@ -1,5 +1,5 @@
 from .http import HttpClient
-from .ws import Client as WsClient
+from .ws import WebSocketHandler
 from .utils import get_log
 from .models import GroupMessage
 from .models import PrivateMessage
@@ -16,15 +16,15 @@ _log = get_log('FBot')
 
 class BotClient:
     def __init__(self, event_bus: EventBus, uri: str, token: str = None):
-        headers = {"Content-Type": "application/json",}
+        headers = {"Content-Type": "application/json"}
         if token:
             headers["Authorization"] = f"Bearer {token}"
         self.event_bus = event_bus
         self.http = HttpClient(uri, headers)
-        self.ws = WsClient(uri, headers, message_handler=self.headers)
+        self.ws = WebSocketHandler(uri, headers, message_handler=self.on_message)
     
     def run(self):
-        self.ws.start()
+        self.ws.start()  # 启动 WebSocket 连接
 
     async def api(self, action: str, param: dict = None, **params) -> dict:
         '''
@@ -32,10 +32,12 @@ class BotClient:
         :param params: 用于传入参数, 可选
         :param echo  : 用于标识唯一请求
         '''
-        print(action, param or params)
         return await self.ws.api(action, param or params)
     
-    async def headers(self, data: str):
+    async def on_message(self, data: str):
+        """
+        消息处理器
+        """
         msg = json.loads(data)
         if msg["post_type"] == "message" or msg["post_type"] == "message_sent":
             if msg["message_type"] == "group":
