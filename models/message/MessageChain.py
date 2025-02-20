@@ -136,7 +136,6 @@ class MessageChain:
     def add_text(self, text: str) -> 'MessageChain':
         """添加文本消息元素"""
         self.elements.append(Text(text=text))
-        print(self.elements)
         return self
 
     def add_at(self, qq: Union[int, str]) -> 'MessageChain':
