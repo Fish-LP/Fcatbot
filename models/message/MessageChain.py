@@ -200,7 +200,6 @@ class MessageChain:
 
     def add_markdown(self, markdown: dict) -> 'MessageChain':
         """添加 Markdown 消息元素"""
-        raise ValueError(f"无法正常发送此类型消息")
         self.elements.append(Markdown(markdown=markdown))
         return self
 
