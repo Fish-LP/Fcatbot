@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Callable, Awaitable
 import asyncio
@@ -29,6 +30,7 @@ class BasePlugin:
         if kwd:
             for k, v in kwd.items():
                 setattr(self, k, v)
+        os.chdir(self.work_path)
 
     async def __unload__(self):
         self._close_()
