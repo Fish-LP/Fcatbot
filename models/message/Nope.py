@@ -5,13 +5,13 @@ from dataclasses import dataclass, field
 from typing import Any
 
 class Behavior(Enum):
-    DAFAULT = 0
+    DAFAULT: int = 0
     '''默认'''
-    TOP = 1
+    TOP: int = 1
     '''置顶'''
-    OCCUPY = 2
+    OCCUPY: int = 2
     '''独占'''
-    OccupyType = 3
+    OccupyType: int = 3
     '''独占类型'''
 
 class Element:

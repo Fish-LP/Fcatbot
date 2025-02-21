@@ -92,6 +92,9 @@ class MessageChain:
         """
         return [element.to_dict() for element in self.elements]
 
+    def clear(self) -> None:
+        self.elements.clear()
+
     def __str__(self) -> str:
         """
         返回消息链的 JSON 字符串表示
@@ -211,17 +214,17 @@ class MessageChain:
     def check_message_chain(self, *args, **kwargs):
         '''保证elements顺序正确'''
         element: Element
+        def move_element_to_front(lst: list, element):
+            lst.remove(element)
+            lst.insert(0, element)
         behavior_handlers = {
             Behavior.DAFAULT:   lambda elements, element: elements,
             Behavior.TOP:       lambda elements, element: move_element_to_front(elements, element),
             Behavior.OCCUPY:    lambda elements, element: [element],
             Behavior.OccupyType:lambda elements, element: [elt for elt in elements if elt.type == element.type],
         }
-        def move_element_to_front(lst: list, element):
-            lst.remove(element)
-            lst.insert(0, element)
         for element in self.elements.copy():
-            self.elements = behavior_handlers[element.behavior](self.elements, element) 
+            self.elements = behavior_handlers[element.behavior](self.elements, element)
 
     def decorate_add_methods(self, func):
         """
