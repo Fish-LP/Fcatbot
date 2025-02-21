@@ -108,14 +108,15 @@ class EventBus:
             List[Any] - 所有处理器返回的结果的列表
         """
         handlers = []
-        # 处理精确匹配处理器
         if event.type in self._exact_handlers:
+            # 处理精确匹配处理器
             for (pattern, priority, handler, handler_id) in self._exact_handlers[event.type]:
                 handlers.append((handler, priority, handler_id))
-        # 处理正则匹配处理器
-        for (pattern, priority, handler, handler_id) in self._regex_handlers:
-            if pattern and pattern.match(event.type):
-                handlers.append((handler, priority, handler_id))
+        else:
+            # 处理正则匹配处理器
+            for (pattern, priority, handler, handler_id) in self._regex_handlers:
+                if pattern and pattern.match(event.type):
+                    handlers.append((handler, priority, handler_id))
         
         # 按优先级排序
         sorted_handlers = sorted(handlers, key=lambda x: (-x[1], x[0].__name__))
