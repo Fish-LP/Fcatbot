@@ -1,3 +1,11 @@
+# -------------------------
+# @Author       : Fish-LP fish.zh@outlook.com
+# @Date         : 2025-02-15 18:38:11
+# @LastEditors  : Fish-LP fish.zh@outlook.com
+# @LastEditTime : 2025-02-21 22:50:07
+# @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
+# @Copyright (c) 2025 by Fish-LP, MIT License 
+# -------------------------
 import inspect
 from functools import wraps
 from .event import Event
@@ -37,7 +45,7 @@ class CompatibleEnrollment:
                         def wrapper(self, event: Event):
                             if types != 'all' and isinstance(event.data, BaseMessage):
                                 event.data.message.filter(types)
-                            return func(self, event)
+                            return func(self, event.data)
                 else:
                     if row_event:
                         @wraps(func)
