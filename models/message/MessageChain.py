@@ -203,13 +203,19 @@ class MessageChain:
         self.elements.append(Markdown(markdown=markdown))
         return self
 
+    def add_nope(self, user_id: str, nickname: str, content: 'MessageChain') -> 'MessageChain':
+        '''添加转发消息节点'''
+        self.elements.append(Nope(NopeData(user_id=user_id, nickname=nickname, content=content)))
+        return self
+
     def check_message_chain(self, *args, **kwargs):
         '''保证elements顺序正确'''
         element: Element
         behavior_handlers = {
             Behavior.DAFAULT:   lambda elements, element: elements,
             Behavior.TOP:       lambda elements, element: move_element_to_front(elements, element),
-            Behavior.OCCUPY:    lambda elements, element: [element]
+            Behavior.OCCUPY:    lambda elements, element: [element],
+            Behavior.OccupyType:lambda elements, element: [elt for elt in elements if elt.type == element.type],
         }
         def move_element_to_front(lst: list, element):
             lst.remove(element)

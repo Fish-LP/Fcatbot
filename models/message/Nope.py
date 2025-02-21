@@ -11,6 +11,8 @@ class Behavior(Enum):
     '''置顶'''
     OCCUPY = 2
     '''独占'''
+    OccupyType = 3
+    '''独占类型'''
 
 class TopElement:
     """强制置顶消息元素"""
@@ -19,6 +21,10 @@ class TopElement:
 class OccupyElement:
     """独占消息元素"""
     behavior: str = Behavior.OCCUPY
+
+class OccupyTypeElement:
+    """独占类型消息元素"""
+    behavior: str = Behavior.OccupyType
 
 class Element:
     """消息元素基类"""
@@ -217,6 +223,28 @@ class Markdown(Element, OccupyElement):
     """Markdown消息元素"""
     markdown: dict
 
+@dataclass
+class Nope(Element, OccupyTypeElement):
+    type: str = field(default="nope", init=False)
+    data: 'NopeData'
+    
+    def to_dict(self):
+        return {
+            "type": "node",
+            "data": {
+                "user_id": self.data.user_id,
+                "nickname": self.data.nickname,
+                "content": self.data.content.to_dict()
+                }
+            }
+
+@dataclass
+class NopeData():
+    user_id: str
+    nickname: str
+    content: any # MessageChain
+
+class Markdown(Element, OccupyElement):
     def __post_init__(self, markdown: str):
         self.type = "markdown"
         ValueError('这是TODO，还没实现呢')
