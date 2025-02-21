@@ -220,8 +220,8 @@ class MessageChain:
         def move_element_to_front(lst: list, element):
             lst.remove(element)
             lst.insert(0, element)
-        for element in self.elements:
-            behavior_handlers[element.behavior](self.elements, element) 
+        for element in self.elements.copy():
+            self.elements = behavior_handlers[element.behavior](self.elements, element) 
 
     def decorate_add_methods(self, func):
         """

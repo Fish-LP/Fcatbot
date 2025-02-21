@@ -14,18 +14,6 @@ class Behavior(Enum):
     OccupyType = 3
     '''独占类型'''
 
-class TopElement:
-    """强制置顶消息元素"""
-    behavior: str = Behavior.TOP
-
-class OccupyElement:
-    """独占消息元素"""
-    behavior: str = Behavior.OCCUPY
-
-class OccupyTypeElement:
-    """独占类型消息元素"""
-    behavior: str = Behavior.OccupyType
-
 class Element:
     """消息元素基类"""
     type: str = "element"
@@ -43,6 +31,18 @@ class Element:
             "type": self.type,
             "data": data
         }
+
+class TopElement(Element):
+    """强制置顶消息元素"""
+    behavior: str = Behavior.TOP
+
+class OccupyElement(Element):
+    """独占消息元素"""
+    behavior: str = Behavior.OCCUPY
+
+class OccupyTypeElement(Element):
+    """独占类型消息元素"""
+    behavior: str = Behavior.OccupyType
 
 
 @dataclass
@@ -114,7 +114,7 @@ class Face(Element):
 
 
 @dataclass
-class Reply(Element, TopElement):
+class Reply(TopElement, Element):
     """回复消息元素"""
     id: str
     reply_to: str = field(default=None)
@@ -125,7 +125,7 @@ class Reply(Element, TopElement):
 
 
 @dataclass
-class Json(Element, OccupyElement):
+class Json(OccupyElement, Element):
     """JSON消息元素"""
     data: str
     type: str = field(default="json", init=False)
@@ -135,7 +135,7 @@ class Json(Element, OccupyElement):
 
 
 @dataclass
-class Record(Element, OccupyElement):
+class Record(OccupyElement, Element):
     """语音消息元素"""
     file: str
     type: str = field(default="record", init=False)
@@ -145,7 +145,7 @@ class Record(Element, OccupyElement):
 
 
 @dataclass
-class Video(Element, OccupyElement):
+class Video(OccupyElement, Element):
     """视频消息元素"""
     file: str
     type: str = field(default="video", init=False)
@@ -155,7 +155,7 @@ class Video(Element, OccupyElement):
 
 
 @dataclass
-class Dice(Element, OccupyElement):
+class Dice(OccupyElement, Element):
     """骰子消息元素"""
     type: str = field(default="dice", init=False)
 
@@ -164,7 +164,7 @@ class Dice(Element, OccupyElement):
 
 
 @dataclass
-class Rps(Element, OccupyElement):
+class Rps(OccupyElement, Element):
     """猜拳消息元素"""
     type: str = field(default="rps", init=False)
 
@@ -173,7 +173,7 @@ class Rps(Element, OccupyElement):
 
 
 @dataclass
-class Music(Element, OccupyElement):
+class Music(OccupyElement, Element):
     """音乐分享消息元素"""
     music_type: str
     id: str
@@ -184,7 +184,7 @@ class Music(Element, OccupyElement):
 
 
 @dataclass
-class CustomMusic(Element, OccupyElement):
+class CustomMusic(OccupyElement, Element):
     """自定义音乐分享消息元素"""
     url: str
     audio: str
@@ -210,7 +210,7 @@ class CustomMusic(Element, OccupyElement):
         }
 
 @dataclass
-class File(Element, OccupyElement):
+class File(OccupyElement, Element):
     """文件信息元素"""
     file: str
     path: str
@@ -219,12 +219,12 @@ class File(Element, OccupyElement):
     file_size: int
 
 @dataclass
-class Markdown(Element, OccupyElement):
+class Markdown(OccupyElement, Element):
     """Markdown消息元素"""
     markdown: dict
 
 @dataclass
-class Nope(Element, OccupyTypeElement):
+class Nope(OccupyTypeElement, Element):
     type: str = field(default="nope", init=False)
     data: 'NopeData'
     
@@ -244,7 +244,7 @@ class NopeData():
     nickname: str
     content: any # MessageChain
 
-class Markdown(Element, OccupyElement):
+class Markdown(OccupyElement, Element):
     def __post_init__(self, markdown: str):
         self.type = "markdown"
         ValueError('这是TODO，还没实现呢')
