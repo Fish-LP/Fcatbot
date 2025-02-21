@@ -2,12 +2,12 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-16 12:50:14
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-22 01:23:14
+# @LastEditTime : 2025-02-22 01:58:13
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
-from setup import setup, find_packages
-from . import __version__
+from setuptools import setup, find_packages 
+__version__ = '0.0.2-dev'
 setup(
     name='Fbot',  # 包名称
     version=__version__,  # 版本号
@@ -33,5 +33,9 @@ setup(
         'Programming Language :: Python :: 3.12',
     ],
     python_requires='>=3.10',  # 所需 Python 版本
-    entry_points={},  # 如果没有可执行脚本，可以先留空
+    entry_points={
+        'console_scripts':[
+            'fbot = Fbot.command:test'
+        ]
+        },
 )
