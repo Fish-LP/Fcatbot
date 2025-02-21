@@ -1,3 +1,11 @@
+# -------------------------
+# @Author       : Fish-LP fish.zh@outlook.com
+# @Date         : 2025-02-18 21:06:40
+# @LastEditors  : Fish-LP fish.zh@outlook.com
+# @LastEditTime : 2025-02-21 22:42:41
+# @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
+# @Copyright (c) 2025 by Fish-LP, MIT License 
+# -------------------------
 import os
 from contextlib import ContextDecorator
 
@@ -13,7 +21,7 @@ class ChangeDir(ContextDecorator):
         参数:
             new_path (str): 新的工作路径
         """
-        self.new_path = new_path
+        self.new_path = os.path.abspath(new_path)
         self.origin_path = os.getcwd()
 
     def __enter__(self):
