@@ -1,3 +1,11 @@
+# -------------------------
+# @Author       : Fish-LP fish.zh@outlook.com
+# @Date         : 2025-02-12 12:38:32
+# @LastEditors  : Fish-LP fish.zh@outlook.com
+# @LastEditTime : 2025-02-22 01:12:57
+# @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
+# @Copyright (c) 2025 by Fish-LP, MIT License 
+# -------------------------
 from .http import HttpClient
 from .ws import WebSocketHandler
 from .utils import get_log
@@ -52,10 +60,10 @@ class BotClient:
                 _log.info(f"Bot.{message.self_id}: [{message.sender.nickname}({message.user_id})] -> {message.raw_message}")
                 await self.event_bus.publish_async(Event(OFFICIAL_PRIVATE_MESSAGE_EVENT, message))
         elif msg["post_type"] == "notice":
-            # self.event_bus.publish_async(Event(OFFICIAL_NOTICE_EVENT, msg))
+            self.event_bus.publish_async(Event(OFFICIAL_NOTICE_EVENT, msg))
             pass
         elif msg["post_type"] == "request":
-            # self.event_bus.publish_async(Event(OFFICIAL_REQUEST_EVENT, msg))
+            self.event_bus.publish_async(Event(OFFICIAL_REQUEST_EVENT, msg))
             pass
         elif msg["post_type"] == "meta_event":
             if msg["meta_event_type"] == "lifecycle":

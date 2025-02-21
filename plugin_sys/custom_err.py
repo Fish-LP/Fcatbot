@@ -1,3 +1,11 @@
+# -------------------------
+# @Author       : Fish-LP fish.zh@outlook.com
+# @Date         : 2025-02-11 17:26:43
+# @LastEditors  : Fish-LP fish.zh@outlook.com
+# @LastEditTime : 2025-02-22 01:19:57
+# @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
+# @Copyright (c) 2025 by Fish-LP, MIT License 
+# -------------------------
 class PluginSystemError(Exception):
     pass
 

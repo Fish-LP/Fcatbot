@@ -1,3 +1,11 @@
+# -------------------------
+# @Author       : Fish-LP fish.zh@outlook.com
+# @Date         : 2025-02-15 20:08:02
+# @LastEditors  : Fish-LP fish.zh@outlook.com
+# @LastEditTime : 2025-02-22 01:20:14
+# @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
+# @Copyright (c) 2025 by Fish-LP, MIT License 
+# -------------------------
 from dataclasses import dataclass, field
 import os
 from pathlib import Path
