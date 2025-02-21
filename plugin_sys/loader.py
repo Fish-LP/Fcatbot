@@ -21,8 +21,6 @@ from ..config import PLUGINS_DIR, META_CONFIG_PATH
 from ..utils import get_log
 from ..utils import UniversalDataIO
 
-import signal
-import atexit
 
 LOG = get_log('PluginLoader')
 
@@ -43,9 +41,6 @@ class PluginLoader:
             self.meta_data = UniversalDataIO(META_CONFIG_PATH)
         else:
             self.meta_data = {}
-        signal.signal(signal.SIGTERM, self._unload_all)
-        signal.signal(signal.SIGINT, self._unload_all)
-        atexit.register(self._unload_all)
 
     def _validate_plugin(self, plugin_cls: Type[BasePlugin]) -> bool:
         """
@@ -221,12 +216,11 @@ class PluginLoader:
 
         return modules
 
-    def _unload_all(self):
+    def unload_all(self, *arg, **kwd):
         loop = asyncio.new_event_loop()
         try:
-            asyncio.set_event_loop(loop)  # 设置为当前事件循环
-            for plugin in tuple(self.plugins.keys()):
-                loop.run_until_complete(self.unload_plugin(plugin))
+            asyncio.set_event_loop(loop)
+            tasks = [self.unload_plugin(plugin) for plugin in self.plugins.keys()]
+            loop.run_until_complete(asyncio.gather(*tasks))
         finally:
-            loop.close()  # 关闭事件循环
-        return
+            loop.close()
