@@ -147,21 +147,25 @@ class WebSocketClient:
         )
         await asyncio.sleep(backoff)  # 等待一段时间后重连
 
-    async def disconnect(self):
+    async def disconnect(self, timeout = 2):
         """
         断开与 WebSocket 服务器的连接。
         """
         self.running = False  # 设置运行状态为 False
         if self.websocket:
-            close_task = asyncio.create_task(self.websocket.close())  # 创建关闭连接的任务
-            # 等待连接关闭完成
+            # 创建关闭连接的任务
+            close_task = asyncio.create_task(self.websocket.close(code=1001))
             try:
-                await asyncio.wait_for(close_task, timeout=10)
+                # 等待最多 2 秒
+                await asyncio.wait_for(close_task, timeout=timeout)
+                _LOG.info("WebSocket 连接已关闭")
             except asyncio.TimeoutError:
                 _LOG.warning("关闭 WebSocket 连接超时！")
+            except Exception as e:
+                _LOG.error(f"关闭 WebSocket 连接时发生异常: {e}")
             finally:
-                self.websocket = None  # 清理连接对象
-                _LOG.info("WebSocket 连接已断开")
+                # 确保连接对象被清理
+                self.websocket = None
 
     def start(self):
         """
@@ -226,7 +230,8 @@ class WebSocketClient:
             _LOG.debug(f"发送数据成功: {data}")
 
             if wait:
-                response = await self.recv(prefer = 'new',wait = True)
+                self._message_available.clear()
+                response = await self.recv(prefer = 'wait', wait = True)
                 _LOG.debug(f"服务器响应: {response}")
                 return response
             return True
@@ -240,39 +245,46 @@ class WebSocketClient:
     async def recv(
         self,
         *,
-        prefer: str = 'oldest',
+        prefer: str = 'latest',
         wait: bool = False
     ) -> Optional[str]:
         """
         非阻塞地接收 WebSocket 消息。可以选择接收最新或最旧消息，并指定是否等待。
 
-        :param prefer: 可选参数，指定接收最新 ('latest','new') 或最旧 ('oldest','old') 消息，默认为 'oldest'。
-        :param wait: 可选参数，指定是否等待直到有消息，默认为 False（不等待）。
+        :param prefer: 可选参数，指定接收最新 ('latest','new') 或最旧 ('oldest','old') 消息，或者等待一个消息 ('wait')，默认为 'latest'。
+        :param wait: 可选参数，如果没有缓存指定是否等待直到有消息，默认为 False（不等待）。
         :return: 接收到的消息，如果没有消息则返回 None。
         """
         try:
-            if prefer in ('latest','new'):
+            if prefer in ['latest', 'new']:
                 # 获取最新消息，即双端队列的末尾元素
-                message = self._message_deque[-1] if self._message_deque else None
-            else:  # 默认为 oldest
+                message = self._message_deque.popleft() if self._message_deque else None
+            elif prefer in ['oldest', 'old']:
                 # 获取最旧消息，即双端队列的头部元素
-                message = self._message_deque[0] if self._message_deque else None
-
-            if message is not None:
-                # 如果需要等待，则等待下一个消息
-                if wait:
-                    await self._message_available.wait()
-                    # 获取消息后重置事件
-                    self._message_available.clear()
-                return message
+                message = self._message_deque.pop() if self._message_deque else None
+            elif prefer == 'wait':
+                # 等待下一个消息，不从队列中获取
+                self._message_available.clear()
+                await self._message_available.wait()  # 等待消息到来
+                message = self._message_deque.popleft()  # 假设消息是按顺序添加的，返回最新的
             else:
-                # 如果没有消息，且需要等待，则等待
-                if wait:
-                    await self._message_available.wait()
-                    # 重新获取消息
-                    await self.recv(prefer=prefer)
-                else:
-                    return None
+                # 默认行为，不指定模式
+                message = self._message_deque.popleft() if self._message_deque else None  # 默认返回最新消息
+
+            if wait and message is None:
+                # 如果需要等待，则等待下一个消息
+                self._message_available.clear()
+                await self._message_available.wait()  # 等待消息到来
+                # 获取消息后重置事件，表示已经处理过
+                self._message_available.clear()
+                # 返回最新的消息
+                message = self._message_deque.popleft() if self._message_deque else None
+            else:
+                # 如果不需要等待，直接返回消息
+                pass
+
+            return message
+
         except IndexError:
             # 队列为空时返回 None
             return None
