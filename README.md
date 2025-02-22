@@ -14,28 +14,30 @@ Fbot 是一个用于构建聊天机器人的框架，核心代码均位于 [Fbot
    pip install -e .
    ```
 3. **运行测试脚本**
-   使用仓库中提供的测试文件进行快速测试：
+   暂时没有测试脚本
 
-   ```sh
-   python test.py
-   ```
 4. **启动 Fbot**
-   可直接运行 Fbot 主入口启动服务：
+   可直接运行以下代码启动服务：
 
-   ```sh
-   python main.py
+   ```python
+   from Fbot import BotClient, EventBus, Event, PluginLoader
+   from Fbot.config import PLUGINS_DIR
+
+   event_bus = EventBus()
+
+   loader = PluginLoader(event_bus)
+   Client = BotClient(event_bus, 'ws://{your adder}')
+
+   asyncio.run(loader.load_plugins(PLUGINS_DIR, ws=Client.ws))
+   Client.run()
    ```
 
 ## 示例代码
 
-在外部测试环境中，可以创建一个新的 Python 文件来调用 Fbot 提供的接口，例如 `external_test.py`：
-
 ```python
-#!/usr/bin/env python3
-# external_test.py
 import asyncio
 from Fbot.ws import WebSocketHandler
-from Fbot import MessageChain  # 假定 MessageChain 为 Fbot 中的消息链实现
+from Fbot import MessageChain
 
 async def main():
     async with WebSocketHandler('ws://127.0.0.1:3001') as client:
@@ -49,16 +51,10 @@ if __name__ == '__main__':
     asyncio.run(main())
 ```
 
-运行方式：
-
-```sh
-python external_test.py
-```
-
 ## 关于
 
-- 更多详细文档请参考 README.md 内的相关说明。
-- 相关 API 接口可分别在 group.py 与 system.py 中查看。
+- 更多详细请参考代码内的相关说明。
+- 相关 API 接口可分别在 Fbot.ws.api 中查看。
 
 ## 许可
 
