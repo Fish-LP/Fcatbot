@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-22 01:20:14
+# @LastEditTime : 2025-02-22 18:55:31
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -16,7 +16,7 @@ from .custom_err import PluginLoadError
 from ..utils import UniversalLoader
 from ..utils.UniversalDataIO import FileTypeUnknownError, SaveError, LoadError
 from ..config import PERSISTENT_DIR
-
+from ..ws import WebSocketHandler
 
 class BasePlugin:
     '''插件基类'''
@@ -24,12 +24,15 @@ class BasePlugin:
     version: str
     dependencies: dict
     meta_data: dict
+    ws: WebSocketHandler
+    http: None = None
     
     def __init__(self, event_bus: EventBus, **kwd):
         if not self.name: raise ValueError('缺失插件名称')
         if not self.version: raise ValueError('缺失插件版本号')
         if not self.dependencies: self.dependencies = {}
         self.event_bus = event_bus
+        self.api = self.ws or self.http
         self.work_path = Path(PERSISTENT_DIR) / self.name
         self.work_path.mkdir(parents=True, exist_ok=True)
         self.data = self._load_persistent_data()
