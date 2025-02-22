@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-16 12:50:14
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-22 01:58:13
+# @LastEditTime : 2025-02-22 18:28:22
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -34,8 +34,6 @@ setup(
     ],
     python_requires='>=3.10',  # 所需 Python 版本
     entry_points={
-        'console_scripts':[
-            'fbot = Fbot.command:test'
-        ]
+        'console_scripts':[]
         },
 )
