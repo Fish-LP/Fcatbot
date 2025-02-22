@@ -2,6 +2,14 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-13 21:47:01
 # @LastEditors  : Fish-LP fish.zh@outlook.com
+# @LastEditTime : 2025-02-22 19:12:44
+# @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
+# @Copyright (c) 2025 by Fish-LP, MIT License 
+# -------------------------
+# -------------------------
+# @Author       : Fish-LP fish.zh@outlook.com
+# @Date         : 2025-02-13 21:47:01
+# @LastEditors  : Fish-LP fish.zh@outlook.com
 # @LastEditTime : 2025-02-22 01:21:05
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
@@ -229,6 +237,15 @@ class UniversalLoader:
     def items(self):
         """获取所有键值对"""
         return self.data.items()
+
+    def __enter__(self) -> 'UniversalLoader':
+        """进入with环境"""
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """退出with环境"""
+        if self.data:
+            self.save()
     # endregion
 
     # ---------------------
