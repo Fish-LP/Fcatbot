@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-16 12:50:14
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-22 18:28:22
+# @LastEditTime : 2025-02-22 19:26:49
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -22,6 +22,7 @@ setup(
         'aiohttp',
         'websockets',
         'tdqm',
+        'packaging',
     ],
     classifiers=[  # 分类器
         'Development Status :: 3 - Alpha',
