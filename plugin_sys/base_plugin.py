@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-23 17:14:18
+# @LastEditTime : 2025-02-23 17:47:54
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -36,7 +36,7 @@ class BasePlugin:
         
         if not self.dependencies: self.dependencies = {}
         self.event_bus = event_bus
-        self.api = self.ws or self.http
+        # self.api = self.ws or self.http
         self.lock = asyncio.Lock()  # 创建一个异步锁对象
         self.work_path = Path(PERSISTENT_DIR) / self.name
         self._data_file = UniversalLoader(self.work_path / f"{self.name}.json")
@@ -45,7 +45,7 @@ class BasePlugin:
         try:
             self.data = self._data_file.load()
         except LoadError as e:
-            raise RuntimeError(self.name, f"加载持久化数据时出错: {e}")
+            self.data = self._data_file
         
         try:
             self.work_path.mkdir(parents=True)
@@ -59,7 +59,7 @@ class BasePlugin:
         self._close_()
         await self.on_unload()
         try:
-            await self.data.asave()
+            self.data.save()
         except (FileTypeUnknownError, SaveError, FileNotFoundError) as e:
             raise RuntimeError(self.name, f"保存持久化数据时出错: {e}")
         self.unregister_handlers()
