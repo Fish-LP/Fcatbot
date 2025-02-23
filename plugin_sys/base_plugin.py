@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-22 18:55:31
+# @LastEditTime : 2025-02-23 17:14:18
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -30,41 +30,39 @@ class BasePlugin:
     def __init__(self, event_bus: EventBus, **kwd):
         if not self.name: raise ValueError('缺失插件名称')
         if not self.version: raise ValueError('缺失插件版本号')
-        if not self.dependencies: self.dependencies = {}
-        self.event_bus = event_bus
-        self.api = self.ws or self.http
-        self.work_path = Path(PERSISTENT_DIR) / self.name
-        self.work_path.mkdir(parents=True, exist_ok=True)
-        self.data = self._load_persistent_data()
-        self.lock = asyncio.Lock()  # 创建一个异步锁对象
-        self._event_handlers = []
         if kwd:
             for k, v in kwd.items():
                 setattr(self, k, v)
+        
+        if not self.dependencies: self.dependencies = {}
+        self.event_bus = event_bus
+        self.api = self.ws or self.http
+        self.lock = asyncio.Lock()  # 创建一个异步锁对象
+        self.work_path = Path(PERSISTENT_DIR) / self.name
+        self._data_file = UniversalLoader(self.work_path / f"{self.name}.json")
+        self._event_handlers = []
+        
+        try:
+            self.data = self._data_file.load()
+        except LoadError as e:
+            raise RuntimeError(self.name, f"加载持久化数据时出错: {e}")
+        
+        try:
+            self.work_path.mkdir(parents=True)
+            self.first_load = True
+        except FileExistsError:
+            self.first_load = False
+        
         os.chdir(self.work_path)
 
     async def __unload__(self):
         self._close_()
         await self.on_unload()
-        self._save_persistent_data()
-        self.unregister_handlers()
-
-    def _load_persistent_data(self) -> Dict[str, Any]:
-        data_path = self.work_path / f"{self.name}.json"
         try:
-            loader = UniversalLoader(data_path)
-            return loader.load()
-        except (FileTypeUnknownError, LoadError, FileNotFoundError) as e:
-            return {}
-
-    def _save_persistent_data(self):
-        data_path = self.work_path / f"{self.name}.json"
-        try:
-            loader = UniversalLoader(data_path)
-            loader.data = self.data if isinstance(self.data, dict) else self.data.data
-            loader.save()
+            await self.data.asave()
         except (FileTypeUnknownError, SaveError, FileNotFoundError) as e:
-            raise PluginLoadError(self.name, f"保存持久化数据时出错: {e}")
+            raise RuntimeError(self.name, f"保存持久化数据时出错: {e}")
+        self.unregister_handlers()
 
     def publish_sync(self, event: Event) -> List[Any]:
         return self.event_bus.publish_sync(event)
