@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-13 21:47:01
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-22 19:12:44
+# @LastEditTime : 2025-02-23 17:02:22
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -237,6 +237,38 @@ class UniversalLoader:
     def items(self):
         """获取所有键值对"""
         return self.data.items()
+
+    def update(self, *args, **kwargs):
+        """用给定的字典或键值对更新数据（类似 dict.update）"""
+        self.data.update(*args, **kwargs)
+
+    def pop(self, key, default=None):
+        """删除指定键并返回其对应的值；如果键不存在，则返回默认值"""
+        return self.data.pop(key, default)
+
+    def popitem(self):
+        """随机删除一个键值对并返回 (key, value) 元组"""
+        return self.data.popitem()
+
+    def clear(self):
+        """清空所有数据"""
+        self.data.clear()
+
+    def setdefault(self, key, default=None):
+        """如果键不存在，则将键的值设为default并返回该值，否则返回原有值"""
+        return self.data.setdefault(key, default)
+
+    def __contains__(self, key):
+        """判断数据中是否包含指定键"""
+        return key in self.data
+
+    def __iter__(self):
+        """返回数据字典的迭代器"""
+        return iter(self.data)
+
+    def __len__(self):
+        """返回数据的键数目"""
+        return len(self.data)
 
     def __enter__(self) -> 'UniversalLoader':
         """进入with环境"""
