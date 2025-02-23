@@ -2,15 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-13 21:47:01
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-23 17:02:22
-# @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
-# @Copyright (c) 2025 by Fish-LP, MIT License 
-# -------------------------
-# -------------------------
-# @Author       : Fish-LP fish.zh@outlook.com
-# @Date         : 2025-02-13 21:47:01
-# @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-22 01:21:05
+# @LastEditTime : 2025-02-23 18:47:47
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -55,7 +47,7 @@ try:
     import toml  # type: ignore
     TOML_AVAILABLE = True
 except ImportError:
-    warnings.warn("toml 模块未安装。TOML 功能将被禁用。", ImportWarning)
+    pass  # 非关键依赖，静默处理
 
 # 异步文件操作模块检测
 AIOFILES_AVAILABLE = False
