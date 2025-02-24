@@ -1,4 +1,4 @@
-from ...models import Status
+from ...DataModels import Status
 from typing import Union
 
 class UserAPi:

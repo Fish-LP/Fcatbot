@@ -13,7 +13,7 @@ from ..config import OFFICIAL_PRIVATE_MESSAGE_EVENT
 from ..config import OFFICIAL_GROUP_MESSAGE_EVENT
 from ..config import OFFICIAL_REQUEST_EVENT
 from ..config import OFFICIAL_NOTICE_EVENT
-from ..models.message import BaseMessage
+from ..DataModels.message import BaseMessage
 
 class CompatibleEnrollment:
     events = {

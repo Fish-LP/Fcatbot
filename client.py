@@ -9,9 +9,9 @@
 from .http import HttpClient
 from .ws import WebSocketHandler
 from .utils import get_log
-from .models import GroupMessage
-from .models import PrivateMessage
-from .plugin_sys import EventBus, Event
+from .DataModels import GroupMessage
+from .DataModels import PrivateMessage
+from .PluginSystem import EventBus, Event
 from .config import OFFICIAL_PRIVATE_MESSAGE_EVENT
 from .config import OFFICIAL_GROUP_MESSAGE_EVENT
 from .config import OFFICIAL_REQUEST_EVENT

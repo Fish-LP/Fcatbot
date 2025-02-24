@@ -9,14 +9,14 @@
 from .client import BotClient
 from .utils import get_log, UniversalDataIO
 from .client import BotClient
-from .models import GroupMessage, PrivateMessage
-from .models import Nope
-from .models import MessageChain
-from .plugin_sys import PluginLoader
-from .plugin_sys import Event
-from .plugin_sys import CompatibleEnrollment
-from .plugin_sys import BasePlugin
-from .plugin_sys import EventBus
+from .DataModels import GroupMessage, PrivateMessage
+from .DataModels import Nope
+from .DataModels import MessageChain
+from .PluginSystem import PluginLoader
+from .PluginSystem import Event
+from .PluginSystem import CompatibleEnrollment
+from .PluginSystem import BasePlugin
+from .PluginSystem import EventBus
 
 LOG = get_log('Bot')
 
