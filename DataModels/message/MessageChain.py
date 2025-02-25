@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-22 01:21:58
+# @LastEditTime : 2025-02-25 21:28:38
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -14,6 +14,14 @@ from .Nope import *
 
 class MessageChain:
     """消息链类，用于管理多个消息元素"""
+    
+    behavior_handlers = {
+        Behavior.DAFAULT:   lambda elements, element: elements,
+        Behavior.TOP:       lambda elements, element: [element] + [x for x in elements if x != element],
+        Behavior.OCCUPY:    lambda elements, element: [element],
+        Behavior.OccupyType:lambda elements, element: [elt for elt in elements if elt.type == element.type],
+    }
+    
     def __init__(self, elements: list = None):
         """
         初始化消息链
@@ -219,20 +227,11 @@ class MessageChain:
         self.elements.append(Nope(NopeData(user_id=user_id, nickname=nickname, content=content)))
         return self
 
-    def check_message_chain(self, *args, **kwargs):
+    def check_message_chain(self):
         '''保证elements顺序正确'''
         element: Element
-        def move_element_to_front(lst: list, element):
-            lst.remove(element)
-            lst.insert(0, element)
-        behavior_handlers = {
-            Behavior.DAFAULT:   lambda elements, element: elements,
-            Behavior.TOP:       lambda elements, element: move_element_to_front(elements, element),
-            Behavior.OCCUPY:    lambda elements, element: [element],
-            Behavior.OccupyType:lambda elements, element: [elt for elt in elements if elt.type == element.type],
-        }
         for element in self.elements.copy():
-            self.elements = behavior_handlers[element.behavior](self.elements, element)
+            self.elements = self.behavior_handlers[element.behavior](self.elements, element)
 
     def decorate_add_methods(self, func):
         """
