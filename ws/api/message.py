@@ -1,8 +1,8 @@
 from typing import Union
+from ...DataModels import MessageChain
 
 class MessageAPi:
     '''消息接口'''
-
     
     async def mark_msg_as_read(self, group_id: Union[int, str] = None, user_id: Union[int, str] = None):
         """
@@ -202,12 +202,19 @@ class MessageAPi:
             "/forward_friend_single_msg", {"user_id": user_id, "message_id": message_id}
         )
 
-    async def send_private_forward_msg(self, user_id: Union[int, str], messages: list[str]):
+    async def send_private_forward_msg(self, user_id: Union[int, str], messages: MessageChain):
         """
         :param user_id: 发送对象QQ号
         :param messages: 消息列表
         :return: 合并转发私聊消息
         """
-        payload = await self._construct_forward_message(messages)
-        payload["user_id"] = user_id
-        return await self.ws_client.api("/send_private_forward_msg", payload)
+        if len(messages) == 0:
+            return None
+        
+        return await self.ws_client.api(
+            "/send_private_forward_msg",
+            {
+                "messages": messages.to_dict(),
+                "user_id": user_id
+                }
+            )

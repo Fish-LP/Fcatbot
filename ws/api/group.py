@@ -1,8 +1,8 @@
 from typing import Union
+from ...DataModels import MessageChain
 
 class GroupApi:
     '''群组接口'''
-
 
     async def set_group_kick(
         self,
@@ -412,7 +412,7 @@ class GroupApi:
         )
 
     async def send_group_forward_msg(
-        self, group_id: Union[int, str], messages: list[str]
+        self, group_id: Union[int, str], messages: MessageChain
     ):
         """
         :param group_id: 群号
@@ -422,7 +422,10 @@ class GroupApi:
         if len(messages) == 0:
             return None
 
-        payload = await self._construct_forward_message(messages)
-        payload["group_id"] = group_id
-
-        return await self.ws_client.api("send_private_forward_msg", payload)
+        return await self.ws_client.api(
+            "send_private_forward_msg",
+            {
+                "messages": MessageChain.to_dict(),
+                "group_id": group_id
+                }
+        )
