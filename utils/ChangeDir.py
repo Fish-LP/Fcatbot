@@ -1,3 +1,11 @@
+# -------------------------
+# @Author       : Fish-LP fish.zh@outlook.com
+# @Date         : 2025-02-18 21:06:40
+# @LastEditors  : Fish-LP fish.zh@outlook.com
+# @LastEditTime : 2025-03-02 18:46:16
+# @Description  : 上下文管理器，用于暂时切换工作路径。
+# @Copyright (c) 2025 by Fish-LP, MIT License 
+# -------------------------
 import os
 import tempfile
 from typing import Optional
@@ -5,7 +13,7 @@ from uuid import UUID, uuid4
 
 from contextlib import ContextDecorator
 
-from .Logger import get_log  # 假设有一个 Logger 模块
+from .Logger import get_log
 
 LOG = get_log("ChangeDir")
 
@@ -15,7 +23,7 @@ class ChangeDir(ContextDecorator):
     上下文管理器，用于暂时切换工作路径。
     支持自动恢复原始路径和目录创建/清理。
     """
-    _DIRS_REGISTRY: dict[UUID, str] = {}  # 保存所有目录的 UUID 和路径
+    _DIRS_REGISTRY: dict[UUID, str] = {}  # 保存所有可用目录的 UUID 和路径
 
     def __init__(
         self,
@@ -40,7 +48,6 @@ class ChangeDir(ContextDecorator):
 
         # 初始化目标路径
         if isinstance(path, str):
-            # 指定路径的情况
             self.new_path = os.path.abspath(path)
             self._handle_str_path()
         elif isinstance(path, UUID):
@@ -50,9 +57,6 @@ class ChangeDir(ContextDecorator):
             # 未指定路径，创建临时目录
             self._create_temp_directory()
 
-        LOG.info(f"初始化路径切换器：路径 = {self.new_path}")
-        LOG.debug(f"路径注册表状态：{self._DIRS_REGISTRY}")
-
     def _handle_str_path(self) -> None:
         """
         处理以字符串形式传入的路径。
@@ -60,11 +64,11 @@ class ChangeDir(ContextDecorator):
         if not os.path.exists(self.new_path):
             if self.create_missing:
                 os.makedirs(self.new_path, exist_ok=True)
-                LOG.debug(f"创建目录: {self.new_path}")
+                LOG.debug(f"创建文件夹: {self.new_path}")
             else:
-                raise FileNotFoundError(f"目录不存在: {self.new_path}")
+                raise FileNotFoundError(f"路径不存在: {self.new_path}")
         if not os.path.isdir(self.new_path):
-            raise NotADirectoryError(f"路径不是目录: {self.new_path}")
+            raise NotADirectoryError(f"路径不是文件夹: {self.new_path}")
         # 生成 UUID 并保存到注册表
         self.dir_id = uuid4()
         self._DIRS_REGISTRY[self.dir_id] = self.new_path
@@ -94,7 +98,6 @@ class ChangeDir(ContextDecorator):
         进入上下文时，切换到新的工作路径。
         """
         os.chdir(self.new_path)
-        LOG.info(f"进入目录: {self.new_path}")
         return self.dir_id if self.dir_id else UUID(int=0)
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
@@ -103,16 +106,16 @@ class ChangeDir(ContextDecorator):
         """
         try:
             os.chdir(self.origin_path)
-            LOG.info(f"恢复目录: {self.origin_path}")
+            LOG.debug(f"恢复目录: {self.origin_path}")
         except Exception as e:
             LOG.error(f"恢复原始目录失败: {e}")
             return False  # 允许异常传播
 
-        # 清理临时目录（如果有的话）
+        # 清理临时目录 如果需要
         if self.temp_dir and not self.keep_temp:
             try:
                 self.temp_dir.cleanup()
-                LOG.info(f"已删除临时目录: {self.new_path}")
+                LOG.debug(f"删除临时目录: {self.new_path}")
                 # 移除临时目录的注册记录
                 if self.dir_id in self._DIRS_REGISTRY:
                     del self._DIRS_REGISTRY[self.dir_id]
@@ -125,6 +128,7 @@ class ChangeDir(ContextDecorator):
         """
         清理临时目录（即使上下文管理器未正常退出）。
         """
+        # 清理临时目录 如果需要
         if self.temp_dir and not self.keep_temp:
             try:
                 self.temp_dir.cleanup()
