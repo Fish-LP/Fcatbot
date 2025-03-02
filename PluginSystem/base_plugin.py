@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-23 18:58:37
+# @LastEditTime : 2025-03-02 20:22:44
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Callable, Awaitable
 import asyncio
 from .event import EventBus, Event
-from .custom_err import PluginLoadError
+from ..utils import ChangeDir
 from ..utils import UniversalLoader
 from ..utils.UniversalDataIO import FileTypeUnknownError, SaveError, LoadError
 from ..config import PERSISTENT_DIR
@@ -53,7 +53,7 @@ class BasePlugin:
         except FileExistsError:
             self.first_load = False
         
-        os.chdir(self.work_path)
+        self.work_space = ChangeDir(self.work, create_missing=True)
 
     async def __unload__(self):
         self._close_()
