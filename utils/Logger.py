@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:41:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-22 01:21:01
+# @LastEditTime : 2025-03-02 20:09:51
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -155,16 +155,22 @@ LOG_LEVEL_TO_COLOR = {
 
 # 定义彩色格式化器
 class ColoredFormatter(logging.Formatter):
+    def __init__(self, fmt=None, datefmt='%H:%M:%S', style="%", use_color=False):
+        super().__init__(fmt, datefmt, style)
+        self.use_color = use_color
+
     def format(self, record):
-        # 获取日志级别并添加颜色
-        levelname = record.levelname
-        colored_level = LOG_LEVEL_TO_COLOR[levelname] + levelname + Color.RESET
-        # 替换 record.levelname 为带颜色的版本
-        record.colored_levelname = colored_level
+        # 创建带有颜色的 levelname
+        if self.use_color:
+            color_code = LOG_LEVEL_TO_COLOR.get(record.levelname, Color.RESET)
+            record.colored_levelname = f"{color_code}{record.levelname.ljust(8)}{Color.RESET}"
+        else:
+            record.colored_levelname = record.levelname
+        record.long_time = self.formatTime(record)
         return super().format(record)
 
 
-def _get_valid_log_level(level_name, default):
+def _get_valid_log_level(level_name: str, default: str):
     """验证并获取有效的日志级别"""
     level = getattr(logging, level_name.upper(), None)
     if not isinstance(level, int):
@@ -176,33 +182,50 @@ def _get_valid_log_level(level_name, default):
 def setup_logging():
     """设置日志"""
     # 环境变量读取
-    console_level = os.getenv("LOG_LEVEL", "INFO")
-    file_level = os.getenv("FILE_LOG_LEVEL", "DEBUG")
+    console_level = os.getenv("LOG_LEVEL", "INFO").upper()
+    file_level = os.getenv("FILE_LOG_LEVEL", "DEBUG").upper()
     
     # 验证并转换日志级别
     console_log_level = _get_valid_log_level(console_level, "INFO")
     file_log_level = _get_valid_log_level(file_level, "DEBUG")
 
+    default_log_format = {
+        "console": {
+            "DEBUG": "%(colored_levelname)-8s - [%(threadName)s|%(processName)s] - %(name)s - %(filename)s:%(funcName)s:%(lineno)d | %(message)s",
+            "INFO": "[%(colored_levelname)s]%(asctime)s| %(name)s: %(message)s",
+            "WARNING": "%(long_time)s - %(colored_levelname)s - %(name)s: %(message)s",
+            "ERROR": "%(long_time)s - %(colored_levelname)s [%(filename)s]%(name)s:%(lineno)d |%(message)s",
+            "CRITICAL": "%(long_time)s - {%(module)s}[%(filename)s]%(name)s:%(lineno)d |%(message)s",
+        },
+        "file": {
+            "DEBUG": "%(levelname)-8s - [%(threadName)s|%(processName)s] - %(name)s - %(filename)s:%(funcName)s:%(lineno)d | %(message)s",
+            "INFO": "[%(levelname)s]%(asctime)s| %(name)s: %(message)s",
+            "WARNING": "%(long_time)s - %(levelname)s - %(name)s: %(message)s",
+            "ERROR": "%(long_time)s - %(levelname)s [%(filename)s]%(name)s:%(lineno)d |%(message)s",
+            "CRITICAL": "%(long_time)s - {%(module)s}[%(filename)s]%(name)s:%(funcName)s:%(lineno)d |%(message)s",
+        }
+    }
     # 日志格式配置
     log_format = os.getenv(
         "LOG_FORMAT",
-        "[%(colored_levelname)s] (%(filename)s:%(lineno)d) %(funcName)s : %(message)s"
+        default_log_format['console'][console_level]
     )
     file_format = os.getenv(
         "LOG_FILE_FORMAT",
-        "[%(levelname)s] (%(asctime)s) (%(filename)s:%(lineno)d) %(funcName)s %(message)s"
+        default_log_format['file'][file_level]
     )
 
     # 文件路径配置
     log_dir = os.getenv("LOG_FILE_PATH", "./logs")
-    file_name = os.getenv("LOG_FILE_NAME", "bot_%Y%m%d.log")
+    file_name = os.getenv("LOG_FILE_NAME", "bot_%Y_%m_%d.log")
     
     # 备份数量验证
     try:
         backup_count = int(os.getenv("BACKUP_COUNT", "7"))
     except ValueError:
         backup_count = 7
-        warnings.warn("Invalid BACKUP_COUNT value, using default 7")
+        warnings.warn("BACKUP_COUNT 为无效值，使用默认值 7")
+        os.environ["BACKUP_COUNT"] = 7
 
     # 创建日志目录
     os.makedirs(log_dir, exist_ok=True)
@@ -215,7 +238,7 @@ def setup_logging():
     # 控制台处理器
     console_handler = logging.StreamHandler()
     console_handler.setLevel(console_log_level)
-    console_handler.setFormatter(ColoredFormatter(log_format))
+    console_handler.setFormatter(ColoredFormatter(log_format, use_color=True))
 
     # 文件处理器
     file_handler = TimedRotatingFileHandler(
