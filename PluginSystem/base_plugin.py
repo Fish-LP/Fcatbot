@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-02 20:22:44
+# @LastEditTime : 2025-03-03 22:06:16
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -25,7 +25,6 @@ class BasePlugin:
     dependencies: dict
     meta_data: dict
     ws: WebSocketHandler
-    http: None = None
     
     def __init__(self, event_bus: EventBus, **kwd):
         if not self.name: raise ValueError('缺失插件名称')
@@ -36,7 +35,7 @@ class BasePlugin:
         
         if not self.dependencies: self.dependencies = {}
         self.event_bus = event_bus
-        self.api = self.ws or self.http
+        self.api = self.ws
         self.lock = asyncio.Lock()  # 创建一个异步锁对象
         self.work_path = Path(PERSISTENT_DIR) / self.name
         self._data_file = UniversalLoader(self.work_path / f"{self.name}.json")
