@@ -6,7 +6,6 @@
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
-from .http import HttpClient
 from .ws import WebSocketHandler
 from .utils import get_log
 from .DataModels import GroupMessage
@@ -28,7 +27,6 @@ class BotClient:
         if token:
             headers["Authorization"] = f"Bearer {token}"
         self.event_bus = event_bus
-        self.http = HttpClient(uri, headers)
         self.ws = WebSocketHandler(uri, headers, message_handler=self.on_message)
     
     def run(self):

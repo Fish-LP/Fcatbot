@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-24 21:55:06
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-24 22:03:30
+# @LastEditTime : 2025-03-03 22:40:13
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -11,13 +11,21 @@ from .Role import Role
 from typing import List
 
 class User:
-    """用户类，包含用户ID和关联的角色"""
-    def __init__(self, user_id: str) -> None:
-        self.user_id: str = user_id
+    """
+    用户类
+    包含用户名称和关联的角色
+    """
+    def __init__(self, user_name: str) -> None:
+        self.user_id: str = user_name
         self.roles: List[Role] = []   # 用户关联的角色列表
 
     def has_permission(self, path: str) -> bool:
-        """检查用户是否拥有指定权限"""
+        """
+        检查用户是否拥有指定权限
+        
+        Args:
+            path: 权限
+        """
         visited_roles = set()  # 记录已访问的角色
         queue = deque(self.roles)
         while queue:
