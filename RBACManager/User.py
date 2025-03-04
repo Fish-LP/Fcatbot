@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-24 21:55:06
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-03 22:40:13
+# @LastEditTime : 2025-03-04 20:42:07
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -16,7 +16,7 @@ class User:
     包含用户名称和关联的角色
     """
     def __init__(self, user_name: str) -> None:
-        self.user_id: str = user_name
+        self.name: str = user_name
         self.roles: List[Role] = []   # 用户关联的角色列表
 
     def has_permission(self, path: str) -> bool:
@@ -39,3 +39,18 @@ class User:
             # 将所有父角色加入队列
             queue.extend(role.get_all_parents())
         return False
+
+    def to_dict(self) -> dict:
+        """
+        将用户序列化为字典
+        
+        为避免循环引用, 角色引用由RBACManager处理(无法单独使用)
+        """
+        return {
+            "name": self.name
+        }
+
+    @staticmethod
+    def from_dict(data: dict) -> 'User':
+        """从字典反序列化为用户"""
+        return User(data["name"])

@@ -7,7 +7,7 @@
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
 from .UniversalDataIO import UniversalLoader
-from .Logger import get_log
+from .Logger import get_log, Color
 from .ChangeDir import ChangeDir
 from .Test_suite import TestSuite
 
@@ -16,4 +16,5 @@ __all__ = [
     'ChangeDir',
     'TestSuite',
     'get_log',
+    'Color',
 ]

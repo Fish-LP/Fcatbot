@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-24 21:56:15
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-03 22:39:25
+# @LastEditTime : 2025-03-04 20:41:46
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -65,3 +65,21 @@ class Role:
         seen = set()
         self._all_parents = [x for x in result if not (x in seen or seen.add(x))]
         return self._all_parents
+
+    def to_dict(self) -> dict:
+        """
+        将角色序列化为字典
+        
+        为避免循环引用, 父角色引用由RBACManager处理(无法单独使用)
+        """
+        return {
+            "name": self.name,
+            "permissions": self.permissions.to_dict()
+        }
+
+    @staticmethod
+    def from_dict(data: dict) -> 'Role':
+        """从字典反序列化为角色"""
+        role = Role(data["name"])
+        role.permissions = PermissionTrie.from_dict(data["permissions"])
+        return role
