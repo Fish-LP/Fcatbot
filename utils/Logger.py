@@ -2,12 +2,13 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:41:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-04 21:10:12
+# @LastEditTime : 2025-03-04 21:16:20
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
 import logging
 import os
+import sys
 import warnings
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
@@ -16,6 +17,46 @@ from tqdm import tqdm as tqdm_original
 
 import ctypes
 from ctypes import wintypes
+
+def is_ansi_supported():
+    """
+    检查系统是否支持 ANSI 转义序列。
+
+    返回:
+        bool: 如果系统支持 ANSI 转义序列返回 True，否则返回 False。
+    """
+    if sys.platform != "win32":
+        # 非 Windows 系统通常支持 ANSI 转义序列
+        return True
+
+    # 检查 Windows 版本
+    is_windows_10_or_higher = False
+    try:
+        # 获取 Windows 版本信息
+        version_info = sys.getwindowsversion()
+        major_version = version_info[0]
+        build_number = version_info[3]
+
+        # Windows 10 (major version 10) 或更高版本
+        if major_version >= 10:
+            is_windows_10_or_higher = True
+    except AttributeError:
+        # 如果无法获取版本信息，假设不支持
+        return False
+
+    # 检查控制台是否支持虚拟终端处理
+    kernel32 = ctypes.windll.kernel32
+    stdout_handle = kernel32.GetStdHandle(-11)
+    if stdout_handle == wintypes.HANDLE(-1).value:
+        return False
+
+    # 获取当前控制台模式
+    console_mode = wintypes.DWORD()
+    if not kernel32.GetConsoleMode(stdout_handle, ctypes.byref(console_mode)):
+        return False
+
+    # 检查是否支持虚拟终端处理
+    return (console_mode.value & 0x0004) != 0 or is_windows_10_or_higher
 
 def set_console_mode(mode=7):
     """
@@ -51,7 +92,7 @@ class Color:
     - 样式：设置样式（如加粗、下划线、反转）
     - RESET：重置所有颜和样式
     """
-    _COLOR = set_console_mode(7)
+    _COLOR = is_ansi_supported() or set_console_mode(7)
     def __getattribute__(self, name):
         if self._COLOR:
             return super().__getattribute__(name)
