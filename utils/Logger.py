@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:41:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-04 18:29:22
+# @LastEditTime : 2025-03-04 21:10:12
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -14,6 +14,32 @@ from logging.handlers import TimedRotatingFileHandler
 
 from tqdm import tqdm as tqdm_original
 
+import ctypes
+from ctypes import wintypes
+
+def set_console_mode(mode=7):
+    """
+    设置控制台输出模式。
+
+    参数:
+        mode (int): 控制台模式标志，默认为7（ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING）。
+
+    返回:
+        bool: 如果操作成功返回True，否则返回False。
+    """
+    try:
+        kernel32 = ctypes.windll.kernel32
+        # 获取标准输出句柄
+        stdout_handle = kernel32.GetStdHandle(-11)
+        if stdout_handle == wintypes.HANDLE(-1).value:
+            return False
+        
+        # 设置控制台模式
+        if not kernel32.SetConsoleMode(stdout_handle, mode):
+            return False
+    except Exception:
+        return False
+    return True
 
 class Color:
     """
@@ -25,6 +51,12 @@ class Color:
     - 样式：设置样式（如加粗、下划线、反转）
     - RESET：重置所有颜和样式
     """
+    _COLOR = set_console_mode(7)
+    def __getattribute__(self, name):
+        if self._COLOR:
+            return super().__getattribute__(name)
+        else:
+            return ''
 
     # 前景
     BLACK = "\033[30m"
