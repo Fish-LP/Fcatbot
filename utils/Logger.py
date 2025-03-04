@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:41:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-02 20:09:51
+# @LastEditTime : 2025-03-04 18:29:22
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -184,6 +184,8 @@ def setup_logging():
     # 环境变量读取
     console_level = os.getenv("LOG_LEVEL", "INFO").upper()
     file_level = os.getenv("FILE_LOG_LEVEL", "DEBUG").upper()
+    # 为了保证有效日志信息仅支持控制台
+    console_log_format = os.getenv("LOG_FORMAT", None)
     
     # 验证并转换日志级别
     console_log_level = _get_valid_log_level(console_level, "INFO")
@@ -208,7 +210,7 @@ def setup_logging():
     # 日志格式配置
     log_format = os.getenv(
         "LOG_FORMAT",
-        default_log_format['console'][console_level]
+        console_log_format or default_log_format['console'][console_level]
     )
     file_format = os.getenv(
         "LOG_FILE_FORMAT",
