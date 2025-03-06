@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:26:43
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-22 01:20:31
+# @LastEditTime : 2025-03-06 18:31:51
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -131,8 +131,7 @@ class PluginLoader:
         self._validate_dependencies()
 
         for name in load_order:
-            self.plugins[name]._init_()
-            await self.plugins[name].on_load()
+            await self.plugins[name].__onload__()
 
     async def load_plugins(self, plugins_path: str = PLUGINS_DIR, **kwargs):
         """
