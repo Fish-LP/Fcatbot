@@ -2,13 +2,15 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-06 18:52:17
+# @LastEditTime : 2025-03-06 19:59:45
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
 from pathlib import Path
 from typing import Any, Dict, List, Callable, Awaitable, final
 import asyncio
+
+from .custom_err import PluginLoadError
 from .event import EventBus, Event
 from ..utils import ChangeDir
 from ..utils import UniversalLoader
@@ -58,21 +60,20 @@ class BasePlugin:
         self.api = self.ws
         self.lock = asyncio.Lock()  # 创建一个异步锁对象
         self.work_path = Path(PERSISTENT_DIR) / self.name
-        self._data_file = UniversalLoader(self.work_path / f"{self.name}.json")
         self._event_handlers = []
-        
-        try:
-            self.data = self._data_file
-        except LoadError as e:
-            raise RuntimeError(self.name, f"读取持久化数据时出错: {e}")
-        
-        try:
-            self.work_path.mkdir(parents=True)
-            self.first_load = True
-        except FileExistsError:
-            self.first_load = False
-        
-        self.work_space = ChangeDir(self.work, create_missing=True)
+        self.data = UniversalLoader(self.work_path / f"{self.name}.json")
+
+        if not self.work_path.exists():
+            try:
+                self.work_path.mkdir(parents=True)
+                self.first_load = True  # 表示是第一次启动
+            except FileExistsError:
+                self.first_load = False
+
+        if not self.work_path.is_dir():
+            raise PluginLoadError(self.name, f"{self.work_path} 不是目录文件夹")
+
+        self.work_space = ChangeDir(self.work_path)
 
     @final
     async def __unload__(self):
