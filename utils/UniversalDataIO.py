@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-13 21:47:01
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-23 18:47:47
+# @LastEditTime : 2025-03-06 20:04:11
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -214,7 +214,7 @@ class UniversalLoader:
         """友好的字符串表示"""
         return str(self.data)
 
-    def get(self, key, default=None):
+    def get(self, key, default= None):
         """安全获取数据方法"""
         return self.data.get(key, default)
 

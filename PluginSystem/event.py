@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:31:16
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-22 01:20:24
+# @LastEditTime : 2025-03-06 20:30:05
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -61,7 +61,7 @@ class EventBus:
         self._exact_handlers = {}
         self._regex_handlers = []
 
-    def subscribe(self, event_type: str, handler: Callable[[Event], Any], priority: int = 0) -> str:
+    def subscribe(self, event_type: str, handler: Callable[[Event], Any], priority: int = 0) -> uuid.UUID:
         """
         订阅事件处理器，并返回处理器的唯一 ID
 
@@ -71,23 +71,28 @@ class EventBus:
             priority: int - 处理器的优先级（数字越大，优先级越高）
 
         返回:
-            str - 处理器的唯一 ID
+            UUID - 处理器的唯一 ID
         """
-        handler_id = str(uuid.uuid4())
+        handler_id = uuid.uuid4()
         pattern = None
-        if event_type.startswith('re:'):
-            pattern = re.compile(event_type[3:])
+        if event_type.startswith("re:"):
+            try:
+                pattern = re.compile(event_type[3:])
+            except re.error as e:
+                raise ValueError(f"无效正则表达式: {event_type[3:]}") from e
             self._regex_handlers.append((pattern, priority, handler, handler_id))
         else:
-            self._exact_handlers.setdefault(event_type, []).append((pattern, priority, handler, handler_id))
+            self._exact_handlers.setdefault(event_type, []).append(
+                (pattern, priority, handler, handler_id)
+            )
         return handler_id
 
-    def unsubscribe(self, handler_id: str) -> bool:
+    def unsubscribe(self, handler_id: uuid.UUID) -> bool:
         """
         取消订阅事件处理器
 
         参数:
-            handler_id: str - 处理器的唯一 ID
+            handler_id: UUID - 处理器的唯一 ID
 
         返回:
             bool - 是否成功取消订阅
