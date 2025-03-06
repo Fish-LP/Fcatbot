@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-24 21:56:27
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-04 20:41:00
+# @LastEditTime : 2025-03-06 18:28:07
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -12,7 +12,10 @@ from .User import User
 from typing import Dict, List
 
 class RBACManager:
-    """RBAC管理类，负责管理角色、用户和权限操作"""
+    """
+    * RBAC管理类，负责管理角色、用户和权限操作
+    ! 警告: 没有进行完全的安全检查
+    """
     def __init__(self, case_sensitive: bool = False) -> None:
         """
         初始化 RBAC 管理器

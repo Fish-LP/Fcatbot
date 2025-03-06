@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-24 21:59:13
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-03 23:03:11
+# @LastEditTime : 2025-03-06 18:27:54
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -32,6 +32,8 @@ from .RBACManager import RBACManager
     具体权限 : "插件.插件功能1" 表示 "插件" 下的 "插件功能1" 权限。
     通配符 "*" : "插件.*" 代表 "插件" 下的所有权限。
     通配符 "**" : "插件.**" 代表 "插件" 下的所有权限，包括子权限。
+
+! 警告: 没有进行完全的安全检查
 """
 __all__ = [
     'RBACManager'
