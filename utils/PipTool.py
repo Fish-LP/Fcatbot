@@ -2,16 +2,18 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-03-08 12:47:07
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-08 15:36:34
+# @LastEditTime : 2025-03-08 21:56:15
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
+import importlib
 import json
 import subprocess
 import sys
 from math import pi
 from typing import List, Dict, Optional, Union, Any
 from packaging.requirements import Requirement
+from packaging.markers import UndefinedComparison
 
 
 class PipManagerException(Exception):
@@ -30,7 +32,7 @@ class PipManagerException(Exception):
         self.message = f"包管理错误: {message}"
 
 
-class PackageManager:
+class PipTool:
     """Python包管理核心类
 
     提供完整的包管理功能, 包括：
@@ -282,7 +284,11 @@ class PackageManager:
         Example:
             >>> await pm.generate_dependency_tree("requests")
             {
-                "package": "requests",
+                "package": {
+                    "key": "requests",
+                    "package_name": "requests",
+                    "installed_version": "2.32.3"
+                    },
                 "dependencies": [
                     {"package": "chardet", "version": "3.0.4"},
                     ...
@@ -303,45 +309,70 @@ class PackageManager:
             raise PipManagerException("依赖分析失败") from exc
 
     def verify_environment(self) -> Dict[str, List]:
-        """验证当前环境依赖兼容性
-
-        Returns:
-            包含冲突信息的字典:
-            {
-                "conflicts": [
-                    {
-                        "package": 包名称,
-                        "required": 依赖要求,
-                        "installed": 已安装版本
-                    },
-                    ...
-                ]
-            }
-
-        Example:
-            >>> pm.verify_environment()
-            {
-                "conflicts": [
-                    {
-                        "package": "numpy",
-                        "required": ">=1.20.0",
-                        "installed": "1.19.5"
-                    }
-                ]
-            }
-        """
+        """验证当前环境依赖兼容性（优化版）"""
         conflicts = []
-        for pkg in self.list_installed() or []:
+        installed = {}
+
+        # 获取所有已安装包的名称和版本（小写规范化）
+        for dist in importlib.metadata.distributions():
+            name = dist.metadata.get("Name", "").lower()
+            if name:  # 跳过无法获取名称的包
+                installed[name] = dist.version
+
+        # 检查每个包的依赖关系
+        for dist in importlib.metadata.distributions():
+            package_name = dist.metadata.get("Name", "").lower()
+            if not package_name:
+                continue
+
             try:
-                for req in self._parse_requirements(pkg["name"]):
-                    if not self._check_requirement(req):
-                        conflicts.append({
-                            "package": pkg["name"],
-                            "required": str(req.specifier),
-                            "installed": self.show_info(req.name)["version"]
-                        })
+                requirements = importlib.metadata.requires(package_name) or []
             except Exception:
                 continue
+
+            for req_str in requirements:
+                try:
+                    req = Requirement(req_str)
+                except:
+                    continue  # 跳过解析失败的依赖
+
+                # 处理环境标记
+                if req.marker:
+                    try:
+                        if not req.marker.evaluate():
+                            continue
+                    except UndefinedComparison:
+                        continue  # 跳过包含未定义变量的条件
+                    except:
+                        continue  # 其他异常跳过
+
+                dep_name = req.name.lower()
+                installed_version = installed.get(dep_name)
+                required_version = req.specifier
+
+                # 跳过没有版本要求
+                if not required_version:
+                    continue
+
+                # 依赖未安装
+                if installed_version is None:
+                    conflicts.append({
+                        "package": package_name,
+                        "dependency": dep_name,
+                        "required": str(req.specifier),
+                        "installed": None
+                    })
+                    continue
+
+                # 版本不满足要求
+                if not req.specifier.contains(installed_version, prereleases=True):
+                    conflicts.append({
+                        "package": package_name,
+                        "dependency": dep_name,
+                        "required": str(req.specifier),
+                        "installed": installed_version
+                    })
+
         return {"conflicts": conflicts}
 
     def _parse_requirements(self, package: str) -> List[Requirement]:
@@ -361,19 +392,20 @@ class PackageManager:
 if __name__ == "__main__":
     def main():
         """示例用法"""
-        pm = PackageManager()
+        pm = PipTool()
         
-        # 安装包
-        print(pm.install("requests"))
+        # # 安装包
+        # print(pm.install("requests"))
         
-        # 列出已安装包
-        print(pm.list_installed(format="json"))
+        # # 列出已安装包
+        # print(pm.list_installed(format="json"))
         
-        # 显示包信息
-        print(pm.show_info("requests"))
+        # # 显示包信息
+        # print(pm.show_info("requests"))
         
-        # 生成依赖树
-        print(pm.generate_dependency_tree("requests"))
+        # # 生成依赖树
+        # print()
+        # print(json.dumps(pm.generate_dependency_tree("requests")))
         
         # 环境验证
         print(pm.verify_environment())

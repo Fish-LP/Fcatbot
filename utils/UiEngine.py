@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-03-07 23:51:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-08 16:03:56
+# @LastEditTime : 2025-03-08 20:29:43
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -105,8 +105,12 @@ class TerminalUI:
             'scroll': 0,               # 滚动偏移量
             'selected': 0,             # 选中项索引
             'selections': set(),       # 多选模式下的选中集合
-            'expanded_nodes': set()    # 树状结构展开的节点ID集合
+            'expanded_nodes': set(),   # 树状结构展开的节点ID集合
         }
+        
+        # 按键处理器
+        self.global_handlers = {}      # 全局按键处理器
+        self.menu_handlers = {}        # 每个菜单的按键处理器
 
     def _init_colors(self) -> None:
         """初始化颜色对配置
@@ -240,7 +244,7 @@ class TerminalUI:
             'checkbox': self._draw_checkbox_list
         }
         
-        if content_type in render_methods:
+        if (content_type in render_methods):
             render_methods[content_type](current_item['content'])
         else:
             self._draw_list_content(current_item.get('content', []))
@@ -264,9 +268,12 @@ class TerminalUI:
                 
             text = items[idx]
             attr = self.get_theme('content')
-            if idx == self.content_state['selected'] and self.focus == 'content':
-                attr |= curses.A_REVERSE
-                
+            
+            # 高亮显示当前编辑项
+            if idx == self.content_state['selected']:
+                if self.focus == 'content':
+                    attr |= curses.A_REVERSE
+                    
             try:
                 self.content_win.addstr(i+1, 2, text[:self.content_win.getmaxyx()[1]-4], attr)
             except curses.error:
@@ -414,15 +421,24 @@ class TerminalUI:
         self.sidebar_win.refresh()
 
     def draw_status(self, message: str = "") -> None:
-        """绘制状态栏
-        
-        Args:
-            message: 状态信息文本
-        """
+        """绘制状态栏(支持输入模式)"""
         self.status_win.erase()
         color = self.get_theme('status')
+        
+        if getattr(self, 'input_state', {}).get('active'):
+            input_prompt = self.input_state['prompt']
+            input_buffer = self.input_state['buffer']
+            error = self.input_state.get('error')
+            
+            if error:
+                color = self.get_theme('error')
+                self.status_win.addstr(1, 2, f"{ICONS['error']} {error}")
+            else:
+                self.status_win.addstr(1, 2, f"{input_prompt}: {input_buffer}_")
+        else:
+            self.status_win.addstr(1, 2, f"{ICONS['progress']} {message}")
+            
         self.status_win.bkgd(' ', color)
-        self.status_win.addstr(1, 2, f"{ICONS['progress']} {message}")
         self.status_win.refresh()
 
     def _draw_scrollbar(self) -> None:
@@ -443,13 +459,52 @@ class TerminalUI:
             self.content_win.chgat(y+1, self.content_win.getmaxyx()[1]-3, 1, curses.A_REVERSE)
 
     def handle_input(self) -> None:
-        """处理键盘输入事件"""
+        """处理输入事件(支持状态栏输入)"""
         key = self.stdscr.getch()
         
+        # 状态栏输入模式
+        if getattr(self, 'input_state', {}).get('active'):
+            if key == 10:  # Enter
+                value = self.input_state['buffer']
+                if self.input_state.get('validator'):
+                    try:
+                        if not self.input_state['validator'](value):
+                            self.input_state['error'] = '输入验证失败'
+                            self.draw_status()
+                            return
+                    except Exception as e:
+                        self.input_state['error'] = str(e)
+                        self.draw_status()
+                        return
+                        
+                self.input_state['active'] = False
+                self.input_state['callback'](value)
+                self.draw_status()
+            elif key == 27:  # ESC
+                self.input_state['active'] = False
+                self.draw_status()
+            elif key == curses.KEY_BACKSPACE:
+                self.input_state['buffer'] = self.input_state['buffer'][:-1]
+                self.draw_status()
+            elif 32 <= key <= 126:  # 可打印字符
+                self.input_state['buffer'] += chr(key)
+                self.draw_status()
+            return
+            
+        # 常规模式处理
+        # 全局快捷键
         if key == ord('q'):
             self.running = False
         elif key == ord('t'):
             self._switch_theme()
+        elif key == ord('h'):  # 帮助
+            self._show_help()
+        elif key == curses.KEY_F5 or key == ord('r'):  # 刷新数据
+            self._refresh_data()
+        elif key == 9:  # Tab键切换焦点
+            self._switch_focus()
+        
+        # 焦点区域分派
         elif self.focus == 'menu':
             self._handle_menu_input(key)
         elif self.focus == 'content':
@@ -482,14 +537,21 @@ class TerminalUI:
                 self.menu_items[self.selected_idx]['callback'](self)
 
     def _handle_content_input(self, key: int) -> None:
-        """处理内容区域的键盘事件
-        
-        Args:
-            key: 输入的键值
-        """
+        """处理内容区域的键盘事件"""
         current_item = self.menu_items[self.selected_idx]
+        menu_id = current_item.get('id')
         content_type = current_item.get('content_type', 'list')
         
+        # 检查当前菜单的按键处理器
+        if menu_id in self.menu_handlers and key in self.menu_handlers[menu_id]:
+            self.menu_handlers[menu_id][key](self)
+            return
+            
+        # 检查全局处理器
+        if key in self.global_handlers:
+            self.global_handlers[key](self)
+            return
+            
         # 通用导航处理
         if key == curses.KEY_UP:
             self.content_state['selected'] = max(0, self.content_state['selected']-1)
@@ -499,13 +561,43 @@ class TerminalUI:
             if self.content_state['selected'] < max_items-1:
                 self.content_state['selected'] += 1
                 self._adjust_scroll()
-                
+        
         # 树状结构特定处理
-        if content_type == 'tree':
-            if key == ord(' '):  # 展开/折叠
+        elif content_type == 'tree':
+            if key == ord(' '):
                 self._toggle_tree_node()
-            elif key == 10:  # Enter键回调
+            elif key == 10:
                 self._trigger_tree_action()
+
+    def register_key_handler(self, key: int, handler: Callable[['TerminalUI'], None], 
+                           menu_id: Optional[str] = None) -> None:
+        """注册按键处理器
+        
+        Args:
+            key: 键值
+            handler: 处理函数，接收 TerminalUI 实例作为参数
+            menu_id: 可选的菜单ID，如果提供则只在该菜单下生效
+        """
+        if menu_id:
+            if menu_id not in self.menu_handlers:
+                self.menu_handlers[menu_id] = {}
+            self.menu_handlers[menu_id][key] = handler
+        else:
+            self.global_handlers[key] = handler
+
+    def unregister_key_handler(self, key: int, menu_id: Optional[str] = None) -> None:
+        """移除按键处理器
+        
+        Args:
+            key: 要移除的处理器的键值
+            menu_id: 可选的菜单ID
+        """
+        if menu_id:
+            if menu_id in self.menu_handlers and key in self.menu_handlers[menu_id]:
+                del self.menu_handlers[menu_id][key]
+        else:
+            if key in self.global_handlers:
+                del self.global_handlers[key]
 
     def _toggle_tree_node(self) -> None:
         """切换树节点的展开/折叠状态"""
@@ -543,6 +635,112 @@ class TerminalUI:
             'expanded_nodes': set()
         }
 
+    def _show_help(self) -> None:
+        """显示帮助信息"""
+        help_content = [
+            "键盘快捷键指南:",
+            "Tab - 切换焦点区域",
+            "F5/r - 刷新数据",
+            "h - 显示帮助",
+            "/ - 搜索内容",
+            "d - 删除当前项 (列表)",
+            "a - 添加新项 (列表)",
+            "空格 - 展开/折叠节点 (树)",
+            "q - 退出程序"
+        ]
+        
+        self.menu_items.append({
+            'label': '帮助',
+            'content_type': 'list',
+            'content': help_content,
+            'help': "导航快捷键说明"
+        })
+        prev_selected = self.selected_idx
+        self.selected_idx = len(self.menu_items)-1
+        self.focus = 'content'
+        self.refresh_all()
+        time.sleep(5)  # 显示5秒后自动返回
+        self.menu_items.pop()
+        self.selected_idx = prev_selected
+        self.refresh_all()
+
+    def _start_input(self, prompt: str, callback: Callable) -> None:
+        """进入输入模式
+        
+        Args:
+            prompt: 输入提示文本
+            callback: 输入完成的回调函数
+        """
+        self.input_mode = True
+        self.input_buffer = ""
+        self.input_prompt = prompt
+        self.input_callback = callback
+        self.draw_content()
+
+    def _switch_focus(self) -> None:
+        """切换焦点区域"""
+        self.focus = 'content' if self.focus == 'menu' else 'menu'
+        if self.focus == 'menu':
+            self._reset_content_state()
+
+    def _refresh_data(self) -> None:
+        """刷新当前数据"""
+        current_item = self.menu_items[self.selected_idx]
+        if 'content' in current_item and callable(current_item['content']):
+            current_item['content'] = current_item['content']()
+        self.show_message(f"{ICONS['progress']} 数据已刷新")
+
+    def _start_search(self) -> None:
+        """进入搜索模式"""
+        self.input_mode = True
+        self.input_buffer = ""
+        self.input_callback = self._perform_search
+        self.draw_content()
+
+    def _perform_search(self) -> None:
+        """执行搜索操作"""
+        search_term = self.input_buffer.lower()
+        current_content = self.menu_items[self.selected_idx]['content']
+        
+        if isinstance(current_content, list):
+            filtered = [item for item in current_content 
+                    if search_term in item.lower()]
+            self.menu_items[self.selected_idx]['content'] = filtered
+            self.content_state['selected'] = 0
+            self.content_state['scroll'] = 0
+        
+        self.input_mode = False
+        self.refresh_all()
+
+    def _delete_current_item(self) -> None:
+        """删除当前选中项"""
+        idx = self.content_state['selected']
+        content = self.menu_items[self.selected_idx]['content']
+        
+        if 0 <= idx < len(content):
+            del content[idx]
+            self.content_state['selected'] = min(idx, len(content)-1)
+            self.show_message(f"{ICONS['installed']} 项已删除")
+            self.refresh_all()
+
+    def prompt_input(self, prompt: str, callback: Callable[[str], None], 
+                    validator: Optional[Callable[[str], bool]] = None) -> None:
+        """在状态栏提示用户输入
+        
+        Args:
+            prompt: 输入提示文本
+            callback: 输入完成的回调函数
+            validator: 可选的输入验证函数
+        """
+        self.input_state = {
+            'active': True,
+            'prompt': prompt,
+            'buffer': '',
+            'callback': callback,
+            'validator': validator,
+            'error': None
+        }
+        self.draw_status()
 
 # ----------------------
 # 主程序入口
