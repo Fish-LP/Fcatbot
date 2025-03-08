@@ -10,7 +10,6 @@ import importlib
 import json
 import subprocess
 import sys
-from math import pi
 from typing import List, Dict, Optional, Union, Any
 from packaging.requirements import Requirement
 from packaging.markers import UndefinedComparison

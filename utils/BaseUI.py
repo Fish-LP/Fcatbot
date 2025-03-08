@@ -12,11 +12,6 @@ class BaseUI(TerminalUI):
         super().__init__(stdscr)
         self.handlers: Dict[str, Callable] = {}
         self.data_providers: Dict[str, Callable] = {}
-        # curses.curs_set(0)
-        # # 主循环
-        # while self.running:
-        #     self.refresh_all()
-        #     self.handle_input()
 
     def add_menu(self, label: str, content_type: str = 'list',
                 data_provider: Optional[Callable] = None,
