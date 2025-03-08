@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:41:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-07 22:46:27
+# @LastEditTime : 2025-03-08 00:22:11
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -25,7 +25,7 @@ def is_ansi_supported():
     返回:
         bool: 如果系统支持 ANSI 转义序列返回 True，否则返回 False。
     """
-    if sys.platform != "win32":
+    if not sys.platform.startswith("win"):
         # 非 Windows 系统通常支持 ANSI 转义序列
         return True
 
@@ -92,7 +92,7 @@ class Color:
     - 样式：设置样式（如加粗、下划线、反转）
     - RESET：重置所有颜和样式
     """
-    _COLOR = is_ansi_supported()# or set_console_mode(7) 等待测试
+    _COLOR = is_ansi_supported() or set_console_mode(7)
     def __getattribute__(self, name):
         if self._COLOR:
             return super().__getattribute__(name)

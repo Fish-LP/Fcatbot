@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-22 01:12:57
+# @LastEditTime : 2025-03-07 23:44:36
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -10,7 +10,7 @@ from .ws import WebSocketHandler
 from .utils import get_log
 from .DataModels import GroupMessage
 from .DataModels import PrivateMessage
-from .PluginSystem import EventBus, Event
+from .PluginSystem import EventBus, Event, PluginLoader
 from .config import OFFICIAL_PRIVATE_MESSAGE_EVENT
 from .config import OFFICIAL_GROUP_MESSAGE_EVENT
 from .config import OFFICIAL_REQUEST_EVENT
@@ -22,13 +22,18 @@ import json
 _log = get_log('FBot')
 
 class BotClient:
-    def __init__(self, event_bus: EventBus, uri: str, token: str = None):
+    def __init__(self, uri: str, token: str = None, load_plugins:bool = True):
+        self.event_bus = EventBus()
+        self.plugin_sys = PluginLoader(self.event_bus)
+        
         headers = {"Content-Type": "application/json"}
         if token:
             headers["Authorization"] = f"Bearer {token}"
-        self.event_bus = event_bus
         self.ws = WebSocketHandler(uri, headers, message_handler=self.on_message)
-    
+        
+        if load_plugins:
+            asyncio.run(self.plugin_sys.load_plugins(api=self.ws))
+
     def run(self):
         self.ws.start()  # 启动 WebSocket 连接
 

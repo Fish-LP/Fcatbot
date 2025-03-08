@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:26:43
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-06 18:31:51
+# @LastEditTime : 2025-03-07 23:38:00
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -138,6 +138,7 @@ class PluginLoader:
         从指定目录加载插件
         :param plugins_path: 插件目录路径
         """
+        if not plugins_path: plugins_path = PLUGINS_DIR
         modules = self._load_modules_from_directory(plugins_path)
         plugins = []
         for plugin in modules.values():
@@ -185,6 +186,7 @@ class PluginLoader:
         await self.unload_plugin(plugin_name)
 
         module = importlib.import_module(old_plugin.__class__.__module__)
+        # 如果模块有依赖项，这些依赖项不会自动重新加载
         importlib.reload(module)
 
         new_cls = getattr(module, old_plugin.__class__.__name__)

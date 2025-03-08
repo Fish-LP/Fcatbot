@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-06 20:39:06
+# @LastEditTime : 2025-03-07 23:43:45
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -58,7 +58,6 @@ class BasePlugin:
         
         if not self.dependencies: self.dependencies = {}
         self.event_bus = event_bus
-        self.api = self.ws
         self.lock = asyncio.Lock()  # 创建一个异步锁对象
         self.work_path = Path(PERSISTENT_DIR) / self.name
         self._event_handlers = []
@@ -134,7 +133,7 @@ class BasePlugin:
         return self.event_bus.publish_async(event)
 
     @final
-    def register_handler(self, event_type: str, handler: function, priority: int = 0) -> UUID:
+    def register_handler(self, event_type: str, handler: Callable[[Event], Any], priority: int = 0) -> UUID:
         '''注册事件处理器
         
         Args:
