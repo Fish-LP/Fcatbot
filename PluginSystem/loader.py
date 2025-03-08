@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:26:43
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-07 23:38:00
+# @LastEditTime : 2025-03-08 23:05:26
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -28,8 +28,9 @@ from .compatible import CompatibleEnrollment
 from ..config import PLUGINS_DIR, META_CONFIG_PATH
 from ..utils import get_log
 from ..utils import UniversalDataIO
+from ..utils import PipTool
 
-
+PM = PipTool()
 LOG = get_log('PluginLoader')
 
 class PluginLoader:
@@ -204,6 +205,7 @@ class PluginLoader:
         """
         modules = {}
         original_sys_path = sys.path.copy()
+        all_install = {pack['name'] for pack in PM.list_installed() if 'name' in pack}
 
         try:
             directory_path = os.path.abspath(directory_path)
@@ -212,6 +214,12 @@ class PluginLoader:
             for filename in os.listdir(directory_path):
                 if not os.path.isdir(os.path.join(directory_path, filename)):
                     continue
+                if os.path.isfile(os.path.join(directory_path, filename, "requirements.txt")):
+                    requirements = {open(os.path.join(directory_path, filename, "requirements.txt")).readlines()}
+                    if all_install <= requirements:
+                        download = requirements - requirements
+                        for pack in download:
+                            PM.install(pack)
 
                 try:
                     module = importlib.import_module(filename)
