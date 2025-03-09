@@ -70,7 +70,7 @@ __all__ = [
 > 此文件通常由pip创建
 
 ```bash
-pip freez > requirements.txt
+pip freeze > requirements.txt
 ```
 
 ### 启动脚本
