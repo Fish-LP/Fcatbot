@@ -1,6 +1,8 @@
-# Fbot
+# Fcatbot
 
 Fbot 是一个基于事件总线的插件化 QQ 机器人框架。它允许开发者通过编写插件来扩展机器人的功能。
+
+> 文档仅供参考，更新缓慢
 
 ## 核心概念
 
@@ -16,28 +18,29 @@ Fbot 是一个基于事件总线的插件化 QQ 机器人框架。它允许开�
 
 ### 环境设置
 
-1. 克隆项目到本地：
+1. 克隆项目到本地Fcatbot文件夹：
 
    ```bash
    git clone https://github.com/Fish-LP/FBot
    ```
-2. 安装依赖：
+
+2. 安装依赖与Fcatbot：
 
    ```bash
    pip install -r requirements.txt
+   pip install -e ./Fcatbot
    ```
 
 ### 编写插件
 
-创建一个新的插件文件，例如 `my_plugin.py`：
+创建一个新的插件文件文件，如 `./plugins/my_plugin/main.py`：
 
 ```python
-from Fbot.plugin_sys.base_plugin import BasePlugin
+from Fcatbot import BasePlugin
 
 class MyPlugin(BasePlugin):
     name = "MyPlugin"
     version = "1.0.0"
-    dependencies = {}
 
     async def on_load(self):
         print(f"{self.name} loaded")
@@ -52,20 +55,34 @@ class MyPlugin(BasePlugin):
         print(f"{self.name} closed")
 ```
 
+与 `__init__.py`
+
+```python
+from .main import MyPlugin
+
+__all__ = [
+    'ExamplePlugin'
+]
+```
+
+同时支持可选文件`requirements.txt`用来定义额外依赖，当插件加载时会尝试安装
+
+> 此文件通常由pip创建
+
+```bash
+pip freez > requirements.txt
+```
+
 ### 启动脚本
 
 创建一个启动脚本，例如 `start_bot.py`：
 
 ```python
-from Fbot.plugin_sys.event import EventBus, Event
-from plugins.my_plugin import MyPlugin
+from Fcatbot import BotClient, Event,
 
 def main():
-    event_bus = EventBus()
-    plugin = MyPlugin(event_bus)
-    plugin._init_()
-    event_bus.publish_sync(Event("plugin_loaded", plugin))
-    # ... 其他启动逻辑 ...
+    Client = BotClient('ws://192.168.3.14:3001')
+    Client.run()
 
 if __name__ == "__main__":
     main()
@@ -94,22 +111,9 @@ class BasePlugin:
     '''插件基类'''
     # ...existing code...
     def __init__(self, event_bus: EventBus, **kwd):
-        # ...existing code...
+        ...
         self.lock = asyncio.Lock()  # 创建一个异步锁对象
-        self._event_handlers = []
-        # ...existing code...
-
-    async def __unload__(self):
-        self._close_()
-        await self.on_unload()
-        self._save_persistent_data()
-        self.unregister_handlers()
-
-    def _load_persistent_data(self) -> Dict[str, Any]:
-        # ...existing code...
-
-    def _save_persistent_data(self):
-        # ...existing code...
+        ...
 
     def publish_sync(self, event: Event) -> List[Any]:
         return self.event_bus.publish_sync(event)
@@ -118,12 +122,10 @@ class BasePlugin:
         return self.event_bus.publish_async(event)
 
     def register_handler(self, event_type: str, handler: Callable[[Event], Any], priority: int = 0):
-        handler_id = self.event_bus.subscribe(event_type, handler, priority)
-        self._event_handlers.append(handler_id)
+        ...
 
     def unregister_handlers(self):
-        for handler_id in self._event_handlers:
-            self.event_bus.unsubscribe(handler_id)
+        ...
 
     async def on_load(self):
         pass
@@ -145,27 +147,9 @@ class BasePlugin:
 以下是一个示例插件，展示了如何处理群消息并回复：
 
 ```python
-from Fbot.plugin_sys.base_plugin import BasePlugin
-from Fbot.message import GroupMessage
-
-class ExamplePlugin(BasePlugin):
-    name = "ExamplePlugin"
-    version = "1.0.0"
-    dependencies = {}
-
-    async def on_load(self):
-        self.register_handler("group_message", self.handle_group_message)
-        print(f"{self.name} loaded")
-
-    async def on_unload(self):
-        print(f"{self.name} unloaded")
-
-    async def handle_group_message(self, event):
-        message: GroupMessage = event.data
-        if "hello" == message.row:
-            await message.reply("Hello! How can I help you?")
+pass
 ```
 
 通过这个示例插件，当机器人收到包含 "hello" 的群消息时，它会自动回复 "Hello! How can I help you?"。
 
-# 文档由ai创建，任何信息以实际实现为准
+文档仅供参考，文档更新缓慢
