@@ -1,6 +1,5 @@
-from utils import TestSuite
-from ..RBACManager import RBACManager
-from termcolor import colored
+from Fcatbot.utils import TestSuite, Color
+from Fcatbot.RBACManager import RBACManager
 import time
 
 
@@ -48,13 +47,13 @@ test_suite = TestSuite()
 
 # 可视化权限树
 time.sleep(0.5)
-print(colored("\nAdmin 权限树:", "yellow"))
+print(f"\n{Color.YELLOW}Admin 权限树:")
 print(rbac.roles["admin"].permissions.visualize())
 time.sleep(0.5)
-print(colored("\nEditor 权限树:", "yellow"))
+print(f"\n{Color.YELLOW}Editor 权限树:")
 print(rbac.roles["editor"].permissions.visualize())
 time.sleep(0.5)
-print(colored("\nViewer 权限树:", "yellow"))
+print(f"\n{Color.YELLOW}Viewer 权限树:")
 print(rbac.roles["viewer"].permissions.visualize())
 
 # 测试用户权限

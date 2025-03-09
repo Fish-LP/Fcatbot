@@ -2,14 +2,14 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 15:58:15
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-09 11:36:08
+# @LastEditTime : 2025-03-09 15:05:40
 # @Description  : PyPI包管理器UI界面
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
 import curses
 from typing import List, Dict
-from ..utils import BaseUI
-from ..utils import PipTool
+from Fcatbot.utils import BaseUI
+from Fcatbot.utils import PipTool
 
 class PipUI(BaseUI):
     def __init__(self, stdscr: curses.window):
