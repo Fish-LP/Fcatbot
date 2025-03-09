@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:32:53
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-23 17:41:28
+# @LastEditTime : 2025-03-09 15:00:17
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -17,7 +17,7 @@ def load_config(config_path="config.yaml"):
         return {}
 
 # 加载配置
-config: UniversalLoader = load_config()
+config = load_config()
 
 # 使用配置
 EVENT_QUEUE_MAX_SIZE = config.get("EVENT_QUEUE_MAX_SIZE", 64)  # 事件队列最大长度
