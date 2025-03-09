@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-13 21:47:01
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-09 11:37:02
+# @LastEditTime : 2025-03-09 14:59:50
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -106,7 +106,7 @@ class ModuleNotInstalledError(UniversalLoaderError):
 # ---------------------
 
 class UniversalLoader:
-    def __init__(self, file_path: Union[str, Path], file_type: Optional[str] = None) -> 'UniversalLoader':
+    def __init__(self, file_path: Union[str, Path], file_type: Optional[str] = None):
         """
         初始化通用加载器
         :param file_path: 文件路径
@@ -117,7 +117,6 @@ class UniversalLoader:
         self.data: Dict[str, Any] = {}
         self.file_type = file_type.lower() if file_type else self._detect_file_type()
         self._async_lock = asyncio.Lock()
-        return self
 
     def _detect_file_type(self) -> str:
         """通过文件扩展名检测文件类型"""
