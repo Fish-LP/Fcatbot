@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:15
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-22 01:22:33
+# @LastEditTime : 2025-03-09 17:28:04
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -59,8 +59,6 @@ class WebSocketClient:
         self._closed = False  # 连接是否已主动关闭
         # 使用双端队列存储消息，支持获取最新或最旧消息
         self._message_deque = collections.deque()
-        # 用于通知 recv 方法有新消息到来
-        self._message_available = asyncio.Event()
 
     async def connect(self):
         """
@@ -75,6 +73,9 @@ class WebSocketClient:
             )
             _LOG.info("连接成功！")
             self._closed = False
+            if self._message_available is None:
+                # 用于通知 recv 方法有新消息到来
+                self._message_available = asyncio.Event()
             return self.websocket
         except Exception as e:
             _LOG.error(f"连接失败: {e}")
