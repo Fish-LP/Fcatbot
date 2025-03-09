@@ -1,5 +1,5 @@
 from utils import TestSuite
-from .RBACManager import RBACManager
+from ..RBACManager import RBACManager
 from termcolor import colored
 import time
 
