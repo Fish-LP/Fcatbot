@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:41:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-08 00:22:11
+# @LastEditTime : 2025-03-09 13:55:38
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -22,7 +22,7 @@ def is_ansi_supported():
     """
     检查系统是否支持 ANSI 转义序列。
 
-    返回:
+    return:
         bool: 如果系统支持 ANSI 转义序列返回 True，否则返回 False。
     """
     if not sys.platform.startswith("win"):
@@ -62,10 +62,10 @@ def set_console_mode(mode=7):
     """
     设置控制台输出模式。
 
-    参数:
+    Args
         mode (int): 控制台模式标志，默认为7（ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING）。
 
-    返回:
+    return:
         bool: 如果操作成功返回True，否则返回False。
     """
     try:

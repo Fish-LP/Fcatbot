@@ -20,17 +20,24 @@ from ..config import PERSISTENT_DIR
 from ..ws import WebSocketHandler
 
 class BasePlugin:
-    '''插件基类
-    
-    所有插件的基类，提供了插件系统的基本功能支持。
-    
-    属性:
+    """插件基类
+
+    所有插件必须继承此类来实现插件功能。提供了插件系统所需的基本功能支持。
+
+    Attributes:
         name (str): 插件名称
-        version (str): 插件版本号
-        dependencies (dict): 插件依赖项
+        version (str): 插件版本号 
+        dependencies (dict): 插件依赖项配置
         meta_data (dict): 插件元数据
         api (WebSocketHandler): API接口处理器
-    '''
+        event_bus (EventBus): 事件总线实例
+        lock (asyncio.Lock): 异步锁对象
+        work_path (Path): 插件工作目录路径
+        data (UniversalLoader): 插件数据管理器
+        work_space (ChangeDir): 插件工作目录上下文管理器
+        first_load (bool): 是否首次加载标志
+    """
+
     name: str
     version: str
     dependencies: dict
@@ -39,15 +46,16 @@ class BasePlugin:
     
     @final
     def __init__(self, event_bus: EventBus, **kwd):
-        '''初始化插件实例
+        """初始化插件实例
         
         Args:
-            event_bus (EventBus): 事件总线实例
-            **kwd: 额外的关键字参数(作为属性)
-        
+            event_bus: 事件总线实例
+            **kwd: 额外的关键字参数，将被设置为插件属性
+            
         Raises:
             ValueError: 当缺少插件名称或版本号时抛出
-        '''
+            PluginLoadError: 当工作目录无效时抛出
+        """
         if not self.name: raise ValueError('缺失插件名称')
         if not self.version: raise ValueError('缺失插件版本号')
         if kwd:
@@ -75,13 +83,13 @@ class BasePlugin:
 
     @final
     async def __unload__(self):
-        '''卸载插件时的清理操作
+        """卸载插件时的清理操作
         
         执行插件卸载前的清理工作，保存数据并注销事件处理器
         
         Raises:
             RuntimeError: 保存持久化数据失败时抛出
-        '''
+        """
         await asyncio.to_thread(self._close_)
         await self.on_unload()
         try:
@@ -92,13 +100,13 @@ class BasePlugin:
 
     @final
     async def __onload__(self):
-        '''加载插件时的初始化操作
+        """加载插件时的初始化操作
         
         执行插件加载时的初始化工作，加载数据
         
         Raises:
             RuntimeError: 读取持久化数据失败时抛出
-        '''
+        """
         await asyncio.to_thread(self._init_)
         await self.on_load()
         try:
@@ -108,51 +116,54 @@ class BasePlugin:
 
     @final
     def publish_sync(self, event: Event) -> List[Any]:
-        '''同步发布事件
-        
+        """同步发布事件
+
         Args:
-            event (Event): 要发布的事件对象
-            
+            event: 要发布的事件对象
+
         Returns:
-            List[Any]: 事件处理器返回的结果列表
-        '''
+            event处理器的返回结果列表
+        """
         return self.event_bus.publish_sync(event)
 
     @final
     def publish_async(self, event: Event) -> Awaitable[List[Any]]:
-        '''异步发布事件
-        
+        """异步发布事件
+
         Args:
-            event (Event): 要发布的事件对象
-            
+            event: 要发布的事件对象
+
         Returns:
-            Awaitable[List[Any]]: 事件处理器返回的结果列表的可等待对象
-        '''
+            event处理器返回结果列表的awaitable对象
+        """
         return self.event_bus.publish_async(event)
 
     @final
     def register_handler(self, event_type: str, handler: Callable[[Event], Any], priority: int = 0) -> UUID:
-        '''注册事件处理器
+        """注册事件处理器
         
         Args:
-            event_type (str): 事件类型
-            handler (Callable[[Event], Any]): 事件处理函数
-            priority (int, optional): 处理器优先级，默认为0
-        '''
+            event_type: 事件类型标识符
+            handler: 事件处理函数
+            priority: 处理器优先级，数值越大优先级越高，默认为0
+            
+        Returns:
+            处理器的唯一标识UUID
+        """
         handler_id = self.event_bus.subscribe(event_type, handler, priority)
         self._event_handlers.append(handler_id)
         return handler_id
 
     @final
-    def unregister_handler(self, handler_id: UUID):
-        '''注销事件处理器(此插件注册)
+    def unregister_handler(self, handler_id: UUID) -> bool:
+        """注销指定的事件处理器
         
         Args:
-            handler_id (UUID): 事件id
-        
+            handler_id: 要注销的处理器UUID
+            
         Returns:
-            bool: 操作结果
-        '''
+            操作是否成功
+        """
         if handler_id in self._event_handlers:
             self._event_handlers.append(handler_id)
             return True
@@ -160,22 +171,22 @@ class BasePlugin:
 
     @final
     def unregister_handlers(self):
-        '''注销所有已注册的事件处理器'''
+        """注销所有已注册的事件处理器"""
         for handler_id in self._event_handlers:
             self.event_bus.unsubscribe(handler_id)
 
     async def on_load(self):
-        '''插件初始化时的钩子函数，可被子类重写'''
+        """插件初始化时的钩子函数，可被子类重写"""
         pass
 
     def _init_(self):
-        '''插件初始化时的子函数，可被子类重写'''
+        """插件初始化时的子函数，可被子类重写"""
         pass
 
     async def on_unload(self):
-        '''插件卸载时的钩子函数，可被子类重写'''
+        """插件卸载时的钩子函数，可被子类重写"""
         pass
 
     def _close_(self):
-        '''插件卸载时的子函数，可被子类重写'''
+        """插件卸载时的子函数，可被子类重写"""
         pass

@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-09 11:31:48
+# @LastEditTime : 2025-03-09 14:00:00
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -23,9 +23,20 @@ import json
 _log = get_log('FBot')
 
 class BotClient:
+    """QQ机器人客户端类.
+    
+    负责管理WebSocket连接、事件总线和插件系统。
+
+    Attributes:
+        event_bus: 事件总线实例
+        plugin_sys: 插件加载器实例
+        last_heartbeat: 最后一次心跳数据
+        ws: WebSocket处理器实例
+    """
     def __init__(self, uri: str, token: str = None, load_plugins:bool = True):
         self.event_bus = EventBus()
         self.plugin_sys = PluginLoader(self.event_bus)
+        self.last_heartbeat:dict = {}
         
         headers = {"Content-Type": "application/json"}
         if token:
@@ -38,41 +49,52 @@ class BotClient:
     def run(self):
         self.ws.start()  # 启动 WebSocket 连接
 
-    async def api(self, action: str, param: dict = None, **params) -> dict:
-        '''
-        :param action: 指定要调用的 API
-        :param params: 用于传入参数, 可选
-        :param echo  : 用于标识唯一请求
-        '''
-        return await self.ws.api(action, param or params)
+    async def api(self, action: str, **params) -> dict:
+        """调用机器人API.
+
+        Args:
+            action: API名称
+            **params: API参数
+
+        Returns:
+            dict: API响应数据
+        """
+        apiid = await self.ws.api(action, params)
+        return apiid
     
     def publish_sync(self, event: Event) -> List[Any]:
-        """
-        同步发布事件
+        """同步发布事件.
 
-        参数:
-            event: Event - 要发布的事件
+        Args:
+            event: 要发布的事件
 
-        返回值:
-            List[Any] - 所有处理器返回的结果的列表
+        Returns:
+            List[Any]: 所有处理器返回的结果列表
         """
         self.event_bus.publish_sync(event)
 
     async def publish_async(self, event: Event) -> List[Any]:
-        """
-        同步发布事件
+        """异步发布事件.
 
-        参数:
-            event: Event - 要发布的事件
+        Args:
+            event: 要发布的事件
 
-        返回值:
-            List[Any] - 所有处理器返回的结果的列表
+        Returns:
+            List[Any]: 所有处理器返回的结果列表
         """
         await self.event_bus.publish_async(event)
     
     async def on_message(self, data: str):
-        """
-        消息处理器
+        """处理接收到的WebSocket消息.
+
+        处理以下消息类型:
+            - message/message_sent: 群聊/私聊消息
+            - notice: 通知事件  
+            - request: 请求事件
+            - meta_event: 元事件(生命周期、心跳)
+
+        Args:
+            data: 接收到的消息数据(JSON格式)
         """
         msg = json.loads(data)
         if msg["post_type"] == "message" or msg["post_type"] == "message_sent":

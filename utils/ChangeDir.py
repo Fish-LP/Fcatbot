@@ -34,7 +34,7 @@ class ChangeDir(ContextDecorator):
         """
         初始化工作路径切换器。
 
-        参数:
+        Args
             path (Optional[str | UUID]): 新的工作路径。若为 None，则创建临时目录。
             create_missing (bool): 如果目标路径不存在，是否自动创建。
             keep_temp (bool): 是否在退出后暂存临时目录。

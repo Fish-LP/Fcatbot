@@ -13,16 +13,23 @@ import asyncio
 import uuid
 
 class Event:
-    """
-    事件类，用于封装事件的类型和数据
-    """
-    def __init__(self, type: str, data: Any):
-        """
-        初始化事件
+    """事件类
 
-        参数:
-            type: str - 事件的类型
-            data: Any - 事件携带的数据
+    用于封装事件信息，包含事件类型、数据及处理结果。
+
+    Attributes:
+        type (str): 事件类型标识符
+        data (Any): 事件携带的数据
+        _results (List[Any]): 事件处理的结果集合
+        _propagation_stopped (bool): 事件传播是否已停止的标志
+    """
+
+    def __init__(self, type: str, data: Any):
+        """初始化事件实例
+
+        Args:
+            type: 事件类型标识符
+            data: 事件携带的数据
         """
         self.type = type
         self.data = data
@@ -30,18 +37,17 @@ class Event:
         self._propagation_stopped = False
 
     def stop_propagation(self):
-        """
-        停止事件的传播
-        当调用此方法后，后续的处理器将不会被执行
+        """停止事件的继续传播
+        
+        调用此方法后，后续的事件处理器将不会被执行。
         """
         self._propagation_stopped = True
 
     def add_result(self, result: Any):
-        """
-        添加事件处理结果
-
-        参数:
-            result: Any - 处理器返回的结果
+        """添加事件处理结果
+        
+        Args:
+            result: 处理器返回的结果
         """
         self._results.append(result)
     
@@ -65,12 +71,12 @@ class EventBus:
         """
         订阅事件处理器，并返回处理器的唯一 ID
 
-        参数:
+        Args
             event_type: str - 事件类型或正则模式（以 're:' 开头表示正则匹配）
             handler: Callable[[Event], Any] - 事件处理器函数
             priority: int - 处理器的优先级（数字越大，优先级越高）
 
-        返回:
+        return:
             UUID - 处理器的唯一 ID
         """
         handler_id = uuid.uuid4()
@@ -91,10 +97,10 @@ class EventBus:
         """
         取消订阅事件处理器
 
-        参数:
+        Args
             handler_id: UUID - 处理器的唯一 ID
 
-        返回:
+        return:
             bool - 是否成功取消订阅
         """
         # 取消精确匹配处理器
@@ -114,10 +120,10 @@ class EventBus:
         """
         异步发布事件
 
-        参数:
+        Args
             event: Event - 要发布的事件
 
-        返回值:
+        return:
             List[Any] - 所有处理器返回的结果的列表
         """
         handlers = []
@@ -155,10 +161,10 @@ class EventBus:
         """
         同步发布事件
 
-        参数:
+        Args
             event: Event - 要发布的事件
 
-        返回值:
+        return:
             List[Any] - 所有处理器返回的结果的列表
         """
         loop = asyncio.new_event_loop()  # 创建新的事件循环
