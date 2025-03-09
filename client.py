@@ -2,10 +2,11 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-07 23:44:36
+# @LastEditTime : 2025-03-09 11:31:48
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
+from typing import Any, List
 from .ws import WebSocketHandler
 from .utils import get_log
 from .DataModels import GroupMessage
@@ -44,6 +45,30 @@ class BotClient:
         :param echo  : 用于标识唯一请求
         '''
         return await self.ws.api(action, param or params)
+    
+    def publish_sync(self, event: Event) -> List[Any]:
+        """
+        同步发布事件
+
+        参数:
+            event: Event - 要发布的事件
+
+        返回值:
+            List[Any] - 所有处理器返回的结果的列表
+        """
+        self.event_bus.publish_sync(event)
+
+    async def publish_async(self, event: Event) -> List[Any]:
+        """
+        同步发布事件
+
+        参数:
+            event: Event - 要发布的事件
+
+        返回值:
+            List[Any] - 所有处理器返回的结果的列表
+        """
+        await self.event_bus.publish_async(event)
     
     async def on_message(self, data: str):
         """
