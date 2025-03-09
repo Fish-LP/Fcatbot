@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:26:43
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-09 17:47:07
+# @LastEditTime : 2025-03-09 18:25:18
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -140,13 +140,22 @@ class PluginLoader:
         :param plugins_path: 插件目录路径
         """
         if not plugins_path: plugins_path = PLUGINS_DIR
-        modules = self._load_modules_from_directory(plugins_path)
-        plugins = []
-        for plugin in modules.values():
-            for plugin_class_name in getattr(plugin, "__all__", []):
-                plugins.append(getattr(plugin, plugin_class_name))
-        await self.from_class_load_plugins(plugins, **kwargs)
-        self.load_compatible_data()
+        if os.path.exists(plugins_path):
+            LOG.info(f"从 {os.path.abspath(plugins_path)} 导入插件")
+            modules = self._load_modules_from_directory(plugins_path)
+            plugins = []
+            for plugin in modules.values():
+                for plugin_class_name in getattr(plugin, "__all__", []):
+                    plugins.append(getattr(plugin, plugin_class_name))
+            LOG.info(f"准备加载插件 [{len(plugins)}]......")
+            await self.from_class_load_plugins(plugins, **kwargs)
+            LOG.info(f"已加载插件数 [{len(self.plugins)}]")
+            LOG.info(f"准备加载兼容内容......")
+            self.load_compatible_data()
+            LOG.info(f"兼容内容加载成功")
+        else:
+            LOG.info(f"插件目录: {os.path.abspath(plugins_path)} 不存在......跳过加载插件")
+
 
     def load_compatible_data(self):
         """

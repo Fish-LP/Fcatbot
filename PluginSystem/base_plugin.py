@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-09 18:12:25
+# @LastEditTime : 2025-03-09 18:36:06
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -90,13 +90,13 @@ class BasePlugin:
         Raises:
             RuntimeError: 保存持久化数据失败时抛出
         """
+        self.unregister_handlers()
         await asyncio.to_thread(self._close_)
         await self.on_unload()
         try:
             self.data.save()
         except (FileTypeUnknownError, SaveError, FileNotFoundError) as e:
             raise RuntimeError(self.name, f"保存持久化数据时出错: {e}")
-        self.unregister_handlers()
 
     @final
     async def __onload__(self):
