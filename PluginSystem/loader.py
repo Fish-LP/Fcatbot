@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:26:43
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-09 11:38:07
+# @LastEditTime : 2025-03-09 17:47:07
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -215,7 +215,7 @@ class PluginLoader:
                 if not os.path.isdir(os.path.join(directory_path, filename)):
                     continue
                 if os.path.isfile(os.path.join(directory_path, filename, "requirements.txt")):
-                    requirements = {open(os.path.join(directory_path, filename, "requirements.txt")).readlines()}
+                    requirements = set(open(os.path.join(directory_path, filename, "requirements.txt")).readlines())
                     if all_install <= requirements:
                         download = requirements - requirements
                         for pack in download:
