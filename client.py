@@ -2,10 +2,11 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-09 14:00:00
+# @LastEditTime : 2025-03-09 17:01:04
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
+import os
 from typing import Any, List
 from .ws import WebSocketHandler
 from .utils import get_log
@@ -16,11 +17,12 @@ from .config import OFFICIAL_PRIVATE_MESSAGE_EVENT
 from .config import OFFICIAL_GROUP_MESSAGE_EVENT
 from .config import OFFICIAL_REQUEST_EVENT
 from .config import OFFICIAL_NOTICE_EVENT
+from .config import PLUGINS_DIR
 
 import asyncio
 import json
 
-_log = get_log('FBot')
+_log = get_log('FcatBot')
 
 class BotClient:
     """QQ机器人客户端类.
@@ -44,6 +46,8 @@ class BotClient:
         self.ws = WebSocketHandler(uri, headers, message_handler=self.on_message)
         
         if load_plugins:
+            if not os.path.exists(PLUGINS_DIR):
+                os.makedirs(PLUGINS_DIR, exist_ok=True)
             asyncio.run(self.plugin_sys.load_plugins(api=self.ws))
 
     def run(self):
