@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-09 11:27:50
+# @LastEditTime : 2025-03-09 18:00:08
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -107,12 +107,13 @@ class BasePlugin:
         Raises:
             RuntimeError: 读取持久化数据失败时抛出
         """
-        await asyncio.to_thread(self._init_)
-        await self.on_load()
         try:
             self.data.load()
         except (FileTypeUnknownError, LoadError, FileNotFoundError) as e:
-            raise RuntimeError(self.name, f"读取持久化数据时出错: {e}")
+            open(self.work_path / f'{self.name}.json','w').write('{}')
+            self.data.load()
+        await asyncio.to_thread(self._init_)
+        await self.on_load()
 
     @final
     def publish_sync(self, event: Event) -> List[Any]:
