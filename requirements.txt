@@ -1,5 +1,6 @@
-aiofile==3.9.0
-aiohttp==3.11.12
-tqdm==4.67.1
-websockets==15.0
-packaging==24.2
+# pip install -e ./Fcatbot
+aiofile~=3.9.0
+aiohttp~=3.11.12
+websockets~=10.4
+packaging~=24.2
+tqdm~=4.67.1
