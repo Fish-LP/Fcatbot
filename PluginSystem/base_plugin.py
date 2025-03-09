@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-07 23:43:45
+# @LastEditTime : 2025-03-09 11:27:50
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -29,14 +29,12 @@ class BasePlugin:
         version (str): 插件版本号
         dependencies (dict): 插件依赖项
         meta_data (dict): 插件元数据
-        ws (WebSocketHandler): WebSocket连接处理器
         api (WebSocketHandler): API接口处理器
     '''
     name: str
     version: str
     dependencies: dict
     meta_data: dict
-    ws: WebSocketHandler
     api: WebSocketHandler
     
     @final
@@ -45,7 +43,7 @@ class BasePlugin:
         
         Args:
             event_bus (EventBus): 事件总线实例
-            **kwd: 额外的关键字参数
+            **kwd: 额外的关键字参数(作为属性)
         
         Raises:
             ValueError: 当缺少插件名称或版本号时抛出

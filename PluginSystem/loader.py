@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:26:43
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-08 23:05:26
+# @LastEditTime : 2025-03-09 11:38:07
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -27,7 +27,7 @@ from .event import EventBus
 from .compatible import CompatibleEnrollment
 from ..config import PLUGINS_DIR, META_CONFIG_PATH
 from ..utils import get_log
-from ..utils import UniversalDataIO
+from ..utils import UniversalLoader
 from ..utils import PipTool
 
 PM = PipTool()
@@ -47,7 +47,7 @@ class PluginLoader:
         self._dependency_graph: Dict[str, Set[str]] = {}  # 插件依赖关系图
         self._version_constraints: Dict[str, Dict[str, str]] = {}  # 插件版本约束
         if META_CONFIG_PATH:
-            self.meta_data = UniversalDataIO(META_CONFIG_PATH)
+            self.meta_data = UniversalLoader(META_CONFIG_PATH).load().data
         else:
             self.meta_data = {}
 
