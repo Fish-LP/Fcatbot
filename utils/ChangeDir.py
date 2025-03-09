@@ -2,13 +2,13 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-18 21:06:40
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-02 18:46:16
+# @LastEditTime : 2025-03-09 15:42:05
 # @Description  : 上下文管理器，用于暂时切换工作路径。
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
 import os
 import tempfile
-from typing import Optional
+from typing import Optional, Union
 from uuid import UUID, uuid4
 
 from contextlib import ContextDecorator
@@ -27,7 +27,7 @@ class ChangeDir(ContextDecorator):
 
     def __init__(
         self,
-        path: Optional[str | UUID] = None,
+        path: Optional[Union[str, UUID]] = None,
         create_missing: bool = False,
         keep_temp: bool = False
     ) -> None:
