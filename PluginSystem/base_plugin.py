@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-09 18:00:08
+# @LastEditTime : 2025-03-09 18:12:25
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -120,10 +120,10 @@ class BasePlugin:
         """同步发布事件
 
         Args:
-            event: 要发布的事件对象
+            event (Event): 要发布的事件对象
 
         Returns:
-            event处理器的返回结果列表
+            List[Any]: 事件处理器返回的结果列表
         """
         return self.event_bus.publish_sync(event)
 
@@ -132,10 +132,10 @@ class BasePlugin:
         """异步发布事件
 
         Args:
-            event: 要发布的事件对象
+            event (Event): 要发布的事件对象
 
         Returns:
-            event处理器返回结果列表的awaitable对象
+            List[Any]: 事件处理器返回的结果列表
         """
         return self.event_bus.publish_async(event)
 
@@ -144,9 +144,9 @@ class BasePlugin:
         """注册事件处理器
         
         Args:
-            event_type: 事件类型标识符
-            handler: 事件处理函数
-            priority: 处理器优先级，数值越大优先级越高，默认为0
+            event_type (str): 事件类型
+            handler (Callable[[Event], Any]): 事件处理函数
+            priority (int, optional): 处理器优先级，默认为0
             
         Returns:
             处理器的唯一标识UUID
@@ -160,10 +160,10 @@ class BasePlugin:
         """注销指定的事件处理器
         
         Args:
-            handler_id: 要注销的处理器UUID
-            
+            handler_id (UUID): 事件id
+        
         Returns:
-            操作是否成功
+            bool: 操作结果
         """
         if handler_id in self._event_handlers:
             self._event_handlers.append(handler_id)
