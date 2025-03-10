@@ -1,3 +1,11 @@
+# -------------------------
+# @Author       : Fish-LP fish.zh@outlook.com
+# @Date         : 2025-03-08 18:38:31
+# @LastEditors  : Fish-LP fish.zh@outlook.com
+# @LastEditTime : 2025-03-10 21:40:32
+# @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
+# @Copyright (c) 2025 by Fish-LP, MIT License 
+# -------------------------
 from typing import Dict, List, Optional, Callable, Any
 from .UiEngine import TerminalUI
 import curses
