@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-10 21:37:27
+# @LastEditTime : 2025-03-10 22:28:17
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -25,7 +25,7 @@ class Behavior(Enum):
 class Element:
     '''消息元素基类'''
     type: str = field(default='element')
-    behavior: Behavior = field(init=False, default=Behavior.DAFAULT)
+    behavior: Behavior = Behavior.DAFAULT
 
     def to_dict(self) -> dict:
         '''将元素转换为可序列化的字典'''
@@ -84,36 +84,46 @@ class AtAll(Element):
 @dataclass(frozen=True)
 class Image(Element):
     '''图片消息元素'''
-    sub_type: int
-    summary: str
-    url: str
-    file: Union[str, bytes]
-    file_size: int
+    sub_type: int = None
+    summary: str = None
+    url: str = None
+    file: Union[str, bytes] = None
+    file_size: int = None
     path: str = None
     type: str = field(default='image', init=False)
-
+    
     def to_dict(self) -> dict:
         return {
             'type': 'image',
-            'data': base64.b64decode(self.file).decode('utf-8')
+            'data': { 
+                'name': '图片', # [发] [选]
+                'summary': self.summary,
+                'file': self.file,
+                'sub_type': self.sub_type, # [选]
+                'file_id': self.sub_type, # [收]
+                'url': self.sub_type, # [收]
+                'path': self.sub_type, # [收]
+                'file_size': self.sub_type, # [收]
+                'file_unique': self.sub_type, # [收]
+                }
             }
 
 
 @dataclass(frozen=True)
 class Face(Element):
     '''表情消息元素'''
-    id: int
+    id: int = None
     type: str = field(default='face', init=False)
-    raw: dict
-    resultId: int
-    chainCount: Any
+    raw: dict = None
+    resultId: int = None
+    chainCount: Any = None
 
 
 @dataclass(frozen=True)
 class Reply(TopElement, Element):
     '''回复消息元素'''
-    id: int
     reply_to: int
+    id: int = None
     type: str = field(default='reply', init=False)
 
 
@@ -152,17 +162,17 @@ class Rps(OccupyElement, Element):
 @dataclass(frozen=True)
 class Music(OccupyElement, Element):
     '''音乐分享消息元素'''
+    id: int
     music_type: str
-    id: str
     type: str = field(default='music', init=False)
 
 
 @dataclass(frozen=True)
 class CustomMusic(OccupyElement, Element):
     '''自定义音乐分享消息元素'''
-    url: str
-    audio: str
-    title: str
+    url: str = None
+    audio: str = None
+    title: str = None
     image: str = None
     singer: str = None
     type: str = field(default='music', init=False)
@@ -183,11 +193,11 @@ class CustomMusic(OccupyElement, Element):
 @dataclass(frozen=True)
 class File(OccupyElement, Element):
     '''文件信息元素'''
-    file: str
-    path: str
-    url: str
-    file_id: str
+    file_id: int
     file_size: int
+    file: str = None
+    path: str = None
+    url: str = None
 
 @dataclass(frozen=True)
 class Markdown(OccupyElement, Element):

@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-10 21:31:32
+# @LastEditTime : 2025-03-10 22:33:08
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -47,7 +47,11 @@ class MessageChain:
         self.elements = []
         if elements is not None:
             for element in elements:
-                self.elements.append(self._guessing_type(data = element['data'], type_ = element.get('type', None)))
+                if isinstance(element, dict):
+                    self.elements.append(self._guessing_type(data = element['data'], type_ = element.get('type', None)))
+                elif element.type in self.type_handlers.keys():
+                    self.elements.append(element)
+        self.check_message_chain()
 
     @classmethod
     def _guessing_type(cls, data: dict, type_: str = None):
@@ -71,9 +75,7 @@ class MessageChain:
         向消息链中添加新的消息元素
         :param element: 单个消息元素或元素列表
         """
-        if isinstance(element, Element):
-            self.elements.append(element)
-        elif isinstance(element, dict):
+        if isinstance(element, dict):
             self.elements.append(self._guessing_type(element))
         elif isinstance(element, Iterable):
             for elem in element:
@@ -89,8 +91,11 @@ class MessageChain:
         从消息链中移除指定类型的所有消息元素
         :param element_type: 要移除的消息元素类型
         """
-        if isinstance(Element, element_type): types = [element_type]
-        self.elements = [event for event in self.elements if not isinstance(event, tuple(types))]
+        if isinstance(element_type, list):
+            types = tuple(element_type)
+        else:
+            types = element_type
+        self.elements = [event for event in self.elements if not isinstance(event, types)]
         return self
 
     def filter(self, element_type: Union[Element, list[Element]]) -> 'MessageChain':
@@ -98,8 +103,11 @@ class MessageChain:
         从消息链中移除指定类型外的所有消息元素
         :param element_type: 要保留的消息元素类型
         """
-        if isinstance(Element, element_type): types = [element_type]
-        self.elements = [event for event in self.elements if isinstance(event, tuple(types))]
+        if isinstance(element_type, list):
+            types = tuple(element_type)
+        else:
+            types = element_type
+        self.elements = [event for event in self.elements if isinstance(event, types)]
         return self
 
     def to_dict(self) -> List[Dict[str, Any]]:
@@ -145,10 +153,10 @@ class MessageChain:
         """
         根据索引设置消息链中的元素
         """
-        if isinstance(element, Element):
-            self.elements[index] = element
-        elif isinstance(element, dict):
+        if isinstance(element, dict):
             self.elements[index] = self._guessing_type(element)
+        elif element.type in self.type_handlers.keys():
+            self.elements[index] = element
         else:
             ValueError(f"添加的元素必须是消息元素或元素列表或字典，但收到类型为 {type(element)}")
 
@@ -172,9 +180,9 @@ class MessageChain:
         self.elements.append(Image(file=file))
         return self
 
-    def add_face(self, face_id: str) -> 'MessageChain':
+    def add_face(self, id: str) -> 'MessageChain':
         """添加表情消息元素"""
-        self.elements.append(Face(face_id=face_id))
+        self.elements.append(Face(id=id))
         return self
 
     def add_reply(self, reply_to: str) -> 'MessageChain':
@@ -182,9 +190,9 @@ class MessageChain:
         self.elements.append(Reply(reply_to=reply_to))
         return self
 
-    def add_json(self, json_msg: str) -> 'MessageChain':
+    def add_json(self, data: str) -> 'MessageChain':
         """添加 JSON 消息元素"""
-        self.elements.append(Json(json_msg=json_msg))
+        self.elements.append(Json(data=data))
         return self
 
     def add_record(self, file: str) -> 'MessageChain':
