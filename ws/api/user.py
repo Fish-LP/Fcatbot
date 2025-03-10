@@ -19,7 +19,7 @@ class UserAPi:
                 "sex": sex},
         )
 
-    async def get_user_card(self, user_id: int, phone_number: str):
+    async def get_user_card(self, user_id: str, phone_number: str):
         """
         :param user_id: QQ号
         :param phone_number: 手机号
@@ -33,7 +33,7 @@ class UserAPi:
             }
         )
 
-    async def get_group_card(self, group_id: int, phone_number: str):
+    async def get_group_card(self, group_id: str, phone_number: str):
         """
         :param group_id: 群号
         :param phone_number: 手机号

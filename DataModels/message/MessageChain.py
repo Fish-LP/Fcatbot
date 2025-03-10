@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-25 21:28:38
+# @LastEditTime : 2025-03-10 21:31:32
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -14,6 +14,22 @@ from .Nope import *
 
 class MessageChain:
     """消息链类，用于管理多个消息元素"""
+    type_handlers = {
+        'text': lambda data: Text(**data),
+        'at': lambda data: At(**data),
+        'image': lambda data: Image(**data),
+        'face': lambda data: Face(**data),
+        'reply': lambda data: Reply(**data),
+        'json': lambda data: Json(**data),
+        'record': lambda data: Record(**data),
+        'video': lambda data: Video(**data),
+        'dice': lambda data: Dice(),
+        'rps': lambda data: Rps(),
+        'music': lambda data: Music(**data),
+        'custom_music': lambda data: CustomMusic(**data),
+        'markdown': lambda data: Markdown(**data),
+        'file': lambda data: File(**data),
+    }
     
     behavior_handlers = {
         Behavior.DAFAULT:   lambda elements, element: elements,
@@ -22,7 +38,7 @@ class MessageChain:
         Behavior.OccupyType:lambda elements, element: [elt for elt in elements if elt.type == element.type],
     }
     
-    def __init__(self, elements: list = None):
+    def __init__(self, elements: List[dict] = None):
         """
         初始化消息链
         :param elements: 初始消息元素列表
@@ -31,34 +47,18 @@ class MessageChain:
         self.elements = []
         if elements is not None:
             for element in elements:
-                self.elements.append(self._guessing_type(element['data'], element['type']))
+                self.elements.append(self._guessing_type(data = element['data'], type_ = element.get('type', None)))
 
-    @staticmethod
-    def _guessing_type(data: dict, type_: str = None):
-        type_handlers = {
-            'text': lambda data: Text(**data),
-            'at': lambda data: At(**data),
-            'image': lambda data: Image(**data),
-            'face': lambda data: Face(**data),
-            'reply': lambda data: Reply(**data),
-            'json': lambda data: Json(**data),
-            'record': lambda data: Record(**data),
-            'video': lambda data: Video(**data),
-            'dice': lambda data: Dice(),
-            'rps': lambda data: Rps(),
-            'music': lambda data: Music(**data),
-            'custom_music': lambda data: CustomMusic(**data),
-            'markdown': lambda data: Markdown(**data),
-            'file': lambda daata: File(**data)
-        }
+    @classmethod
+    def _guessing_type(cls, data: dict, type_: str = None):
         if type_ is not None:
             try:
-                result = type_handlers[type_](data)
+                result = cls.type_handlers[type_](data)
                 return result
             except TypeError as e:
                 raise TypeError(f"{type_} 初始化错误 {e.args}")
 
-        for handler in type_handlers.values():
+        for handler in cls.type_handlers.values():
             try:
                 result = handler(data)
                 return result
@@ -172,7 +172,7 @@ class MessageChain:
         self.elements.append(Image(file=file))
         return self
 
-    def add_face(self, face_id: int) -> 'MessageChain':
+    def add_face(self, face_id: str) -> 'MessageChain':
         """添加表情消息元素"""
         self.elements.append(Face(face_id=face_id))
         return self

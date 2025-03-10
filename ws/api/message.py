@@ -98,7 +98,7 @@ class MessageAPi:
         )
 
     async def set_msg_emoji_like(
-        self, message_id: Union[int, str], emoji_id: int, emoji_set: bool
+        self, message_id: Union[int, str], emoji_id: str, emoji_set: bool
     ):
         """
         :param message_id: 消息ID
