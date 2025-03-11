@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-24 21:56:27
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-06 18:28:07
+# @LastEditTime : 2025-03-11 20:04:28
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -16,16 +16,19 @@ class RBACManager:
     * RBAC管理类，负责管理角色、用户和权限操作
     ! 警告: 没有进行完全的安全检查
     """
-    def __init__(self, case_sensitive: bool = False) -> None:
+    def __init__(self, case_sensitive: bool = False, max_cache:int = 64) -> None:
         """
         初始化 RBAC 管理器
         
         Args:
             case_sensitive (False): 是否区分大小写
+            max_cache (int): 最大缓存数量
         """
         self.roles: Dict[str, Role] = {}        # 角色映射
         self.users: Dict[str, User] = {}         # 用户映射
         self.case_sensitive: bool = case_sensitive  # 是否区分大小写
+        self.max_cache = max_cache
+        self._cache: Dict[tuple, bool] = {}  # 缓存查询结果
 
     def create_role(self, role_name: str) -> None:
         """
@@ -40,6 +43,8 @@ class RBACManager:
             raise ValueError(f"角色 {role_name} 已经存在")
         
         self.roles[role_name] = Role(role_name)
+        self._cache.clear()
+        return True
 
     def add_role_parent(self, role_name: str, parent_name: str) -> None:
         """
@@ -56,7 +61,9 @@ class RBACManager:
         if not role or not parent:
             raise ValueError(f"角色 {role_name} 或 {parent_name} 没有找到, 请先创建")
         
+        self._cache.clear()
         role.add_parent(parent)
+        return True
 
     def revoke_permission(self, role_name: str, path: str) -> None:
         """
@@ -71,8 +78,8 @@ class RBACManager:
         role = self.roles.get(role_name)
         if not role:
             raise ValueError(f"角色 {role_name} 没有找到, 请先创建")
-        
-        role.remove_permission(path)
+        self._cache.clear()
+        return role.remove_permission(path)
 
     def assign_permission(self, role_name: str, path: str) -> None:
         """
@@ -89,10 +96,11 @@ class RBACManager:
             raise ValueError("角色不存在")
 
         try:
+            self._cache.clear()
             role.permissions.add_permission(path, role.name)
-            
         except ValueError as e:
             raise ValueError(f"无效权限路径 '{path}': {e}")
+        return True
 
     def create_user(self, user_name: str) -> None:
         """
@@ -106,7 +114,9 @@ class RBACManager:
         if user_name in self.users:
             raise ValueError(f"用户 {user_name} 已经存在")
         
+        self._cache.clear()
         self.users[user_name] = User(user_name)
+        return True
 
     def assign_role_to_user(self, user_name: str, role_name: str) -> None:
         """
@@ -126,7 +136,9 @@ class RBACManager:
         if not role:
             raise ValueError(f"角色 {role_name} 没有找到, 请先创建")
         
+        self._cache.clear()
         user.roles.append(role)
+        return True
 
     def has_user_permission(self, user_name: str, path: str) -> bool:
         """
@@ -138,13 +150,23 @@ class RBACManager:
         Returns:
             bool: 是否拥有权限
         """
+        # 检查缓存
+        key = (user_name, path)
+        if key in self._cache:
+            return self._cache[key]
+        
         user = self.users.get(user_name)
         if not user:
+            self._cache[key] = False
             return False
         
         for role in user.roles:
             if role.permissions.has_permission(path):
+                self._cache[key] = True
+                if len(self._cache) > self.max_cache:
+                    self._cache.popitem()
                 return True
+        self._cache[key] = False
         return False
 
     def to_dict(self) -> dict:

@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-24 21:52:42
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-04 20:02:25
+# @LastEditTime : 2025-03-11 19:50:01
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -83,10 +83,7 @@ class PermissionTrie:
         segments = path.split('.') if path else []
         
         # 权限路径合法性校验
-        try:
-            self._validate_path(segments)
-        except ValueError:
-            return False  # 非法路径
+        self._validate_path(segments)
 
         # 定位到目标节点，并记录路径
         traversal_path = [(self.root, None, None)]  # (当前节点, 父节点, 进入当前节点的类型)
