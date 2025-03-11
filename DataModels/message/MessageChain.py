@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-10 22:33:08
+# @LastEditTime : 2025-03-11 18:18:25
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -81,7 +81,8 @@ class MessageChain:
             for elem in element:
                 if not isinstance(elem, Element):
                     self.elements.append(self._guessing_type(elem))
-                self.elements.append(elem)
+                else:
+                    self.elements.append(elem)
         else:
             raise TypeError(f"添加的元素必须是消息元素或元素列表或字典，但收到类型为 {type(elem)}")
         return self
