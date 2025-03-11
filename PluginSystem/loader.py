@@ -2,12 +2,13 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:26:43
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-09 18:25:18
+# @LastEditTime : 2025-03-11 21:58:21
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
 import importlib
 import asyncio
+import atexit
 import os
 import sys
 from collections import defaultdict, deque
@@ -149,6 +150,7 @@ class PluginLoader:
                     plugins.append(getattr(plugin, plugin_class_name))
             LOG.info(f"准备加载插件 [{len(plugins)}]......")
             await self.from_class_load_plugins(plugins, **kwargs)
+            atexit.register(self.unload_all)
             LOG.info(f"已加载插件数 [{len(self.plugins)}]")
             LOG.info(f"准备加载兼容内容......")
             self.load_compatible_data()
@@ -173,7 +175,7 @@ class PluginLoader:
                 else:
                     self.event_bus.subscribe(event_type, func, priority)
 
-    async def unload_plugin(self, plugin_name: str):
+    def unload_plugin(self, plugin_name: str):
         """
         卸载插件
         :param plugin_name: 插件名称
@@ -181,7 +183,7 @@ class PluginLoader:
         if plugin_name not in self.plugins:
             return
 
-        await self.plugins[plugin_name].__unload__()
+        self.plugins[plugin_name].__unload__()
         del self.plugins[plugin_name]
 
     async def reload_plugin(self, plugin_name: str):
@@ -243,10 +245,5 @@ class PluginLoader:
         return modules
 
     def unload_all(self, *arg, **kwd):
-        loop = asyncio.new_event_loop()
-        try:
-            asyncio.set_event_loop(loop)
-            tasks = [self.unload_plugin(plugin) for plugin in self.plugins.keys()]
-            loop.run_until_complete(asyncio.gather(*tasks))
-        finally:
-            loop.close()
+        for plugin in tuple(self.plugins.keys()):
+            self.unload_plugin(plugin)
