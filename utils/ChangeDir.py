@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-18 21:06:40
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-09 15:42:05
+# @LastEditTime : 2025-03-11 22:03:05
 # @Description  : 上下文管理器，用于暂时切换工作路径。
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -29,7 +29,8 @@ class ChangeDir(ContextDecorator):
         self,
         path: Optional[Union[str, UUID]] = None,
         create_missing: bool = False,
-        keep_temp: bool = False
+        keep_temp: bool = False,
+        init_path: bool = False,
     ) -> None:
         """
         初始化工作路径切换器。
@@ -38,24 +39,33 @@ class ChangeDir(ContextDecorator):
             path (Optional[str | UUID]): 新的工作路径。若为 None，则创建临时目录。
             create_missing (bool): 如果目标路径不存在，是否自动创建。
             keep_temp (bool): 是否在退出后暂存临时目录。
+            init_path (bool): 立刻初始化路径。否则在使用时初始化
         """
         self.create_missing = create_missing
         self.keep_temp = keep_temp
         self.temp_dir = None  # 临时目录管理器
         self.origin_path = os.getcwd()
+        self.path = path
+        self.init = False
         self.new_path = ""
         self.dir_id = None  # 目录对应的 UUID
+        if init_path:
+            self.init_path()
 
-        # 初始化目标路径
-        if isinstance(path, str):
-            self.new_path = os.path.abspath(path)
+    def init_path(self):
+        '''初始化目标路径'''
+        if self.init:
+            return
+        if isinstance(self.path, str):
+            self.new_path = os.path.abspath(self.path)
             self._handle_str_path()
-        elif isinstance(path, UUID):
+        elif isinstance(self.path, UUID):
             # 从路径注册表中加载路径
-            self._load_path(path)
+            self._load_path(self.path)
         else:
             # 未指定路径，创建临时目录
             self._create_temp_directory()
+        self.init = True
 
     def _handle_str_path(self) -> None:
         """
@@ -95,8 +105,9 @@ class ChangeDir(ContextDecorator):
 
     def __enter__(self) -> "UUID":
         """
-        进入上下文时，切换到新的工作路径。
+        进入上下文时，初始化并切换到新的工作路径。
         """
+        self.init_path()
         os.chdir(self.new_path)
         return self.dir_id if self.dir_id else UUID(int=0)
 
