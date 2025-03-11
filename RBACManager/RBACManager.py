@@ -2,14 +2,14 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-24 21:56:27
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-11 20:04:28
+# @LastEditTime : 2025-03-11 21:13:14
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
 from .Trie import PermissionTrie
 from .Role import Role
 from .User import User
-from typing import Dict, List
+from typing import Dict, Literal
 
 class RBACManager:
     """
@@ -22,7 +22,7 @@ class RBACManager:
         
         Args:
             case_sensitive (False): 是否区分大小写
-            max_cache (int): 最大缓存数量
+            max_cache (64): 最大缓存数量
         """
         self.roles: Dict[str, Role] = {}        # 角色映射
         self.users: Dict[str, User] = {}         # 用户映射
@@ -138,6 +138,64 @@ class RBACManager:
         
         self._cache.clear()
         user.roles.append(role)
+        return True
+
+    def revoke_role_to_user(self, user_name: str, role_name: str) -> None:
+        """
+        撤销用户的角色
+        
+        Args:
+            user_name (str): 用户名称
+            role_name (str): 角色名称
+        Raises:
+            ValueError: 如果用户或角色不存在
+        """
+        user = self.users.get(user_name)
+        role = self.roles.get(role_name)
+        if not user:
+            raise ValueError(f"用户 {user_name} 没有找到, 请先创建")
+        
+        if not role:
+            raise ValueError(f"角色 {role_name} 没有找到, 请先创建")
+        
+        self._cache.clear()
+        user.roles = [urole for urole in user.roles.copy() if urole != role]
+        return True
+
+    def assign_black_permission_to_user(self, user_name: str, path: str) -> None:
+        """
+        为用户分配拒绝权限
+        
+        Args:
+            user_name (str): 用户名称
+            path (str): 权限路径
+        Raises:
+            ValueError: 如果用户不存在
+        """
+        user = self.users.get(user_name)
+        if not user:
+            raise ValueError(f"用户 {user_name} 没有找到, 请先创建")
+        
+        user.assign_black_permission(path)
+        self._cache.clear()
+        return True
+
+    def revoke_black_permission_to_user(self, user_name: str, path: str) -> None:
+        """
+        为用户撤销拒绝权限
+        
+        Args:
+            user_name (str): 用户名称
+            path (str): 权限路径
+        Raises:
+            ValueError: 如果用户不存在
+        """
+        user = self.users.get(user_name)
+        if not user:
+            raise ValueError(f"用户 {user_name} 没有找到, 请先创建")
+        
+        user.revoke_black_permission(path)
+        self._cache.clear()
         return True
 
     def has_user_permission(self, user_name: str, path: str) -> bool:
