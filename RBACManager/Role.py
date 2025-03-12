@@ -16,9 +16,33 @@ class Role:
     """
     def __init__(self, name: str) -> None:
         self.name: str = name
-        self.parents: List['Role'] = []       # 父角色列表
-        self.permissions: PermissionTrie = PermissionTrie()  # 权限树
-        self._all_parents: Optional[List['Role']] = None   # 缓存的全部父角色列表
+        self.parents: List['Role'] = []
+        self.permissions: PermissionTrie = PermissionTrie()  # 正向权限
+        self.deny_permissions: PermissionTrie = PermissionTrie()  # 反向权限
+        self._all_parents: Optional[List['Role']] = None
+
+    def has_permission(self, path: str) -> bool:
+        """检查角色是否拥有指定权限"""
+        # 先检查反向权限
+        if self.deny_permissions.has_permission(path):
+            return False
+        return self.permissions.has_permission(path)
+
+    def assign_permission(self, path: str) -> None:
+        """分配正向权限"""
+        self.permissions.add_permission(path, self.name)
+        
+    def assign_deny_permission(self, path: str) -> None:
+        """分配反向权限"""
+        self.deny_permissions.add_permission(path, self.name)
+
+    def revoke_permission(self, path: str) -> bool:
+        """移除正向权限"""
+        return self.permissions.remove_permission(path, self.name)
+
+    def revoke_deny_permission(self, path: str) -> bool:
+        """移除反向权限"""
+        return self.deny_permissions.remove_permission(path, self.name)
 
     def remove_permission(self, path: str) -> bool:
         """调用权限树的权限移除方法"""
@@ -74,7 +98,8 @@ class Role:
         """
         return {
             "name": self.name,
-            "permissions": self.permissions.to_dict()
+            "permissions": self.permissions.to_dict(),
+            "deny_permissions": self.deny_permissions.to_dict()
         }
 
     @staticmethod
@@ -82,4 +107,5 @@ class Role:
         """从字典反序列化为角色"""
         role = Role(data["name"])
         role.permissions = PermissionTrie.from_dict(data["permissions"])
+        role.deny_permissions = PermissionTrie.from_dict(data["deny_permissions"])
         return role

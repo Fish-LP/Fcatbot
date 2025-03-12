@@ -2,10 +2,11 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-24 21:52:42
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-11 19:50:01
+# @LastEditTime : 2025-03-12 22:13:18
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
+from functools import lru_cache
 from typing import Dict, List, Optional, Set, Tuple
 from ..utils import Color
 
@@ -64,6 +65,7 @@ class PermissionTrie:
         self.root: TrieNode = TrieNode()              # 初始化根节点
         self.case_sensitive: bool = case_sensitive    # 设置是否区分大小写
 
+    @lru_cache(128)
     def normalize_path(self, path: str) -> str:
         """
         路径规范化
@@ -80,7 +82,7 @@ class PermissionTrie:
         """移除特定角色授予的权限路径"""
         # 规范化权限路径
         path = self.normalize_path(path)
-        segments = path.split('.') if path else []
+        segments = tuple(path.split('.')) if path else ()
         
         # 权限路径合法性校验
         self._validate_path(segments)
@@ -128,7 +130,8 @@ class PermissionTrie:
         self._cleanup_nodes(traversal_path)
         return removed
 
-    def _validate_path(self, segments: List[str]) -> None:
+    @lru_cache(128)
+    def _validate_path(self, segments: Tuple[str, ...]) -> None:
         """
         校验路径格式
             多级通配符**只能出现一次，并且必须位于权限路径末尾
@@ -172,11 +175,8 @@ class PermissionTrie:
     def add_permission(self, path: str, role: str) -> None:
         """添加权限路径并记录授权角色"""
         path = self.normalize_path(path)
-        segments = path.split('.') if path else []
-        
-        # 路径合法性校验
-        self._validate_path(segments)
-        
+        segments = tuple(path.split('.') if path else ())  # 转为元组以适配_validate_path
+        self._validate_path(segments)  # 参数改为元组
         current = self.root
         for i, seg in enumerate(segments):
             is_last = i == len(segments)-1
@@ -203,36 +203,46 @@ class PermissionTrie:
     def has_permission(self, path: str) -> bool:
         """检查权限是否被授予"""
         path = self.normalize_path(path)
-        segments = path.split('.') if path else []
-        return self._check_segments(segments, 0, self.root)
+        segments = tuple(path.split('.') if path else ())  # 转为元组
+        return self._check_segments(segments, 0, self.root, {})
 
-    def _check_segments(self, segments: List[str], index: int, node: TrieNode) -> bool:
+    def _check_segments(self, segments: Tuple[str, ...], index: int, node: TrieNode, memo: Dict[Tuple[int, int], bool]) -> bool:
         """递归检查路径段是否匹配"""
-        # 所有段匹配完成，判断是否到达权限终点
+        key = (id(node), index)
+        if key in memo:
+            return memo[key]
+        
         if index == len(segments):
-            return node.is_end
+            result = node.is_end
+            memo[key] = result
+            return result
         
         current_seg = segments[index]
-        if not self.case_sensitive: # 如果忽略大小写
+        if not self.case_sensitive:
             current_seg = current_seg.lower()
-
-        # 尝试精确匹配
+        
+        # 精确匹配
         if current_seg in node.children:
-            if self._check_segments(segments, index+1, node.children[current_seg]):
+            if self._check_segments(segments, index + 1, node.children[current_seg], memo):
+                memo[key] = True
                 return True
         
-        # 尝试单级通配符匹配
+        # 单级通配符*
         if node.star:
-            # 单级通配符允许匹配当前段
-            if self._check_segments(segments, index+1, node.star):
+            if self._check_segments(segments, index + 1, node.star, memo):
+                memo[key] = True
                 return True
         
-        # 尝试多级通配符匹配
+        # 多级通配符**
         if node.star_star:
-            # 多级通配符允许匹配当前段及后续所有段，或只匹配当前段
-            return node.star_star.is_end or self._check_segments(segments, index+1, node.star_star)
+            if node.star_star.is_end:
+                memo[key] = True
+                return True
+            if self._check_segments(segments, index + 1, node.star_star, memo):
+                memo[key] = True
+                return True
         
-        # 未匹配到任何段
+        memo[key] = False
         return False
 
     def visualize(self) -> str:

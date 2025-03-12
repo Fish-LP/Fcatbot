@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-24 21:55:06
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-11 21:00:14
+# @LastEditTime : 2025-03-12 22:17:58
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -19,7 +19,7 @@ class User:
     def __init__(self, user_name: str) -> None:
         self.name: str = user_name
         self.roles: List[Role] = []   # 用户关联的角色列表
-        self.black_permissions: PermissionTrie = PermissionTrie()  # 用户黑名单权限
+        self.black_permissions: PermissionTrie = PermissionTrie()  # 用户反向权限
 
     def has_permission(self, path: str) -> bool:
         """
@@ -28,28 +28,27 @@ class User:
         Args:
             path: 权限
         """
-        # 检查黑名单权限
+        # 先检查反向权限
         if self.black_permissions.has_permission(path):
             return False
-        
+
         # 检查角色权限
-        visited_roles = set()  # 记录已访问的角色
+        visited_roles = set()
         queue = deque(self.roles)
         while queue:
             role = queue.popleft()
             if role in visited_roles:
                 continue
             visited_roles.add(role)
-            # 检查当前角色的权限Trie树
-            if role.permissions.has_permission(path):
+            # 检查当前角色的权限
+            if role.has_permission(path):
                 return True
-            # 将所有父角色加入队列
             queue.extend(role.get_all_parents())
         return False
 
     def assign_black_permission(self, path: str) -> None:
         """
-        为用户直接分配黑名单权限
+        为用户分配反向权限
         
         Args:
             path: 权限"""
@@ -57,7 +56,7 @@ class User:
 
     def revoke_black_permission(self, path: str) -> None:
         """
-        移除用户的直接黑名单权限
+        移除用户的反向权限
         
         Args:
             path: 权限"""
@@ -71,12 +70,12 @@ class User:
         """
         return {
             "name": self.name,
-            "black_permissions": self.direct_permissions.to_dict()
+            "black_permissions": self.black_permissions.to_dict()
         }
 
     @staticmethod
     def from_dict(data: dict) -> 'User':
         """从字典反序列化为用户"""
         user = User(data["name"])
-        user.direct_permissions = PermissionTrie.from_dict(data["direct_permissions"])
+        user.black_permissions = PermissionTrie.from_dict(data["black_permissions"])
         return user

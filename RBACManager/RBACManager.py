@@ -2,14 +2,15 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-24 21:56:27
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-11 21:13:14
+# @LastEditTime : 2025-03-12 21:42:51
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
 from .Trie import PermissionTrie
 from .Role import Role
 from .User import User
-from typing import Dict, Literal
+from typing import Dict, Literal, List
+from collections import deque
 
 class RBACManager:
     """
@@ -30,6 +31,9 @@ class RBACManager:
         self.max_cache = max_cache
         self._cache: Dict[tuple, bool] = {}  # 缓存查询结果
 
+    # ---------------------
+    # region 角色功能类实现
+    # ---------------------
     def create_role(self, role_name: str) -> None:
         """
         创建新角色
@@ -102,6 +106,39 @@ class RBACManager:
             raise ValueError(f"无效权限路径 '{path}': {e}")
         return True
 
+    def assign_deny_permission(self, role_name: str, path: str) -> None:
+        """为角色添加反向权限"""
+        role = self.roles.get(role_name)
+        if not role:
+            raise ValueError(f"角色 {role_name} 不存在")
+        try:
+            self._cache.clear()
+            role.assign_deny_permission(path)
+        except ValueError as e:
+            raise ValueError(f"无效权限路径 '{path}': {e}")
+        return True
+
+    def revoke_deny_permission(self, role_name: str, path: str) -> None:
+        """移除角色的反向权限"""
+        role = self.roles.get(role_name)
+        if not role:
+            raise ValueError(f"角色 {role_name} 不存在")
+        self._cache.clear()
+        return role.revoke_deny_permission(path)
+
+    def get_role_permissions(self, role_name: str) -> dict:
+        """获取角色的所有权限"""
+        role = self.roles.get(role_name)
+        if not role:
+            return {}
+        return {
+            "allow": role.permissions.get_all_permissions(),
+            "deny": role.deny_permissions.get_all_permissions()
+        }
+
+    # ---------------------
+    # region 用户功能类实现
+    # ---------------------
     def create_user(self, user_name: str) -> None:
         """
         创建新用户
@@ -164,7 +201,7 @@ class RBACManager:
 
     def assign_black_permission_to_user(self, user_name: str, path: str) -> None:
         """
-        为用户分配拒绝权限
+        为用户分配反向权限
         
         Args:
             user_name (str): 用户名称
@@ -182,7 +219,7 @@ class RBACManager:
 
     def revoke_black_permission_to_user(self, user_name: str, path: str) -> None:
         """
-        为用户撤销拒绝权限
+        为用户撤销反向权限
         
         Args:
             user_name (str): 用户名称
@@ -227,6 +264,28 @@ class RBACManager:
         self._cache[key] = False
         return False
 
+    def get_user_permissions(self, user_name: str) -> List[str]:
+        """获取用户所有权限"""
+        user = self.users.get(user_name)
+        if not user:
+            return []
+        permissions = set()
+        visited_roles = set()
+        queue = deque(user.roles) 
+        
+        while queue:
+            role = queue.popleft()
+            if role in visited_roles:
+                continue
+            visited_roles.add(role)
+            permissions.update(role.permissions.get_all_permissions())
+            queue.extend(role.get_all_parents())
+            
+        return list(permissions - set(user.black_permissions.get_all_permissions()))
+
+    # ---------------------
+    # region 存储
+    # ---------------------
     def to_dict(self) -> dict:
         """将权限管理器序列化为字典"""
         return {
