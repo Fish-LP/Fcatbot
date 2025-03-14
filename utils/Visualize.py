@@ -61,7 +61,6 @@ def visualize_tree(data, parent_prefix='', is_last=True, is_root=True, level=0):
     elif isinstance(data, list):
         for i, item in enumerate(data):
             is_last_item = i + 1 == len(data)  # 判断是否是最后一个列表项
-            print(i, item, is_last_item)
             bullet = f"{Color.WHITE}•{Color.RESET}"  # 列表项目符号
             
             # 生成当前行的前缀
