@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:41:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-14 19:54:52
+# @LastEditTime : 2025-03-14 20:38:43
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -118,8 +118,6 @@ class Color:
     """前景-青"""
     WHITE = "\033[37m"
     """前景-白"""
-    RESET = "\033[0m"
-    """重置所有颜色和样式"""
     GRAY = "\033[90m"
     """前景-灰"""
 
@@ -144,6 +142,8 @@ class Color:
     """背景-灰"""
 
     # 样式
+    RESET = "\033[0m"
+    """重置所有颜色和样式"""
     BOLD = "\033[1m"
     """加粗"""
     UNDERLINE = "\033[4m"
