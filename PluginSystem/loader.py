@@ -2,13 +2,12 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:26:43
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-11 21:58:21
+# @LastEditTime : 2025-03-15 20:10:05
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
-import importlib
 import asyncio
-import atexit
+import importlib
 import os
 import sys
 from collections import defaultdict, deque
@@ -150,7 +149,6 @@ class PluginLoader:
                     plugins.append(getattr(plugin, plugin_class_name))
             LOG.info(f"准备加载插件 [{len(plugins)}]......")
             await self.from_class_load_plugins(plugins, **kwargs)
-            atexit.register(self.unload_all)
             LOG.info(f"已加载插件数 [{len(self.plugins)}]")
             LOG.info(f"准备加载兼容内容......")
             self.load_compatible_data()
@@ -175,7 +173,7 @@ class PluginLoader:
                 else:
                     self.event_bus.subscribe(event_type, func, priority)
 
-    def unload_plugin(self, plugin_name: str):
+    async def unload_plugin(self, plugin_name: str, *arg, **kwd):
         """
         卸载插件
         :param plugin_name: 插件名称
@@ -183,7 +181,7 @@ class PluginLoader:
         if plugin_name not in self.plugins:
             return
 
-        self.plugins[plugin_name].__unload__()
+        await self.plugins[plugin_name].__unload__(*arg, **kwd)
         del self.plugins[plugin_name]
 
     async def reload_plugin(self, plugin_name: str):
@@ -245,5 +243,19 @@ class PluginLoader:
         return modules
 
     def unload_all(self, *arg, **kwd):
-        for plugin in tuple(self.plugins.keys()):
-            self.unload_plugin(plugin)
+        # 创建一个新的事件循环
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)  # 设置当前线程的事件循环
+
+        try:
+            # 创建任务列表
+            tasks = [self.unload_plugin(plugin, *arg, **kwd) for plugin in self.plugins.keys()]
+            
+            # 聚合任务并运行
+            gathered = asyncio.gather(*tasks)
+            loop.run_until_complete(gathered)
+        except Exception as e:
+            LOG.error(f"在卸载某个插件时产生了错误: {e}")
+        finally:
+            # 关闭事件循环
+            loop.close()

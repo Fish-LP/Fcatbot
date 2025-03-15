@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-15 19:41:25
+# @LastEditTime : 2025-03-15 19:55:20
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -52,6 +52,7 @@ class BotClient:
                 os.makedirs(PLUGINS_DIR, exist_ok=True)
             asyncio.run(self.plugin_sys.load_plugins(api=self.ws))
         _log.info('准备启动Fcatbot')
+        self.ws.close_handler = self.plugin_sys.unload_all
         self.ws.start()  # 启动 WebSocket 连接
 
     async def api(self, action: str, **params) -> dict:

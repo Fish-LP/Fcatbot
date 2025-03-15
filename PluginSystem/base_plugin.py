@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-11 21:56:20
+# @LastEditTime : 2025-03-15 20:10:56
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -82,7 +82,7 @@ class BasePlugin:
         self.work_space = ChangeDir(self.work_path)
 
     @final
-    def __unload__(self):
+    async def __unload__(self, *arg, **kwd):
         """卸载插件时的清理操作
         
         执行插件卸载前的清理工作,保存数据并注销事件处理器
@@ -91,7 +91,8 @@ class BasePlugin:
             RuntimeError: 保存持久化数据失败时抛出
         """
         self.unregister_handlers()
-        self._close_()
+        await asyncio.to_thread(self._close_, *arg, **kwd)
+        await self.on_close(*arg, **kwd)
         try:
             self.data.save()
         except (FileTypeUnknownError, SaveError, FileNotFoundError) as e:
@@ -106,6 +107,7 @@ class BasePlugin:
         Raises:
             RuntimeError: 读取持久化数据失败时抛出
         """
+        # load时传入的参数作为属性被保存在self中
         try:
             self.data.load()
         except (FileTypeUnknownError, LoadError, FileNotFoundError) as e:
@@ -176,13 +178,17 @@ class BasePlugin:
             self.event_bus.unsubscribe(handler_id)
 
     async def on_load(self):
-        """插件初始化时的钩子函数,可被子类重写"""
+        """插件初始化时的子函数,可被子类重写"""
+        pass
+
+    async def on_close(self, *arg, **kwd):
+        """插件卸载时的子函数,可被子类重写"""
         pass
 
     def _init_(self):
         """插件初始化时的子函数,可被子类重写"""
         pass
 
-    def _close_(self):
+    def _close_(self, *arg, **kwd):
         """插件卸载时的子函数,可被子类重写"""
         pass

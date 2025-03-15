@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:15
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-15 19:39:28
+# @LastEditTime : 2025-03-15 19:51:52
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -34,7 +34,8 @@ class WebSocketClient:
         initial_reconnect_interval: int = 5,  # 初始重连间隔（秒）
         max_reconnect_interval: int = 60,     # 最大重连间隔（秒）
         max_reconnect_attempts: int = 5,      # 最大重连尝试次数
-        message_handler: Optional[MessageHandler] = None  # 自定义消息处理器
+        message_handler: Optional[Callable[[str], None]] = None,  # 自定义消息处理器
+        close_handler: Optional[Callable[[], None]] = None
     ):
         """
         WebSocket 客户端初始化方法。
@@ -45,6 +46,7 @@ class WebSocketClient:
         :param max_reconnect_interval: 最大重连间隔时间,默认为 60 秒
         :param max_reconnect_attempts: 最大重连尝试次数,默认为 5 次
         :param message_handler: 消息处理器,可选
+        :param close_handler: 额外关闭函数,可选
         """
         self.uri = uri  # WebSocket 服务器地址
         self.websocket = None  # WebSocket 连接对象
@@ -56,6 +58,7 @@ class WebSocketClient:
         self.max_reconnect_interval = max_reconnect_interval  # 最大重连间隔
         self.max_reconnect_attempts = max_reconnect_attempts  # 最大重连尝试次数
         self.message_handler = message_handler  # 自定义消息处理器
+        self.close_handler = close_handler  # 额外关闭函数
         self._closed = False  # 连接是否已主动关闭
         # 使用双端队列存储消息,支持获取最新或最旧消息
         self._message_deque = collections.deque()
@@ -186,6 +189,11 @@ class WebSocketClient:
         except KeyboardInterrupt:
             print()
             _LOG.info('用户触发主动关闭')
+            if self.close_handler:
+                try:
+                    self.close_handler()
+                except Exception as e:
+                    _LOG.error(f"自定义关闭函数产生错误: {e}")
             asyncio.run(self.disconnect(5))
 
     async def _start_client(self):
