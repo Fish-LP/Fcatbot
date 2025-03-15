@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:15
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-15 19:51:52
+# @LastEditTime : 2025-03-16 01:24:29
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -21,7 +21,7 @@ from ..utils import get_log
 _LOG = get_log('WebSocketClient')
 
 # 自定义处理器类型: 接受一个字符串参数、返回 None
-MessageHandler = Callable[[str], None]
+MessageHandler = Callable[[str], bool]
 
 class WebSocketClient:
     """
@@ -96,24 +96,14 @@ class WebSocketClient:
             await self.connect()
 
     async def _handle_websocket(self):
-        """
-        处理 WebSocket 连接的逻辑。包括接收和处理消息,以及连接关闭后的重连逻辑。
-        """
-        async for message in self.websocket:  # 不断接收服务器发来的消息
-            _LOG.debug(f"接收到消息: {message}")
-            # 将消息存入双端队列
-            self._message_deque.append(message)
-            # 通知有新消息
-            self._message_available.set()
+        """处理接收消息，自动存入队列并触发事件。"""
+        async for msg in self.websocket:
+            _LOG.debug(f"收到消息: {msg}")
+            self._message_deque.append(msg)
+            self._message_available.set()  # 触发有新消息
+            # 若有自定义处理器，异步调用
             if self.message_handler:
-                # 如果用户提供了自定义处理器,则调用该处理器
-                await self._invoke_handler(message)
-            else:
-                # 如果没有自定义处理器,使用默认处理器
-                self._default_message_handler(message)
-        # 如果 WebSocket 连接断开,并且客户端仍处于运行状态,则尝试重连
-        if self.running and not self._closed:
-            await self._start_reconnect()
+                asyncio.create_task(self._invoke_handler(msg))
 
     async def _invoke_handler(self, data: str):
         """
@@ -123,7 +113,7 @@ class WebSocketClient:
         """
         try:
             # 调用自定义处理器,处理接收到的消息
-            await self.message_handler(data)
+            return await self.message_handler(data)
         except Exception as e:
             _LOG.error(f"自定义处理器抛出异常: {e}")
 
@@ -231,39 +221,39 @@ class WebSocketClient:
             except:
                 pass
 
-    async def send_data(self, data: str, wait: bool = True):
+    async def send_data(
+        self, 
+        data: str, 
+        wait: bool = True, 
+        response_prefer: str = 'oldest'
+    ) -> Optional[str]:
         """
-        发送数据前确保 WebSocket 连接已建立
+        发送数据并可选等待响应。
+
+        :param data: 要发送的数据。
+        :param wait: 是否等待响应，默认是。
+        :param response_prefer: 响应获取方式，默认'oldest'。
+        :return: 响应内容或发送状态。
         """
         if not self.websocket:
-            _LOG.error("WebSocket 连接尚未建立,请稍后再试！")
-            return None
+            _LOG.error("未连接，发送失败！")
+            return False
 
         try:
-            # 发送数据
-            if data is None:
-                _LOG.warning("没有数据可发送！")
-                return None
-
-            if isinstance(data, dict):
-                await self.websocket.send(json.dumps(data))
-            else:
-                await self.websocket.send(str(data))
-
-            _LOG.debug(f"发送数据成功: {data}")
-
+            await self.websocket.send(data)
+            _LOG.debug(f"发送成功: {data}")
+            
             if wait:
-                self._message_available.clear()
-                response = await self.recv(prefer = 'wait', wait = True)
-                _LOG.debug(f"服务器响应: {response}")
+                response = await self.recv(wait=True)
+                _LOG.debug(f"收到响应: {response}")
                 return response
             return True
-        except websockets.exceptions.ConnectionClosed as e:
-            _LOG.error(f"WebSocket 连接关闭: {e}")
-            return None
+        except websockets.ConnectionClosed:
+            _LOG.error("连接已关闭，发送失败！")
+            return False
         except Exception as e:
-            _LOG.error(f"发送数据时发生异常: {e}")
-            return None
+            _LOG.error(f"发送异常: {e}")
+            return False
 
     async def recv(
         self,
@@ -272,45 +262,36 @@ class WebSocketClient:
         wait: bool = False
     ) -> Optional[str]:
         """
-        非阻塞地接收 WebSocket 消息。可以选择接收最新或最旧消息,并指定是否等待。
+        接收 WebSocket 消息。可选最新/最旧，支持等待新消息。
 
-        :param prefer: 可选参数,指定接收最新 ('latest','new') 或最旧 ('oldest','old') 消息,或者等待一个消息 ('wait'),默认为 'latest'。
-        :param wait: 可选参数,如果没有缓存指定是否等待直到有消息,默认为 False（不等待）。
-        :return: 接收到的消息,如果没有消息则返回 None。
+        :param prefer: 'latest'（默认）取最新，'oldest'取最旧。
+        :param wait: 无消息时是否阻塞等待，默认否。
+        :return: 消息内容，无消息且不等待时返回None。
         """
         try:
-            if prefer in ['latest', 'new']:
-                # 获取最新消息,即双端队列的末尾元素
-                message = self._message_deque.popleft() if self._message_deque else None
-            elif prefer in ['oldest', 'old']:
-                # 获取最旧消息,即双端队列的头部元素
-                message = self._message_deque.pop() if self._message_deque else None
-            elif prefer == 'wait':
-                # 等待下一个消息,不从队列中获取
+            if not wait and self._message_deque:
+                if len(self._message_deque) > 64:
+                    self._message_deque.popleft()
+                # 更新事件状态
                 self._message_available.clear()
-                await self._message_available.wait()  # 等待消息到来
-                message = self._message_deque.popleft()  # 假设消息是按顺序添加的,返回最新的
+                message = None
+                # 根据prefer选择消息
+                if prefer in ['latest', 'new']:
+                    message = self._message_deque.pop()
+                elif prefer in ['oldest', 'old']:
+                    message = self._message_deque.popleft()
+                else:
+                    _LOG.warning(f"无效prefer参数'{prefer}'，使用默认'latest'")
+                    message = self._message_deque.pop()
+
+                return message
             else:
-                # 默认行为,不指定模式
-                message = self._message_deque.popleft() if self._message_deque else None  # 默认返回最新消息
-
-            if wait and message is None:
-                # 如果需要等待,则等待下一个消息
+                if not wait:
+                    return None
+                # 等待新消息
                 self._message_available.clear()
-                await self._message_available.wait()  # 等待消息到来
-                # 获取消息后重置事件,表示已经处理过
-                self._message_available.clear()
-                # 返回最新的消息
-                message = self._message_deque.popleft() if self._message_deque else None
-            else:
-                # 如果不需要等待,直接返回消息
-                pass
-
-            return message
-
-        except IndexError:
-            # 队列为空时返回 None
-            return None
+                await self._message_available.wait()
+                return self._message_deque.pop()
         except Exception as e:
-            _LOG.error(f"接收消息时发生异常: {e}")
+            _LOG.error(f"接收消息出错: {e}")
             return None

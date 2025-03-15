@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:27
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-09 14:13:14
+# @LastEditTime : 2025-03-15 23:04:57
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -50,8 +50,13 @@ class WebSocketHandler(WebSocketClient, Apis):
         self.ping:int = -1
         self.request_cache:Dict[uuid.UUID: dict] = {}
 
-    async def api(self, action: str, param: Optional[Any] = None, 
-                 echo = uuid.uuid4().hex, wait: bool = True, **params) -> Optional[dict]:
+    async def api(self,
+                action: str,
+                param: Optional[Any] = None, 
+                echo = uuid.uuid4().hex,
+                wait: bool = True,
+                **params
+                ) -> Optional[dict]:
         """调用API接口
 
         Args:
@@ -74,7 +79,7 @@ class WebSocketHandler(WebSocketClient, Apis):
             "params": param or params,
             "echo": echo,
         }
-        re = await self.send_data(data, wait=wait)
+        re = await self.send_data(json.dumps(data), wait=wait)
         if not wait:
             return None
 
