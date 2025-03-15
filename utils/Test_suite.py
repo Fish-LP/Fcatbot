@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-24 20:45:19
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-15 17:02:39
+# @LastEditTime : 2025-03-15 19:28:54
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -116,7 +116,7 @@ class TestSuite:
     def run(self):
         """执行所有测试用例并输出美观的结果报告"""
         print(f"\n🚀 {Color.CYAN}开始执行测试: {Color.RESET}{self.test_name}")
-        print(f"{Color.CYAN + "═"*120 + Color.RESET}")
+        print(f"{Color.CYAN + '='*120 + Color.RESET}")
         
         # 打印表头
         header = (f"{Color.CYAN}{StringFormatter.visual_center('测试描述', 40)}{Color.RESET}|"
