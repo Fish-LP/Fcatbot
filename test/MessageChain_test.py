@@ -30,12 +30,12 @@ def run_message_chain_tests():
     )
 
     # 测试添加多个元素
-    message_chain = MessageChain()
     elements = [
         {"type": "text", "data": {"text": "Hello"}},
         Text(text="World"),
         Image(file="image.jpg")
     ]
+    message_chain = MessageChain(elements)
     suite.add_test(
         description="添加多个元素",
         actual=len(message_chain),

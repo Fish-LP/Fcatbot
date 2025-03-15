@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-11 18:18:25
+# @LastEditTime : 2025-03-15 18:04:40
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -49,7 +49,7 @@ class MessageChain:
             for element in elements:
                 if isinstance(element, dict):
                     self.elements.append(self._guessing_type(data = element['data'], type_ = element.get('type', None)))
-                elif element.type in self.type_handlers.keys():
+                elif getattr(element,'type',None) in set(self.type_handlers.keys()):
                     self.elements.append(element)
         self.check_message_chain()
 
@@ -81,8 +81,10 @@ class MessageChain:
             for elem in element:
                 if not isinstance(elem, Element):
                     self.elements.append(self._guessing_type(elem))
-                else:
+                elif getattr(element,'type', None) in self.type_handlers:
                     self.elements.append(elem)
+        elif getattr(element,'type', None) in set(self.type_handlers.keys()):
+            self.elements.append(element)
         else:
             raise TypeError(f"添加的元素必须是消息元素或元素列表或字典,但收到类型为 {type(elem)}")
         return self
