@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-10 22:28:17
+# @LastEditTime : 2025-03-16 01:33:52
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -122,7 +122,6 @@ class Face(Element):
 @dataclass(frozen=True)
 class Reply(TopElement, Element):
     '''回复消息元素'''
-    reply_to: int
     id: int = None
     type: str = field(default='reply', init=False)
 
