@@ -67,7 +67,7 @@ class MessageAPi:
     async def get_record(self, record_id: str, output_type: str = "mp3"):
         """
         :param record_id: 语音ID
-        :param output_type: 输出类型，枚举值: mp3, amr, wma, m4a, spx, ogg, wav, flac，默认为mp3
+        :param output_type: 输出类型,枚举值: mp3, amr, wma, m4a, spx, ogg, wav, flac,默认为mp3
         :return: 获取语音消息详情
         """
         return await self.ws_client.api(
@@ -192,7 +192,7 @@ class MessageAPi:
     async def send_poke(self, user_id: Union[int, str], group_id: Union[int, str] = None):
         """
         :param user_id: QQ号
-        :param group_id: 群号, 可选，不填则为私聊
+        :param group_id: 群号, 可选,不填则为私聊
         :return: 发送戳一戳
         """
         params = {"user_id": user_id}

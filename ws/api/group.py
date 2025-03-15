@@ -145,7 +145,7 @@ class GroupApi:
         """
         :param group_id: 群号
         :param content: 内容
-        :param image: 图片路径，可选
+        :param image: 图片路径,可选
         :return: 发送群公告
         """
         if image:
@@ -300,7 +300,7 @@ class GroupApi:
 
     async def get_group_list(self, no_cache: bool = False):
         """
-        :param no_cache: 不缓存，默认为false
+        :param no_cache: 不缓存,默认为false
         :return: 获取群列表
         """
         return await self.ws_client.api("get_group_list", {"no_cache": no_cache})

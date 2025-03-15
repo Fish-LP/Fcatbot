@@ -25,14 +25,14 @@ class SystemApi:
 
     async def ocr_image(self, image: str):
         """
-        :param image: 图片路径，支持本地路径和网络路径
+        :param image: 图片路径,支持本地路径和网络路径
         :return: OCR 图片识别
         """
         return await self.ws_client.post("ocr_image", {"image": image})
 
     async def ocr_image_new(self, image: str):
         """
-        :param image: 图片路径，支持本地路径和网络路径
+        :param image: 图片路径,支持本地路径和网络路径
         :return: OCR 图片识别
         """
         return await self.ws_client.post(".ocr_image", {"image": image})
@@ -71,8 +71,8 @@ class SystemApi:
         """
         :param thread_count: 下载线程数
         :param headers: 请求头
-        :param base64: base64 编码的图片，二选一
-        :param url: 图片 URL，二选一
+        :param base64: base64 编码的图片,二选一
+        :param url: 图片 URL,二选一
         :param name: 文件名（可选）
         :return: 下载文件
         """

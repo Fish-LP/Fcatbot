@@ -88,7 +88,7 @@ class UserAPi:
 
     async def set_qq_avatar(self, avatar: str):
         """
-        :param avatar: 头像路径，支持本地路径和网络路径
+        :param avatar: 头像路径,支持本地路径和网络路径
         :return: 设置头像
         """
         return await self.ws_client.api(

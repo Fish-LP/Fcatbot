@@ -9,12 +9,12 @@
 """
 通用文件加载器
 
-支持格式：JSON/TOML/YAML/INI/XML/PROPERTIES(/PICKLE[需手动开启])
-支持同步/异步操作，自动检测文件类型，异步锁保护异步操作
+支持格式: JSON/TOML/YAML/INI/XML/PROPERTIES(/PICKLE[需手动开启])
+支持同步/异步操作,自动检测文件类型,异步锁保护异步操作
 注意:
     1.UniversalLoader 并不是一个专门用于处理纯列表的工具
     2.读取未知来源的pickle文件可能导致任意代码执行漏洞请手动开启支持
-    3.创建UniversalLoader实例后不会立刻读取文件，请手动调用load或者aload读取文件
+    3.创建UniversalLoader实例后不会立刻读取文件,请手动调用load或者aload读取文件
 
 Raises:
     FileTypeUnknownError:       当文件类型无法识别时抛出
@@ -47,7 +47,7 @@ try:
     import toml  # type: ignore
     TOML_AVAILABLE = True
 except ImportError:
-    pass  # 非关键依赖，静默处理
+    pass  # 非关键依赖,静默处理
 
 # 异步文件操作模块检测
 AIOFILES_AVAILABLE = False
@@ -65,7 +65,7 @@ try:
     import yaml  # type: ignore
     YAML_AVAILABLE = True
 except ImportError:
-    pass  # 非关键依赖，静默处理
+    pass  # 非关键依赖,静默处理
 
 # 高性能JSON模块检测
 UJSON_AVAILABLE = False
@@ -110,7 +110,7 @@ class UniversalLoader:
         """
         初始化通用加载器
         :param file_path: 文件路径
-        :param file_type: 可选参数，手动指定文件类型（覆盖自动检测）
+        :param file_type: 可选参数,手动指定文件类型（覆盖自动检测）
         """
         # 统一路径为 Path 类型
         self.file_path: Path = Path(file_path).resolve()  # 获取绝对路径
@@ -134,7 +134,7 @@ class UniversalLoader:
         ext = self.file_path.suffix.lower().lstrip('.') if self.file_path.suffix else ''
         file_type = file_type_map.get(ext, None)
         if not file_type:
-            raise FileTypeUnknownError(f"无法识别的文件格式：{self.file_path}")
+            raise FileTypeUnknownError(f"无法识别的文件格式: {self.file_path}")
         return file_type
 
     # ---------------------
@@ -235,7 +235,7 @@ class UniversalLoader:
         self.data.update(*args, **kwargs)
 
     def pop(self, key, default=None):
-        """删除指定键并返回其对应的值；如果键不存在，则返回默认值"""
+        """删除指定键并返回其对应的值；如果键不存在,则返回默认值"""
         return self.data.pop(key, default)
 
     def popitem(self):
@@ -247,7 +247,7 @@ class UniversalLoader:
         self.data.clear()
 
     def setdefault(self, key, default=None):
-        """如果键不存在，则将键的值设为default并返回该值，否则返回原有值"""
+        """如果键不存在,则将键的值设为default并返回该值,否则返回原有值"""
         return self.data.setdefault(key, default)
 
     def __contains__(self, key):
@@ -316,7 +316,7 @@ class UniversalLoader:
                 return pickle.load(f)
         
         else:
-            raise FileTypeUnknownError(f"不支持的文件类型：{self.file_type}")
+            raise FileTypeUnknownError(f"不支持的文件类型: {self.file_type}")
     #endregion
 
     # ---------------------
@@ -377,7 +377,7 @@ class UniversalLoader:
             if not YAML_AVAILABLE:
                 raise ModuleNotInstalledError("请安装 PyYAML 模块以支持 YAML 文件")
             with open(save_path, 'w') as f:
-                # 禁用默认的排序和流式风格，保持数据顺序
+                # 禁用默认的排序和流式风格,保持数据顺序
                 yaml.dump(self.data, f, allow_unicode=True, 
                          default_flow_style=False, sort_keys=False)
         
@@ -408,7 +408,7 @@ class UniversalLoader:
                 pickle.dump(self.data, f)
         
         else:
-            raise FileTypeUnknownError(f"不支持的文件类型：{self.file_type}")
+            raise FileTypeUnknownError(f"不支持的文件类型: {self.file_type}")
     # endregion
 
     # ---------------------
@@ -470,7 +470,7 @@ class UniversalLoader:
             
             # 处理重复标签的情况
             if key in result:
-                # 如果已存在相同标签，转换为列表存储
+                # 如果已存在相同标签,转换为列表存储
                 if isinstance(result[key], list):
                     result[key].append(child_dict)
                 else:

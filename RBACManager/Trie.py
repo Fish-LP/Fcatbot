@@ -14,17 +14,17 @@ class TrieNode:
     """Trie树的节点
     
     Attributes:
-        children (Dict[str, TrieNode]): 普通子节点映射，保存精确匹配的路径段
-        star (Optional[TrieNode]): 单级通配符 `*` 指针，允许匹配任意一个路径段
-        star_star (Optional[TrieNode]): 多级通配符 `**` 指针，允许匹配任意数量的路径段
+        children (Dict[str, TrieNode]): 普通子节点映射,保存精确匹配的路径段
+        star (Optional[TrieNode]): 单级通配符 `*` 指针,允许匹配任意一个路径段
+        star_star (Optional[TrieNode]): 多级通配符 `**` 指针,允许匹配任意数量的路径段
         is_end (bool): 标志该节点是否为权限路径的终点
         granted_by (Set[str]): 拥有该权限节点权限的角色集合
     """    
     def __init__(self) -> None:
         """初始化Trie树的节点"""
-        self.children: Dict[str, TrieNode] = {}       # 普通子节点映射，保存精确匹配的路径段
-        self.star: Optional[TrieNode] = None          # 单级通配符*指针，允许匹配任意一个路径段
-        self.star_star: Optional[TrieNode] = None     # 多级通配符**指针，允许匹配任意数量的路径段
+        self.children: Dict[str, TrieNode] = {}       # 普通子节点映射,保存精确匹配的路径段
+        self.star: Optional[TrieNode] = None          # 单级通配符*指针,允许匹配任意一个路径段
+        self.star_star: Optional[TrieNode] = None     # 多级通配符**指针,允许匹配任意数量的路径段
         self.is_end: bool = False                     # 标志是否是权限路径的终点
         self.granted_by: Set[str] = set()             # 拥有该权限节点权限的角色集合
 
@@ -50,17 +50,17 @@ class TrieNode:
         return node
 
 class PermissionTrie:
-    """权限树，用于权限管理
+    """权限树,用于权限管理
     
     Attributes:
         root (TrieNode): 权限Trie树的根节点
-        case_sensitive (bool): 是否区分大小写，决定路径规范化的方式
+        case_sensitive (bool): 是否区分大小写,决定路径规范化的方式
     """
     def __init__(self, case_sensitive: bool = False) -> None:
         """初始化权限树
         
         Args:
-            case_sensitive (bool, optional): 是否区分大小写，默认为 False
+            case_sensitive (bool, optional): 是否区分大小写,默认为 False
         """
         self.root: TrieNode = TrieNode()              # 初始化根节点
         self.case_sensitive: bool = case_sensitive    # 设置是否区分大小写
@@ -87,7 +87,7 @@ class PermissionTrie:
         # 权限路径合法性校验
         self._validate_path(segments)
 
-        # 定位到目标节点，并记录路径
+        # 定位到目标节点,并记录路径
         traversal_path = [(self.root, None, None)]  # (当前节点, 父节点, 进入当前节点的类型)
         current = self.root
         removed = False
@@ -121,11 +121,11 @@ class PermissionTrie:
         current.granted_by.remove(role)
         removed = True
 
-        # 如果仍有其他角色授权，保留节点
+        # 如果仍有其他角色授权,保留节点
         if current.granted_by:
             return removed
 
-        # 标记当前节点不再作为权限终点，并尝试清理无效节点
+        # 标记当前节点不再作为权限终点,并尝试清理无效节点
         current.is_end = False
         self._cleanup_nodes(traversal_path)
         return removed
@@ -134,7 +134,7 @@ class PermissionTrie:
     def _validate_path(self, segments: Tuple[str, ...]) -> None:
         """
         校验路径格式
-            多级通配符**只能出现一次，并且必须位于权限路径末尾
+            多级通配符**只能出现一次,并且必须位于权限路径末尾
         """
         star_star_positions = [i for i, seg in enumerate(segments) if seg == "**"]
         if len(star_star_positions) > 1:
@@ -143,12 +143,12 @@ class PermissionTrie:
             raise ValueError("**通配符必须位于权限路径末尾")
 
     def _cleanup_nodes(self, traversal_path: List[Tuple[TrieNode, TrieNode, str]]) -> None:
-        """反向遍历权限路径，清理不再需要的节点"""
+        """反向遍历权限路径,清理不再需要的节点"""
         # 从子节点向上清理
         for i in range(len(traversal_path)-1, 0, -1):
             current_node, parent_node, seg_type = traversal_path[i]
             
-            # 如果当前节点有子节点或授权记录，保留
+            # 如果当前节点有子节点或授权记录,保留
             retain_cond = (
                 current_node.is_end
                 or current_node.children
@@ -187,12 +187,12 @@ class PermissionTrie:
                     current.star = TrieNode()
                 current = current.star
             elif seg == "**":
-                # 多级通配符，添加到当前节点
+                # 多级通配符,添加到当前节点
                 if not current.star_star:
                     current.star_star = TrieNode()
                 current = current.star_star
             else:
-                # 普通段，添加到子节点
+                # 普通段,添加到子节点
                 if seg not in current.children:
                     current.children[seg] = TrieNode()
                 current = current.children[seg]

@@ -5,7 +5,7 @@ def visualize_tree(data, parent_prefix='', is_last=True, is_root=True, level=0):
     # 存储每一行的列表
     lines = []
     
-    # 根据层级选择连接线的颜色，循环使用三种颜色
+    # 根据层级选择连接线的颜色,循环使用三种颜色
     connector_color = [
         Color.YELLOW,
         Color.MAGENTA,
@@ -13,13 +13,13 @@ def visualize_tree(data, parent_prefix='', is_last=True, is_root=True, level=0):
     ][level % 3]
 
     # 定义树形图的连接线和填充字符
-    # 垂直线，用于非最后一个子节点的后续行
+    # 垂直线,用于非最后一个子节点的后续行
     vertical_line = f"{connector_color}│{Color.RESET}   "
-    # 水平线，用于连接中间节点
+    # 水平线,用于连接中间节点
     horizontal_line = f"{connector_color}├──{Color.RESET} "
-    # 角落线，用于连接最后一个节点
+    # 角落线,用于连接最后一个节点
     corner_line = f"{connector_color}└──{Color.RESET} "
-    # 空格填充，用于已结束分支的对齐
+    # 空格填充,用于已结束分支的对齐
     space_fill = "    "
 
     # 如果数据是字典类型
@@ -41,7 +41,7 @@ def visualize_tree(data, parent_prefix='', is_last=True, is_root=True, level=0):
                 prefix = parent_prefix + (corner_line if is_last_item else horizontal_line)
                 new_prefix = parent_prefix + (space_fill if is_last_item else vertical_line)
 
-            # 处理键的显示，给键加上蓝色
+            # 处理键的显示,给键加上蓝色
             key_str = f"{Color.from_rgb(152, 245, 249)}{key}{Color.RESET}"
             # 将当前键添加到行列表
             lines.append(f"{prefix}{key_str}")

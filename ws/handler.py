@@ -24,7 +24,7 @@ _LOG = get_log('WsClient')
 class WebSocketHandler(WebSocketClient, Apis):
     """WebSocket 处理器类
 
-    继承自 WebSocketClient 和 Apis 类，用于管理 WebSocket 连接和 API 调用。
+    继承自 WebSocketClient 和 Apis 类,用于管理 WebSocket 连接和 API 调用。
 
     Attributes:
         ws_client (WebSocketClient): WebSocket 客户端实例
@@ -62,7 +62,7 @@ class WebSocketHandler(WebSocketClient, Apis):
             **params: 额外的API参数
 
         Returns:
-            API调用结果字典，失败时返回None
+            API调用结果字典,失败时返回None
 
         Raises:
             JSONDecodeError: 响应数据JSON解析失败

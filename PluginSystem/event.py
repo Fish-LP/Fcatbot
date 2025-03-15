@@ -15,7 +15,7 @@ import uuid
 class Event:
     """事件类
 
-    用于封装事件信息，包含事件类型、数据及处理结果。
+    用于封装事件信息,包含事件类型、数据及处理结果。
 
     Attributes:
         type (str): 事件类型标识符
@@ -39,7 +39,7 @@ class Event:
     def stop_propagation(self):
         """停止事件的继续传播
         
-        调用此方法后，后续的事件处理器将不会被执行。
+        调用此方法后,后续的事件处理器将不会被执行。
         """
         self._propagation_stopped = True
 
@@ -58,7 +58,7 @@ import asyncio
 
 class EventBus:
     """
-    事件总线类，用于管理和分发事件
+    事件总线类,用于管理和分发事件
     """
     def __init__(self):
         """
@@ -69,12 +69,12 @@ class EventBus:
 
     def subscribe(self, event_type: str, handler: Callable[[Event], Any], priority: int = 0) -> uuid.UUID:
         """
-        订阅事件处理器，并返回处理器的唯一 ID
+        订阅事件处理器,并返回处理器的唯一 ID
 
         Args
             event_type: str - 事件类型或正则模式（以 're:' 开头表示正则匹配）
             handler: Callable[[Event], Any] - 事件处理器函数
-            priority: int - 处理器的优先级（数字越大，优先级越高）
+            priority: int - 处理器的优先级（数字越大,优先级越高）
 
         return:
             UUID - 处理器的唯一 ID

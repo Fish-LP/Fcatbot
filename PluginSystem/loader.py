@@ -198,7 +198,7 @@ class PluginLoader:
         await self.unload_plugin(plugin_name)
 
         module = importlib.import_module(old_plugin.__class__.__module__)
-        # 如果模块有依赖项，这些依赖项不会自动重新加载
+        # 如果模块有依赖项,这些依赖项不会自动重新加载
         importlib.reload(module)
 
         new_cls = getattr(module, old_plugin.__class__.__name__)
@@ -211,8 +211,8 @@ class PluginLoader:
         self, directory_path: str
     ) -> Dict[str, ModuleType]:
         """
-        从指定文件夹动态加载模块，返回模块名到模块的字典。
-        不修改 `sys.path`，仅在必要时临时添加路径。
+        从指定文件夹动态加载模块,返回模块名到模块的字典。
+        不修改 `sys.path`,仅在必要时临时添加路径。
         """
         modules = {}
         original_sys_path = sys.path.copy()

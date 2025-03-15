@@ -231,7 +231,7 @@ class Markdown(OccupyElement, Element):
     type: str = field(default='markdown', init=False)
     
     def __post_init__(self, markdown: str):
-        ValueError('这是TODO，还没实现呢')
+        ValueError('这是TODO,还没实现呢')
 
     def to_dict(self) -> dict:
-        ValueError('这是TODO，还没实现呢')
+        ValueError('这是TODO,还没实现呢')

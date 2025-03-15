@@ -14,7 +14,7 @@ from collections import deque
 
 class RBACManager:
     """
-    * RBAC管理类，负责管理角色、用户和权限操作
+    * RBAC管理类,负责管理角色、用户和权限操作
     ! 警告: 没有进行完全的安全检查
     """
     def __init__(self, case_sensitive: bool = False, max_cache:int = 64) -> None:

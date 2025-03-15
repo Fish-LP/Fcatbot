@@ -50,7 +50,7 @@ class BasePlugin:
         
         Args:
             event_bus: 事件总线实例
-            **kwd: 额外的关键字参数，将被设置为插件属性
+            **kwd: 额外的关键字参数,将被设置为插件属性
             
         Raises:
             ValueError: 当缺少插件名称或版本号时抛出
@@ -85,7 +85,7 @@ class BasePlugin:
     def __unload__(self):
         """卸载插件时的清理操作
         
-        执行插件卸载前的清理工作，保存数据并注销事件处理器
+        执行插件卸载前的清理工作,保存数据并注销事件处理器
         
         Raises:
             RuntimeError: 保存持久化数据失败时抛出
@@ -101,7 +101,7 @@ class BasePlugin:
     async def __onload__(self):
         """加载插件时的初始化操作
         
-        执行插件加载时的初始化工作，加载数据
+        执行插件加载时的初始化工作,加载数据
         
         Raises:
             RuntimeError: 读取持久化数据失败时抛出
@@ -145,7 +145,7 @@ class BasePlugin:
         Args:
             event_type (str): 事件类型
             handler (Callable[[Event], Any]): 事件处理函数
-            priority (int, optional): 处理器优先级，默认为0
+            priority (int, optional): 处理器优先级,默认为0
             
         Returns:
             处理器的唯一标识UUID
@@ -176,13 +176,13 @@ class BasePlugin:
             self.event_bus.unsubscribe(handler_id)
 
     async def on_load(self):
-        """插件初始化时的钩子函数，可被子类重写"""
+        """插件初始化时的钩子函数,可被子类重写"""
         pass
 
     def _init_(self):
-        """插件初始化时的子函数，可被子类重写"""
+        """插件初始化时的子函数,可被子类重写"""
         pass
 
     def _close_(self):
-        """插件卸载时的子函数，可被子类重写"""
+        """插件卸载时的子函数,可被子类重写"""
         pass

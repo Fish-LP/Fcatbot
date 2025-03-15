@@ -129,4 +129,4 @@ class BotClient:
                 except Exception:
                     self.last_heartbeat = msg
         else:
-            _log.error("这是一个错误，请反馈给开发者\n" + str(msg))
+            _log.error("这是一个错误,请反馈给开发者\n" + str(msg))

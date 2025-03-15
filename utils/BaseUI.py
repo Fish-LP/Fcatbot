@@ -13,7 +13,7 @@ import curses
 class BaseUI(TerminalUI):
     """UI引擎基础封装类
     
-    提供常用高级功能封装，简化应用开发
+    提供常用高级功能封装,简化应用开发
     """
     
     def __init__(self, stdscr: curses.window):
@@ -102,7 +102,7 @@ class BaseUI(TerminalUI):
         Args:
             key: 键名(例如: 'a', 'F5')
             handler: 处理函数
-            menu_id: 可选的菜单ID，指定后只在该菜单下生效
+            menu_id: 可选的菜单ID,指定后只在该菜单下生效
         """
         # 转换键名到键值
         key_value = ord(key) if len(key) == 1 else getattr(curses, f'KEY_{key}', None)

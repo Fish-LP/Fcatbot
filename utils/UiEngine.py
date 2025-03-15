@@ -87,7 +87,7 @@ class TerminalUI:
         """初始化UI框架
         
         Args:
-            stdscr: curses标准窗口对象，由curses.wrapper传入
+            stdscr: curses标准窗口对象,由curses.wrapper传入
         """
         self.stdscr = stdscr
         self.theme = '深海'
@@ -115,7 +115,7 @@ class TerminalUI:
     def _init_colors(self) -> None:
         """初始化颜色对配置
         
-        根据THEMES配置创建对应的颜色对，每个主题的颜色对ID范围: 
+        根据THEMES配置创建对应的颜色对,每个主题的颜色对ID范围: 
         主题索引*10 + 颜色元素索引
         """
         curses.start_color()
@@ -140,7 +140,7 @@ class TerminalUI:
         +---------------------------------+
         """
         rows, cols = self.stdscr.getmaxyx()
-        # 调整窗口尺寸计算，确保边框可见
+        # 调整窗口尺寸计算,确保边框可见
         self.title_win = self.stdscr.subwin(3, cols-1, 0, 1)
         self.menu_win = self.stdscr.subwin(rows-6, 24, 2, 1)
         self.content_win = self.stdscr.subwin(rows-6, cols-44, 2, 25)
@@ -155,7 +155,7 @@ class TerminalUI:
         """切换当前主题
         
         Args:
-            theme_name: 主题名称，必须存在于THEMES中
+            theme_name: 主题名称,必须存在于THEMES中
             
         Raises:
             ValueError: 当主题名称无效时
@@ -197,7 +197,7 @@ class TerminalUI:
         
         Args:
             message: 要显示的消息文本
-            msg_type: 消息类型 (info/error)，影响显示颜色
+            msg_type: 消息类型 (info/error),影响显示颜色
         """
         color = self.get_theme('error' if msg_type == 'error' else 'status')
         self.status_win.bkgd(' ', color)
@@ -215,7 +215,7 @@ class TerminalUI:
         """绘制标题栏
         
         Args:
-            text: 标题文本，为空时使用默认标题
+            text: 标题文本,为空时使用默认标题
         """
         self.title_win.erase()
         color = self.get_theme('title')
@@ -225,7 +225,7 @@ class TerminalUI:
         self.title_win.refresh()
 
     def draw_content(self) -> None:
-        """绘制内容区域，根据内容类型自动分派渲染方法"""
+        """绘制内容区域,根据内容类型自动分派渲染方法"""
         self.content_win.erase()
         color = self.get_theme('content')
         self.content_win.bkgd(' ', color)
@@ -283,7 +283,7 @@ class TerminalUI:
         """渲染树状结构内容
         
         Args:
-            nodes: 树节点列表，每个节点需包含: 
+            nodes: 树节点列表,每个节点需包含: 
                 - id: 唯一标识符
                 - name: 显示名称
                 - children (可选): 子节点列表
@@ -575,8 +575,8 @@ class TerminalUI:
         
         Args:
             key: 键值
-            handler: 处理函数，接收 TerminalUI 实例作为参数
-            menu_id: 可选的菜单ID，如果提供则只在该菜单下生效
+            handler: 处理函数,接收 TerminalUI 实例作为参数
+            menu_id: 可选的菜单ID,如果提供则只在该菜单下生效
         """
         if menu_id:
             if menu_id not in self.menu_handlers:

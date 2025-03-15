@@ -49,7 +49,7 @@ class Role:
         return self.permissions.remove_permission(path, self.name)
 
     def add_parent(self, parent: 'Role') -> None:
-        """添加父角色，并检测循环依赖"""
+        """添加父角色,并检测循环依赖"""
         if self._check_cycle(parent):
             raise ValueError(f"在角色 {self.name} 继承中检测到循环")
         self.parents.append(parent)

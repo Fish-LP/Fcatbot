@@ -22,7 +22,7 @@ config = load_config()
 # 使用配置
 EVENT_QUEUE_MAX_SIZE = config.get("EVENT_QUEUE_MAX_SIZE", 64)  # 事件队列最大长度
 PLUGINS_DIR = config.get("PLUGINS_DIR", "./plugins")  # 插件目录
-META_CONFIG_PATH = config.get("META_CONFIG_PATH", None)  # 元数据，所有插件一份(只读)
+META_CONFIG_PATH = config.get("META_CONFIG_PATH", None)  # 元数据,所有插件一份(只读)
 PERSISTENT_DIR = config.get("PERSISTENT_DIR", "./data")  # 插件私有数据目录
 
 OFFICIAL_GROUP_MESSAGE_EVENT = config.get("OFFICIAL_GROUP_MESSAGE_EVENT", 'meta.bot.group')

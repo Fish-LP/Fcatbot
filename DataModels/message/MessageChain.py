@@ -13,7 +13,7 @@ import json
 from .Nope import *
 
 class MessageChain:
-    """消息链类，用于管理多个消息元素"""
+    """消息链类,用于管理多个消息元素"""
     type_handlers = {
         'text': lambda data: Text(**data),
         'at': lambda data: At(**data),
@@ -84,7 +84,7 @@ class MessageChain:
                 else:
                     self.elements.append(elem)
         else:
-            raise TypeError(f"添加的元素必须是消息元素或元素列表或字典，但收到类型为 {type(elem)}")
+            raise TypeError(f"添加的元素必须是消息元素或元素列表或字典,但收到类型为 {type(elem)}")
         return self
 
     def remove(self, element_type: Union[Element, list[Element]]) -> 'MessageChain':
@@ -159,7 +159,7 @@ class MessageChain:
         elif element.type in self.type_handlers.keys():
             self.elements[index] = element
         else:
-            ValueError(f"添加的元素必须是消息元素或元素列表或字典，但收到类型为 {type(element)}")
+            ValueError(f"添加的元素必须是消息元素或元素列表或字典,但收到类型为 {type(element)}")
 
     def add_text(self, text: str) -> 'MessageChain':
         """添加文本消息元素"""
@@ -244,7 +244,7 @@ class MessageChain:
 
     def decorate_add_methods(self, func):
         """
-        动态装饰以“add_”开头的方法，在方法执行后自动执行提供的函数 `func`
+        动态装饰以“add_”开头的方法,在方法执行后自动执行提供的函数 `func`
         :param func: 方法执行后要调用的函数
         """
         # 遍历类的实例方法

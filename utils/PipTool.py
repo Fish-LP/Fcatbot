@@ -34,7 +34,7 @@ class PipManagerException(Exception):
 class PipTool:
     """Python包管理核心类
 
-    提供完整的包管理功能, 包括：
+    提供完整的包管理功能, 包括: 
     - 包安装/卸载
     - 包信息查询
     - 依赖管理
@@ -255,7 +255,7 @@ class PipTool:
             return None
 
     def _format_output(self, data: Any, format: str) -> Any:
-        """内部方法：格式化输出数据
+        """内部方法: 格式化输出数据
 
         Args:
             data: 要格式化的原始数据

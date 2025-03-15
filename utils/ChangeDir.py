@@ -3,7 +3,7 @@
 # @Date         : 2025-02-18 21:06:40
 # @LastEditors  : Fish-LP fish.zh@outlook.com
 # @LastEditTime : 2025-03-11 22:03:05
-# @Description  : 上下文管理器，用于暂时切换工作路径。
+# @Description  : 上下文管理器,用于暂时切换工作路径。
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
 import os
@@ -20,7 +20,7 @@ LOG = get_log("ChangeDir")
 
 class ChangeDir(ContextDecorator):
     """
-    上下文管理器，用于暂时切换工作路径。
+    上下文管理器,用于暂时切换工作路径。
     支持自动恢复原始路径和目录创建/清理。
     """
     _DIRS_REGISTRY: dict[UUID, str] = {}  # 保存所有可用目录的 UUID 和路径
@@ -36,8 +36,8 @@ class ChangeDir(ContextDecorator):
         初始化工作路径切换器。
 
         Args
-            path (Optional[str | UUID]): 新的工作路径。若为 None，则创建临时目录。
-            create_missing (bool): 如果目标路径不存在，是否自动创建。
+            path (Optional[str | UUID]): 新的工作路径。若为 None,则创建临时目录。
+            create_missing (bool): 如果目标路径不存在,是否自动创建。
             keep_temp (bool): 是否在退出后暂存临时目录。
             init_path (bool): 立刻初始化路径。否则在使用时初始化
         """
@@ -63,7 +63,7 @@ class ChangeDir(ContextDecorator):
             # 从路径注册表中加载路径
             self._load_path(self.path)
         else:
-            # 未指定路径，创建临时目录
+            # 未指定路径,创建临时目录
             self._create_temp_directory()
         self.init = True
 
@@ -105,7 +105,7 @@ class ChangeDir(ContextDecorator):
 
     def __enter__(self) -> "UUID":
         """
-        进入上下文时，初始化并切换到新的工作路径。
+        进入上下文时,初始化并切换到新的工作路径。
         """
         self.init_path()
         os.chdir(self.new_path)
@@ -113,7 +113,7 @@ class ChangeDir(ContextDecorator):
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
         """
-        退出上下文时，恢复原始路径并清理临时目录。
+        退出上下文时,恢复原始路径并清理临时目录。
         """
         try:
             os.chdir(self.origin_path)
