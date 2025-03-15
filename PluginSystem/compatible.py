@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 18:38:11
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-10 21:42:08
+# @LastEditTime : 2025-03-16 02:13:04
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -13,7 +13,9 @@ from ..config import (
     OFFICIAL_PRIVATE_MESSAGE_EVENT,
     OFFICIAL_GROUP_MESSAGE_EVENT,
     OFFICIAL_REQUEST_EVENT,
-    OFFICIAL_NOTICE_EVENT
+    OFFICIAL_NOTICE_EVENT,
+    OFFICIAL_GROUP_COMMAND_EVENT,
+    OFFICIAL_PRIVATE_COMMAND_EVENT,
 )
 from ..DataModels.message import BaseMessage
 
@@ -76,4 +78,5 @@ class CompatibleEnrollment:
     group_event = _EventDecorator(OFFICIAL_GROUP_MESSAGE_EVENT)
     private_event = _EventDecorator(OFFICIAL_PRIVATE_MESSAGE_EVENT)
     notice_event = _EventDecorator(OFFICIAL_NOTICE_EVENT)
-    request_event = _EventDecorator(OFFICIAL_REQUEST_EVENT)
+    group_command = _EventDecorator(OFFICIAL_GROUP_COMMAND_EVENT)
+    private_command = _EventDecorator(OFFICIAL_PRIVATE_COMMAND_EVENT)
