@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:41:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-15 16:14:50
+# @LastEditTime : 2025-03-16 01:41:00
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -270,7 +270,7 @@ def setup_logging():
     # 控制台处理器
     console_handler = logging.StreamHandler()
     console_handler.setLevel(console_log_level)
-    console_handler.setFormatter(ColoredFormatter(log_format))
+    console_handler.setFormatter(ColoredFormatter(log_format, datefmt='%H:%M:%S'))
 
     # 文件处理器
     file_handler = TimedRotatingFileHandler(

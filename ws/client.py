@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:15
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-16 01:24:29
+# @LastEditTime : 2025-03-16 01:49:31
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -177,13 +177,15 @@ class WebSocketClient:
         try:
             asyncio.run(self._start_client())
         except KeyboardInterrupt:
-            print()
-            _LOG.info('用户触发主动关闭')
             if self.close_handler:
                 try:
+                    print()
                     self.close_handler()
                 except Exception as e:
                     _LOG.error(f"自定义关闭函数产生错误: {e}")
+            else:
+                raise KeyboardInterrupt
+        finally:
             asyncio.run(self.disconnect(5))
 
     async def _start_client(self):

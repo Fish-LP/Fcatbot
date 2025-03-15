@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-16 01:34:34
+# @LastEditTime : 2025-03-16 01:49:05
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -43,7 +43,14 @@ class BotClient:
         headers = {"Content-Type": "application/json"}
         if token:
             headers["Authorization"] = f"Bearer {token}"
-        self.ws = WebSocketHandler(uri, headers, message_handler=self.on_message)
+        self.ws = WebSocketHandler(uri, headers)
+
+    def close(self):
+        _log.info('用户主动触发关闭事件...')
+        _log.info('准备关闭所有插件...')
+        self.plugin_sys.unload_all()
+        _log.info('所有插件关闭完成')
+        _log.info('Fcatbot 关闭完成')
 
     def run(self, load_plugins:bool = True):
         if load_plugins:
@@ -52,7 +59,7 @@ class BotClient:
                 os.makedirs(PLUGINS_DIR, exist_ok=True)
             asyncio.run(self.plugin_sys.load_plugins(api=self.ws))
         _log.info('准备启动Fcatbot')
-        self.ws.close_handler = self.plugin_sys.unload_all
+        self.ws.close_handler = self.close
         self.ws.start()  # 启动 WebSocket 连接
 
     async def api(self, action: str, **params) -> dict:
