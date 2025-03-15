@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 15:16:05
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-10 21:34:35
+# @LastEditTime : 2025-03-15 19:45:37
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -25,6 +25,7 @@ class BaseMessage:
     """消息事件基类"""
     id: int = field(default=None)
     self_id: int = field(default=None)
+    real_seq: int = field(default=None)
     reply_to: int = field(default=None)
     time: int = field(default=None)
     post_type: str = field(default=None)

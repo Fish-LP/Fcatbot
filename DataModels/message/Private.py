@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-13 20:31:31
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-10 21:13:48
+# @LastEditTime : 2025-03-15 19:46:02
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -16,6 +16,7 @@ class PrivateMessage(BaseMessage):
     """私聊消息"""
     id: int
     self_id: int
+    real_seq: int
     reply_to: int
     time: int
     post_type: str

@@ -16,6 +16,7 @@ class GroupMessage(BaseMessage):
     """群聊消息"""
     id: int
     self_id: int
+    real_seq: int
     reply_to: int
     time: int
     post_type: str
