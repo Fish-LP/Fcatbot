@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-16 01:49:05
+# @LastEditTime : 2025-03-16 01:52:10
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -112,7 +112,7 @@ class BotClient:
         msg = json.loads(data)
         if 'post_type' not in msg:
             return
-        _LOG = get_log(f'Bot.{msg['self_id']}')
+        _LOG = get_log(f"Bot.{msg['self_id']}")
         if msg["post_type"] == "message" or msg["post_type"] == "message_sent":
             if msg["message_type"] == "group":
                 # 群消息
