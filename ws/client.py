@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:15
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-09 17:28:04
+# @LastEditTime : 2025-03-15 19:30:54
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -180,7 +180,10 @@ class WebSocketClient:
         """
         启动客户端,进入事件循环并尝试连接 WebSocket 服务器。
         """
-        asyncio.run(self._start_client())
+        try:
+            asyncio.run(self._start_client())
+        except KeyboardInterrupt:
+            self.disconnect(5)
 
     async def _start_client(self):
         self.running = True
