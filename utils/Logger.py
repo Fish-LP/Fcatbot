@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:41:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-14 20:38:43
+# @LastEditTime : 2025-03-15 16:14:50
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -14,6 +14,7 @@ from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
 
 from tqdm import tqdm as tqdm_original
+from .Color import Color
 
 import ctypes
 from ctypes import wintypes
@@ -23,7 +24,7 @@ def is_ansi_supported():
     检查系统是否支持 ANSI 转义序列。
 
     return:
-        bool: 如果系统支持 ANSI 转义序列返回 True，否则返回 False。
+        bool: 如果系统支持 ANSI 转义序列返回 True,否则返回 False。
     """
     if not sys.platform.startswith("win"):
         # 非 Windows 系统通常支持 ANSI 转义序列
@@ -41,7 +42,7 @@ def is_ansi_supported():
         if major_version >= 10:
             is_windows_10_or_higher = True
     except AttributeError:
-        # 如果无法获取版本信息，假设不支持
+        # 如果无法获取版本信息,假设不支持
         return False
 
     # 检查控制台是否支持虚拟终端处理
@@ -63,10 +64,10 @@ def set_console_mode(mode=7):
     设置控制台输出模式。
 
     Args
-        mode (int): 控制台模式标志，默认为7（ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING）。
+        mode (int): 控制台模式标志,默认为7（ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING）。
 
     return:
-        bool: 如果操作成功返回True，否则返回False。
+        bool: 如果操作成功返回True,否则返回False。
     """
     try:
         kernel32 = ctypes.windll.kernel32
@@ -82,175 +83,15 @@ def set_console_mode(mode=7):
         return False
     return True
 
-class Color:
-    """
-    用于在终端中显示颜色和样式。
-
-    包含以下功能:
-    - 前景: 设置颜色
-    - 背景: 设置背景颜色
-    - 样式: 设置样式（如加粗、下划线、反转）
-    - RESET: 重置所有颜色和样式
-    - from_rgb: 从 RGB 代码创建颜色
-    """
-    _COLOR = True  # 假设终端支持 ANSI 颜色，实际使用时可能需要检测
-
-    def __getattribute__(self, name):
-        if self._COLOR:
-            return super().__getattribute__(name)
-        else:
-            return ''
-
-    # 前景颜色
-    BLACK = "\033[30m"
-    """前景-黑"""
-    RED = "\033[31m"
-    """前景-红"""
-    GREEN = "\033[32m"
-    """前景-绿"""
-    YELLOW = "\033[33m"
-    """前景-黄"""
-    BLUE = "\033[34m"
-    """前景-蓝"""
-    MAGENTA = "\033[35m"
-    """前景-品红"""
-    CYAN = "\033[36m"
-    """前景-青"""
-    WHITE = "\033[37m"
-    """前景-白"""
-    GRAY = "\033[90m"
-    """前景-灰"""
-
-    # 背景颜色
-    BG_BLACK = "\033[40m"
-    """背景-黑"""
-    BG_RED = "\033[41m"
-    """背景-红"""
-    BG_GREEN = "\033[42m"
-    """背景-绿"""
-    BG_YELLOW = "\033[43m"
-    """背景-黄"""
-    BG_BLUE = "\033[44m"
-    """背景-蓝"""
-    BG_MAGENTA = "\033[45m"
-    """背景-品红"""
-    BG_CYAN = "\033[46m"
-    """背景-青"""
-    BG_WHITE = "\033[47m"
-    """背景-白"""
-    BG_GRAY = "\033[100m"
-    """背景-灰"""
-
-    # 样式
-    RESET = "\033[0m"
-    """重置所有颜色和样式"""
-    BOLD = "\033[1m"
-    """加粗"""
-    UNDERLINE = "\033[4m"
-    """下划线"""
-    REVERSE = "\033[7m"
-    """反转（前景色和背景色互换）"""
-    ITALIC = "\033[3m"
-    """斜体"""
-    BLINK = "\033[5m"
-    """闪烁"""
-    STRIKE = "\033[9m"
-    """删除线"""
-
-    @classmethod
-    def from_rgb(cls, r, g, b, background=False):
-        """
-        从 RGB 颜色代码创建颜色代码。
-
-        :param r: 红色分量 (0-255)
-        :param g: 绿色分量 (0-255)
-        :param b: 蓝色分量 (0-255)
-        :param background: 是否是背景颜色，默认为前景颜色
-        :return: ANSI 颜色代码
-        """
-        if not cls._COLOR:
-            return ''
-        if background:
-            return f"\033[48;2;{r};{g};{b}m"
-        else:
-            return f"\033[38;2;{r};{g};{b}m"
-
-    @classmethod
-    def rgb(cls, r, g, b):
-        """
-        创建前景 RGB 颜色。
-
-        :param r: 红色分量 (0-255)
-        :param g: 绿色分量 (0-255)
-        :param b: 蓝色分量 (0-255)
-        :return: ANSI 前景颜色代码
-        """
-        return cls.from_rgb(r, g, b, background=False)
-
-    @classmethod
-    def bg_rgb(cls, r, g, b):
-        """
-        创建背景 RGB 颜色。
-
-        :param r: 红色分量 (0-255)
-        :param g: 绿色分量 (0-255)
-        :param b: 蓝色分量 (0-255)
-        :return: ANSI 背景颜色代码
-        """
-        return cls.from_rgb(r, g, b, background=True)
-
-    # 256 色模式
-    @classmethod
-    def color256(cls, color_code, background=False):
-        """
-        使用 256 色模式创建颜色。
-
-        :param color_code: 256 色中的颜色编号 (0-255)
-        :param background: 是否是背景颜色，默认为前景颜色
-        :return: ANSI 颜色代码
-        """
-        if not cls._COLOR:
-            return ''
-        if background:
-            return f"\033[48;5;{color_code}m"
-        else:
-            return f"\033[38;5;{color_code}m"
-
-    @classmethod
-    def rgb256(cls, r, g, b, background=False):
-        """
-        将 RGB 颜色转换为最接近的 256 色。
-
-        :param r: 红色分量 (0-255)
-        :param g: 绿色分量 (0-255)
-        :param b: 蓝色分量 (0-255)
-        :param background: 是否是背景颜色，默认为前景颜色
-        :return: ANSI 256 色代码
-        """
-        if not cls._COLOR:
-            return ''
-        # 将 RGB 转换为 256 色
-        def rgb_to_256(r, g, b):
-            if r == g == b:  # 灰度
-                if r < 8:
-                    return 16
-                if r > 248:
-                    return 231
-                return round((r - 8) / 247 * 24) + 232
-            return 16 + (36 * round(r / 255 * 5)) + (6 * round(g / 255 * 5)) + round(b / 255 * 5)
-        
-        color_code = rgb_to_256(r, g, b)
-        return cls.color256(color_code, background)
-
-# 定义自定义的 tqdm 类，继承自原生的 tqdm 类
+# 定义自定义的 tqdm 类,继承自原生的 tqdm 类
 class tqdm(tqdm_original):
     """
     自定义 tqdm 类的初始化方法。
-    通过设置默认参数，确保每次创建 tqdm 进度条时都能应用统一的风格。
+    通过设置默认参数,确保每次创建 tqdm 进度条时都能应用统一的风格。
 
     参数说明: 
     :param args: 原生 tqdm 支持的非关键字参数（如可迭代对象等）。
-    :param kwargs: 原生 tqdm 支持的关键字参数，用于自定义进度条的行为和外观。
+    :param kwargs: 原生 tqdm 支持的关键字参数,用于自定义进度条的行为和外观。
         - bar_format (str): 进度条的格式化字符串。
         - ncols (int): 进度条的宽度（以字符为单位）。
         - colour (str): 进度条的颜色。
@@ -289,7 +130,7 @@ class tqdm(tqdm_original):
     @colour.setter 
     def colour(self, color):
         # 确保颜色值有效
-        valid_color = self._STYLE_MAP.get(color, "GREEN")  # 如果无效，回退到 GREEN
+        valid_color = self._STYLE_MAP.get(color, "GREEN")  # 如果无效,回退到 GREEN
         self._colour = valid_color
         self.desc = f"{getattr(Color, valid_color)}{self.desc}{Color.RESET}"
 
@@ -415,7 +256,7 @@ def setup_logging():
         backup_count = int(os.getenv("BACKUP_COUNT", "7"))
     except ValueError:
         backup_count = 7
-        warnings.warn("BACKUP_COUNT 为无效值，使用默认值 7")
+        warnings.warn("BACKUP_COUNT 为无效值,使用默认值 7")
         os.environ["BACKUP_COUNT"] = 7
 
     # 创建日志目录
