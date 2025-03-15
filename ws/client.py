@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:15
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-15 19:30:54
+# @LastEditTime : 2025-03-15 19:39:28
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -59,6 +59,7 @@ class WebSocketClient:
         self._closed = False  # 连接是否已主动关闭
         # 使用双端队列存储消息,支持获取最新或最旧消息
         self._message_deque = collections.deque()
+        self._message_available = None
 
     async def connect(self):
         """
@@ -183,7 +184,9 @@ class WebSocketClient:
         try:
             asyncio.run(self._start_client())
         except KeyboardInterrupt:
-            self.disconnect(5)
+            print()
+            _LOG.info('用户触发主动关闭')
+            asyncio.run(self.disconnect(5))
 
     async def _start_client(self):
         self.running = True

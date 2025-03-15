@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-09 17:01:04
+# @LastEditTime : 2025-03-15 19:41:25
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -35,7 +35,7 @@ class BotClient:
         last_heartbeat: 最后一次心跳数据
         ws: WebSocket处理器实例
     """
-    def __init__(self, uri: str, token: str = None, load_plugins:bool = True):
+    def __init__(self, uri: str, token: str = None):
         self.event_bus = EventBus()
         self.plugin_sys = PluginLoader(self.event_bus)
         self.last_heartbeat:dict = {}
@@ -44,13 +44,14 @@ class BotClient:
         if token:
             headers["Authorization"] = f"Bearer {token}"
         self.ws = WebSocketHandler(uri, headers, message_handler=self.on_message)
-        
+
+    def run(self, load_plugins:bool = True):
         if load_plugins:
+            _log.info('准备加载插件')
             if not os.path.exists(PLUGINS_DIR):
                 os.makedirs(PLUGINS_DIR, exist_ok=True)
             asyncio.run(self.plugin_sys.load_plugins(api=self.ws))
-
-    def run(self):
+        _log.info('准备启动Fcatbot')
         self.ws.start()  # 启动 WebSocket 连接
 
     async def api(self, action: str, **params) -> dict:
