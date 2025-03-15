@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 15:15:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-10 21:31:25
+# @LastEditTime : 2025-03-15 19:47:27
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -14,6 +14,7 @@ from typing import Union
 @dataclass(frozen=True)
 class GroupMessage(BaseMessage):
     """群聊消息"""
+    raw: dict
     id: int
     self_id: int
     real_seq: int
