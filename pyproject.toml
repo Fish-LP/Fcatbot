@@ -5,50 +5,45 @@ build-backend = "setuptools.build_meta"
 
 [project]
 # 项目元数据
-name = "Fcatbot"  # 包名称
-version = "1.0.4-alpha"  # 版本号
-description = "基于ncatbot开发"  # 简短描述
+name = "Fcatbot" # 包名称
+version = "2.0.0-alpha" # 版本号
+description = "基于ncatbot开发" # 简短描述
 authors = [
-    { name = "Fish-LP", email = "fish.zh@outlook.com" }  # 作者姓名和邮箱
+    { name = "Fish-LP", email = "fish.zh@outlook.com" }, # 作者姓名和邮箱
 ]
-license = { file = "LICENSE" }  # 许可证文件路径
-readme = "README.md"  # 项目说明文件路径
+license = { file = "LICENSE" } # 许可证文件路径
+readme = "README.md" # 项目说明文件路径
+urls = { Homepage = "https://github.com/Fish-LP/FcatBot" } # 项目主页
 classifiers = [
-    "Development Status :: 3 - Alpha",  # 开发状态
-    "Intended Audience :: Developers",  # 目标受众
-    "License :: OSI Approved :: MIT License",  # 许可证类型
-    "Programming Language :: Python :: 3",  # 支持的 Python 版本
+    "Development Status :: 3 - Alpha",        # 开发状态
+    "Intended Audience :: Developers",        # 目标受众
+    "License :: Other/Proprietary License",   # 自定义许可协议
+    "Programming Language :: Python :: 3",    # 支持的 Python 版本
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-urls = {
-    "Homepage": "https://github.com/Fish-LP/FcatBot",  # 项目主页
-}
-python-version = ">=3.9"  # 所需 Python 版本
-
-# 依赖项
 dependencies = [
-    "aiofile ~=3.9.0",  # 异步文件操作
-    "aiohttp ~=3.11.12",  # HTTP 客户端/服务器
-    "websockets ~=10.4",  # WebSocket 支持
+    "aiofile ~=3.9.0",   # UniversalLoaderError 支持异步文件读写
+    "aiohttp ~=3.11.12", # HTTP 客户端/服务器
+    "websockets ~=10.4", # WebSocket 支持
     "packaging ~=24.2",  # 包版本解析
-    "tqdm ~=4.67.1",  # 进度条
-    "aiofiles ~=24.1.0",  # UniversalLoaderError 支持异步文件读写
+    "tqdm ~=4.67.1",     # 进度条
 ]
-
-# 可选依赖项
-optional-dependencies = {
-    "json": ["ujson ~=5.10.0"],  # 加速 JSON 操作
-    "yaml": ["pyyaml ~=6.0.2"],  # UniversalLoaderError 读取 YAML 格式文件
-    "toml": ["pytoml ~=0.1.21"],  # UniversalLoaderError 读取 TOML 格式文件
-}
+optional-dependencies = { "json" = [
+    "ujson ~=5.10.0",
+], "yaml" = [
+    "pyyaml ~=6.0.2",
+], "toml" = [
+    "pytoml ~=0.1.21",
+] }
+python-version = ">=3.9" # 所需 Python 版本
 
 [tool.setuptools]
 # Setuptools 特定的配置
-packages = ["Fcatbot"]  # 自动发现所有包
-include-package-data = true  # 包含包中的数据文件
+packages = ["Fcatbot"]      # 自动发现所有包
+include-package-data = true # 包含包中的数据文件
 
 [tool.setuptools.entry-points]
 # 入口点
