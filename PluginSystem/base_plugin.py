@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-16 19:04:18
+# @LastEditTime : 2025-03-16 19:07:36
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -75,7 +75,7 @@ class BasePlugin:
         if not self._work_path.exists():
             self._work_path.mkdir(parents=True)
             self.first_load = True  # 表示是第一次启动
-        elif not (self._work_path / f"{self.name}.json").exists():
+        elif not self._data_path.exists():
             self.first_load = True
 
         if not self._work_path.is_dir():
