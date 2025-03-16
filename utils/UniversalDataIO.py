@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-13 21:47:01
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-16 15:28:48
+# @LastEditTime : 2025-03-16 15:30:20
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -203,7 +203,7 @@ class UniversalLoader:
         """字典式数据访问"""
         if self.easy_mod:
             return self.data.get(key, None)
-        return self.data.get(key)
+        return self.data[key]
 
     def __setitem__(self, key: str, value: Any) -> None:
         """字典式数据设置"""
