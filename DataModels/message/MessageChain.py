@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-15 18:04:40
+# @LastEditTime : 2025-03-16 21:58:55
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -110,7 +110,7 @@ class MessageChain:
             types = tuple(element_type)
         else:
             types = element_type
-        self.elements = [event for event in self.elements if isinstance(event, types)]
+        self.elements = [event for event in self.elements if event.type == types]
         return self
 
     def to_dict(self) -> List[Dict[str, Any]]:
@@ -146,11 +146,15 @@ class MessageChain:
         """
         return len(self.elements)
 
-    def __getitem__(self, index: int) -> Element:
+    def __getitem__(self, index: Union[int, str]) -> Element:
         """
         根据索引获取消息链中的元素
         """
-        return self.elements[index]
+        if isinstance(index, int):
+            return self.elements[index]
+        elif index in self.type_handlers:
+            return tuple(filter(lambda d:d.type == index, self.elements))
+        raise IndexError(f'MessageChain 索引错误: {index}')
 
     def __setitem__(self, index: int, element: Union[dict ,Element]):
         """

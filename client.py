@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-16 18:38:31
+# @LastEditTime : 2025-03-16 21:35:25
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -124,7 +124,7 @@ class BotClient:
                 message = GroupMessage(**msg)
                 group_info = await self.api('get_group_info', group_id = message.group_id)
                 _LOG.info(f"[{group_info['group_name']}({message.group_id})] {message.sender.nickname}({message.user_id}) -> {message.raw_message}")
-                if GroupMessage.message['text'][0].startswith(self.command_prefix):
+                if message.message['text'][0].startswith(self.command_prefix):
                     await self.event_bus.publish_async(Event(OFFICIAL_GROUP_COMMAND_EVENT, message))
                 else:
                     await self.event_bus.publish_async(Event(OFFICIAL_GROUP_MESSAGE_EVENT, message))
@@ -132,7 +132,7 @@ class BotClient:
                 # 私聊消息
                 message = PrivateMessage(**msg)
                 _LOG.info(f"Bot.{message.self_id}: [{message.sender.nickname}({message.user_id})] -> {message.raw_message}")
-                if GroupMessage.message['text'][0].startswith(self.command_prefix):
+                if message.message['text'][0].startswith(self.command_prefix):
                     await self.event_bus.publish_async(Event(OFFICIAL_PRIVATE_COMMAND_EVENT, message))
                 else:
                     await self.event_bus.publish_async(Event(OFFICIAL_PRIVATE_MESSAGE_EVENT, message))
