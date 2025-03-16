@@ -19,7 +19,7 @@ setup(
     description='基于ncatbot开发',  # 简短描述
     author='Fish-LP',  # 作者姓名
     author_email='fish.zh@outlook.com',  # 作者邮箱
-    url='https://github.com/Fish-LP/FBot',  # 项目地址,确保是一个有效的 URL
+    url='https://github.com/Fish-LP/FcatBot',  # 项目地址,确保是一个有效的 URL
     packages=find_packages(),  # 自动发现所有包
     include_package_data=True,  # 包含包中的数据文件
     install_requires=[  # 依赖项

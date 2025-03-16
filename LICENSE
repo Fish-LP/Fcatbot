@@ -1,21 +1,29 @@
-MIT License
+Fcatbot使用许可协议
+版本 1.0 | © 2025 Fish-LP
 
-Copyright (c) 2025 Fish-LP
+您被允许
+✅ 自由使用、修改、分发本作品（含源码及衍生作品）
+✅ 保留本协议及原始版权声明的前提下进行非商业传播
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+您被禁止
+⛔ 将本作品用于任何商业目的，包括但不限于：
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+- 集成至商业产品/服务
+- 用于商业机构内部系统
+- 通过SaaS、API服务等形式获利
+- 销售、租赁、捆绑销售等收费行为
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+附加义务
+🔗 修改后的作品必须：
+
+- 继承本协议全部条款
+- 显著标注修改痕迹和日期
+
+免责声明
+❗ 本作品按"原样"提供，作者不承担任何直接/间接责任
+
+协议变更
+🔄 保留更新条款的权利，更新版本发布于[本仓库](https://github.com/Fish-LP/Fcatbot/)
+
+违约后果
+⚠️ 商业用途将自动终止许可
