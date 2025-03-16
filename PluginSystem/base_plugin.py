@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-16 19:34:51
+# @LastEditTime : 2025-03-16 21:17:57
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -96,7 +96,7 @@ class BasePlugin:
         await asyncio.to_thread(self._close_, *arg, **kwd)
         await self.on_close(*arg, **kwd)
         try:
-            await self.data.asave()
+            self.data.save()
         except (FileTypeUnknownError, SaveError, FileNotFoundError) as e:
             raise RuntimeError(self.name, f"保存持久化数据时出错: {e}")
 
