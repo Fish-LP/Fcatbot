@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-15 20:10:56
+# @LastEditTime : 2025-03-16 19:04:18
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -43,6 +43,7 @@ class BasePlugin:
     dependencies: dict
     meta_data: dict
     api: WebSocketHandler
+    first_load: bool
     
     @final
     def __init__(self, event_bus: EventBus, **kwd):
@@ -63,23 +64,24 @@ class BasePlugin:
                 setattr(self, k, v)
         
         if not self.dependencies: self.dependencies = {}
+        self._event_handlers = []
         self.event_bus = event_bus
         self.lock = asyncio.Lock()  # 创建一个异步锁对象
-        self.work_path = Path(PERSISTENT_DIR) / self.name
-        self._event_handlers = []
-        self.data = UniversalLoader(self.work_path / f"{self.name}.json")
+        self._work_path = Path(PERSISTENT_DIR) / self.name
+        self._data_path = self._work_path / f"{self.name}.json"
+        self.data = UniversalLoader(self._work_path / f"{self.name}.json")
 
-        if not self.work_path.exists():
-            try:
-                self.work_path.mkdir(parents=True)
-                self.first_load = True  # 表示是第一次启动
-            except FileExistsError:
-                self.first_load = False
+        self.first_load = False
+        if not self._work_path.exists():
+            self._work_path.mkdir(parents=True)
+            self.first_load = True  # 表示是第一次启动
+        elif not (self._work_path / f"{self.name}.json").exists():
+            self.first_load = True
 
-        if not self.work_path.is_dir():
-            raise PluginLoadError(self.name, f"{self.work_path} 不是目录文件夹")
+        if not self._work_path.is_dir():
+            raise PluginLoadError(self.name, f"{self._work_path} 不是目录文件夹")
 
-        self.work_space = ChangeDir(self.work_path)
+        self.work_space = ChangeDir(self._work_path)
 
     @final
     async def __unload__(self, *arg, **kwd):
@@ -94,7 +96,7 @@ class BasePlugin:
         await asyncio.to_thread(self._close_, *arg, **kwd)
         await self.on_close(*arg, **kwd)
         try:
-            self.data.save()
+            await self.data.asave()
         except (FileTypeUnknownError, SaveError, FileNotFoundError) as e:
             raise RuntimeError(self.name, f"保存持久化数据时出错: {e}")
 
@@ -109,10 +111,10 @@ class BasePlugin:
         """
         # load时传入的参数作为属性被保存在self中
         try:
-            self.data.load()
+            await self.data.aload()
         except (FileTypeUnknownError, LoadError, FileNotFoundError) as e:
-            open(self.work_path / f'{self.name}.json','w').write('{}')
-            self.data.load()
+            open(self._work_path / f'{self.name}.json','w').write('{}')
+            await self.data.aload()
         await asyncio.to_thread(self._init_)
         await self.on_load()
 
