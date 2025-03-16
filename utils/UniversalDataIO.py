@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-13 21:47:01
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-09 14:59:50
+# @LastEditTime : 2025-03-16 15:28:48
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -106,13 +106,15 @@ class ModuleNotInstalledError(UniversalLoaderError):
 # ---------------------
 
 class UniversalLoader:
-    def __init__(self, file_path: Union[str, Path], file_type: Optional[str] = None):
+    def __init__(self, file_path: Union[str, Path], easy_mod: bool = True, file_type: Optional[str] = None):
         """
         初始化通用加载器
         :param file_path: 文件路径
         :param file_type: 可选参数,手动指定文件类型（覆盖自动检测）
+        :param easy_mod: 简易模式,当 修改｜读取 数据时尝试阻止错误
         """
         # 统一路径为 Path 类型
+        self.easy_mod = easy_mod
         self.file_path: Path = Path(file_path).resolve()  # 获取绝对路径
         self.data: Dict[str, Any] = {}
         self.file_type = file_type.lower() if file_type else self._detect_file_type()
@@ -199,6 +201,8 @@ class UniversalLoader:
 
     def __getitem__(self, key: str) -> Any:
         """字典式数据访问"""
+        if self.easy_mod:
+            return self.data.get(key, None)
         return self.data.get(key)
 
     def __setitem__(self, key: str, value: Any) -> None:
@@ -207,14 +211,15 @@ class UniversalLoader:
 
     def __delitem__(self, key: str) -> None:
         """字典式数据删除"""
-        if key in self.data:
+        if self.easy_mod and key in self.data:
             del self.data[key]
+        del self.data[key]
 
     def __str__(self) -> str:
         """友好的字符串表示"""
         return str(self.data)
 
-    def get(self, key, default= None):
+    def get(self, key, default = None):
         """安全获取数据方法"""
         return self.data.get(key, default)
 
@@ -234,7 +239,7 @@ class UniversalLoader:
         """用给定的字典或键值对更新数据（类似 dict.update）"""
         self.data.update(*args, **kwargs)
 
-    def pop(self, key, default=None):
+    def pop(self, key, default = None):
         """删除指定键并返回其对应的值；如果键不存在,则返回默认值"""
         return self.data.pop(key, default)
 
@@ -246,7 +251,7 @@ class UniversalLoader:
         """清空所有数据"""
         self.data.clear()
 
-    def setdefault(self, key, default=None):
+    def setdefault(self, key, default = None):
         """如果键不存在,则将键的值设为default并返回该值,否则返回原有值"""
         return self.data.setdefault(key, default)
 
