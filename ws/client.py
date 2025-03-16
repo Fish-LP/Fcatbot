@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:15
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-16 01:49:31
+# @LastEditTime : 2025-03-16 18:38:48
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -175,18 +175,43 @@ class WebSocketClient:
         启动客户端,进入事件循环并尝试连接 WebSocket 服务器。
         """
         try:
-            asyncio.run(self._start_client())
+            # 获取或创建事件循环
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            
+            # 运行客户端
+            loop.run_until_complete(self._start_client())
+        
         except KeyboardInterrupt:
+            # 处理用户中断
             if self.close_handler:
                 try:
                     print()
                     self.close_handler()
                 except Exception as e:
                     _LOG.error(f"自定义关闭函数产生错误: {e}")
-            else:
-                raise KeyboardInterrupt
+            raise  # 确保 KeyboardInterrupt 被重新抛出
+        
+        except Exception as e:
+            _LOG.error(f"客户端启动时发生错误: {e}")
+        
         finally:
-            asyncio.run(self.disconnect(5))
+            # 确保断开连接
+            try:
+                if loop.is_running():
+                    loop.call_soon_threadsafe(loop.stop)
+                elif not loop.is_closed():
+                    loop.run_until_complete(self.disconnect(5))
+            except NameError:
+                # 如果 loop 未定义（如初始化失败），直接运行 disconnect
+                asyncio.run(self.disconnect(5))
+            
+            # 关闭循环（如果存在）
+            if 'loop' in locals() and not loop.is_closed():
+                loop.close()
 
     async def _start_client(self):
         self.running = True

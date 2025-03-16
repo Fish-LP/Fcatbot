@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-16 02:13:22
+# @LastEditTime : 2025-03-16 18:38:31
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -52,7 +52,6 @@ class BotClient:
         _log.info('用户主动触发关闭事件...')
         _log.info('准备关闭所有插件...')
         self.plugin_sys.unload_all()
-        _log.info('所有插件关闭完成')
         _log.info('Fcatbot 关闭完成')
 
     def run(self, load_plugins:bool = True):
@@ -63,7 +62,10 @@ class BotClient:
             asyncio.run(self.plugin_sys.load_plugins(api=self.ws))
         _log.info('准备启动Fcatbot')
         self.ws.close_handler = self.close
-        self.ws.start()  # 启动 WebSocket 连接
+        try:
+            self.ws.start()  # 启动 WebSocket 连接
+        except KeyboardInterrupt:
+            exit(0)
 
     async def api(self, action: str, **params) -> dict:
         """调用机器人API.
