@@ -38,15 +38,12 @@ optional-dependencies = { "json" = [
 ], "toml" = [
     "pytoml ~=0.1.21",
 ] }
-python-version = ">=3.9" # 所需 Python 版本
+requires-python = ">=3.9" # 所需 Python 版本
 
 [tool.setuptools]
 # Setuptools 特定的配置
-packages = ["Fcatbot"]      # 自动发现所有包
+# packages = ["Fcatbot"]      # 自动发现所有包
 include-package-data = true # 包含包中的数据文件
 
-[tool.setuptools.entry-points]
-# 入口点
-console_scripts = [
-    # 可以在这里定义命令行入口
-]
+# [project.entry-points.console_scripts]
+# fcatbot = "Fcatbot.__main__:main" # 命令行启动

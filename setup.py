@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-16 12:50:14
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-16 20:20:28
+# @LastEditTime : 2025-03-16 20:57:53
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -31,7 +31,7 @@ setup(
         'aiofile',
     ],
     python_requires='>=3.9',  # 所需 Python 版本
-    entry_points={
-        'console_scripts':[]
-        },
+    # entry_points={
+    #     'console_scripts':[]
+    #     },
 )
