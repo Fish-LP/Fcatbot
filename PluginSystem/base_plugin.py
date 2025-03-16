@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-16 19:07:36
+# @LastEditTime : 2025-03-16 19:34:51
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
@@ -111,6 +111,10 @@ class BasePlugin:
         """
         # load时传入的参数作为属性被保存在self中
         try:
+            if isinstance(self.data,dict):
+                data = UniversalLoader()
+                data.data = self.data
+                self.data = data
             await self.data.aload()
         except (FileTypeUnknownError, LoadError, FileNotFoundError) as e:
             open(self._work_path / f'{self.name}.json','w').write('{}')
