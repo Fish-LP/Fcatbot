@@ -2,11 +2,12 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:31:16
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-06 20:30:05
+# @LastEditTime : 2025-03-16 15:09:46
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, MIT License 
 # -------------------------
 from typing import List, Any, Callable, Tuple
+from copy import copy
 import inspect
 import re
 import asyncio
@@ -31,10 +32,33 @@ class Event:
             type: 事件类型标识符
             data: 事件携带的数据
         """
-        self.type = type
-        self.data = data
+        self._type = type
+        self._data = data
         self._results: List[Any] = []
         self._propagation_stopped = False
+
+    @property
+    def data(self):
+        return copy(self._data)
+
+    @property
+    def type(self):
+        return copy(self._type)
+
+    @property
+    def results(self):
+        return copy(self._results)
+
+    def __eq__(self, value: str):
+        return self.type == value
+
+    def __add__(self, other):
+        self.add_result(other)
+        return self
+
+    def __iadd__(self, other):
+        self.add_result(other)
+        return self
 
     def stop_propagation(self):
         """停止事件的继续传播
@@ -52,9 +76,7 @@ class Event:
         self._results.append(result)
     
     def __repr__(self):
-        return f'Event(type="{self.type}",data={self.data})'
-
-import asyncio
+        return f'Event(type="{self.type}",data={self.data},results={self.results})'
 
 class EventBus:
     """
