@@ -18,7 +18,7 @@ from .Logger import get_log
 LOG = get_log("ChangeDir")
 
 
-class  (ContextDecorator):
+class ChangeDir(ContextDecorator):
     """
     上下文管理器,用于暂时切换工作路径。
     支持自动恢复原始路径和目录创建/清理。
