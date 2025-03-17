@@ -2,12 +2,12 @@
 # @Author       : Ncatbot
 # @Date         : 2025-02-12 13:41:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-10 21:40:56
+# @LastEditTime : 2025-03-17 19:16:49
 # @Description  : 当时确实是 MIT License 后来给改了
 # @Copyright (c) 2025 by Ncatbot, MIT License 
 # -------------------------
 from typing import Union
-from ...DataModels import MessageChain
+from ...data_models import MessageChain
 
 class GroupApi:
     '''群组接口'''

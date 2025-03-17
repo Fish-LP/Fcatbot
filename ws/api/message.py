@@ -7,7 +7,7 @@
 # @Copyright (c) 2025 by Ncatbot, MIT License 
 # -------------------------
 from typing import Union
-from ...DataModels import MessageChain
+from ...data_models import MessageChain
 
 class MessageAPi:
     '''消息接口'''

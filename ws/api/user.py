@@ -6,7 +6,7 @@
 # @Description  : 当时确实是 MIT License 后来给改了
 # @Copyright (c) 2025 by Ncatbot, MIT License 
 # -------------------------
-from ...DataModels import Status
+from ...data_models import Status
 from typing import Union
 
 class UserAPi:

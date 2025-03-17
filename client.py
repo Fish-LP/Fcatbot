@@ -10,9 +10,9 @@ import os
 from typing import Any, List
 from .ws import WebSocketHandler
 from .utils import get_log
-from .DataModels import GroupMessage
-from .DataModels import PrivateMessage
-from .PluginSystem import EventBus, Event, PluginLoader
+from .data_models import GroupMessage
+from .data_models import PrivateMessage
+from .plugin_system import EventBus, Event, PluginLoader
 from .config import OFFICIAL_PRIVATE_MESSAGE_EVENT
 from .config import OFFICIAL_GROUP_MESSAGE_EVENT
 from .config import OFFICIAL_REQUEST_EVENT

@@ -15,7 +15,7 @@ from .custom_err import PluginLoadError
 from .event import EventBus, Event
 from ..utils import ChangeDir
 from ..utils import UniversalLoader
-from ..utils.UniversalDataIO import FileTypeUnknownError, SaveError, LoadError
+from ..utils.universal_data_IO import FileTypeUnknownError, SaveError, LoadError
 from ..config import PERSISTENT_DIR
 from ..ws import WebSocketHandler
 

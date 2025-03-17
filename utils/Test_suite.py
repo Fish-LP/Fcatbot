@@ -6,7 +6,7 @@
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
-from .Color import Color
+from .color import Color
 
 class StringFormatter:
     """处理字符串的视觉对齐问题,支持中英文混合字符串"""

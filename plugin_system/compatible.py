@@ -17,7 +17,7 @@ from ..config import (
     OFFICIAL_GROUP_COMMAND_EVENT,
     OFFICIAL_PRIVATE_COMMAND_EVENT,
 )
-from ..DataModels.message import BaseMessage
+from ..data_models.message import BaseMessage
 
 class CompatibleEnrollment:
     events = {

@@ -1,6 +1,6 @@
 import json
 from Fcatbot import MessageChain
-from Fcatbot.DataModels.message.Nope import *
+from Fcatbot.data_models.message.message_nope import *
 from Fcatbot.utils import TestSuite, Color
 
 def run_message_chain_tests():

@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-16 01:33:52
+# @LastEditTime : 2025-03-17 18:53:16
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -40,6 +40,11 @@ class Element:
         }
 
 @dataclass(frozen=True)
+class DafaultElement(Element):
+    '''强制置顶消息元素'''
+    behavior: Behavior = field(init=False, default=Behavior.DAFAULT)
+
+@dataclass(frozen=True)
 class TopElement(Element):
     '''强制置顶消息元素'''
     behavior: Behavior = field(init=False, default=Behavior.TOP)
@@ -54,21 +59,39 @@ class OccupyTypeElement(Element):
     '''独占类型消息元素''' 
     behavior: Behavior = field(init=False, default=Behavior.OccupyType)
 
+
+
+
+
+
+
+
+
 @dataclass(frozen=True)
-class Text(Element):
+class Text(DafaultElement):
     '''文本消息元素'''
     text: str
     type: str = field(default='text', init=False)
 
 @dataclass(frozen=True)
-class At(Element):
+class Face(DafaultElement):
+    '''表情消息元素'''
+    id: int = None
+    type: str = field(default='face', init=False)
+    raw: dict = None
+    resultId: int = None
+    chainCount: Any = None
+
+
+@dataclass(frozen=True)
+class At(DafaultElement):
     '''@消息元素'''
     qq: Union[int, str]
     type: str = field(default='at', init=False)
 
 
 @dataclass(frozen=True)
-class AtAll(Element):
+class AtAll(DafaultElement):
     '''@全体消息元素'''
     type: str = field(default='at', init=False)
 
@@ -82,7 +105,7 @@ class AtAll(Element):
 
 
 @dataclass(frozen=True)
-class Image(Element):
+class Image(DafaultElement):
     '''图片消息元素'''
     sub_type: int = None
     summary: str = None
@@ -110,56 +133,46 @@ class Image(Element):
 
 
 @dataclass(frozen=True)
-class Face(Element):
-    '''表情消息元素'''
-    id: int = None
-    type: str = field(default='face', init=False)
-    raw: dict = None
-    resultId: int = None
-    chainCount: Any = None
-
-
-@dataclass(frozen=True)
-class Reply(TopElement, Element):
+class Reply(TopElement):
     '''回复消息元素'''
     id: int = None
     type: str = field(default='reply', init=False)
 
 
 @dataclass(frozen=True)
-class Json(OccupyElement, Element):
+class Json(OccupyElement):
     '''JSON消息元素'''
     data: str
     type: str = field(default='json', init=False)
 
 
 @dataclass(frozen=True)
-class Record(OccupyElement, Element):
+class Record(OccupyElement):
     '''语音消息元素'''
     file: str
     type: str = field(default='record', init=False)
 
 
 @dataclass(frozen=True)
-class Video(OccupyElement, Element):
+class Video(OccupyElement):
     '''视频消息元素'''
     file: str
     type: str = field(default='video', init=False)
 
 @dataclass(frozen=True)
-class Dice(OccupyElement, Element):
+class Dice(OccupyElement):
     '''骰子消息元素'''
     type: str = field(default='dice', init=False)
 
 
 @dataclass(frozen=True)
-class Rps(OccupyElement, Element):
+class Rps(OccupyElement):
     '''猜拳消息元素'''
     type: str = field(default='rps', init=False)
 
 
 @dataclass(frozen=True)
-class Music(OccupyElement, Element):
+class Music(OccupyElement):
     '''音乐分享消息元素'''
     id: int
     music_type: str
@@ -167,7 +180,7 @@ class Music(OccupyElement, Element):
 
 
 @dataclass(frozen=True)
-class CustomMusic(OccupyElement, Element):
+class CustomMusic(OccupyElement):
     '''自定义音乐分享消息元素'''
     url: str = None
     audio: str = None
@@ -190,7 +203,7 @@ class CustomMusic(OccupyElement, Element):
         }
 
 @dataclass(frozen=True)
-class File(OccupyElement, Element):
+class File(OccupyElement):
     '''文件信息元素'''
     file_id: int
     file_size: int
@@ -199,12 +212,12 @@ class File(OccupyElement, Element):
     url: str = None
 
 @dataclass(frozen=True)
-class Markdown(OccupyElement, Element):
+class Markdown(OccupyElement):
     '''Markdown消息元素'''
     markdown: dict
 
 @dataclass(frozen=True)
-class Nope(OccupyTypeElement, Element):
+class Nope(OccupyTypeElement):
     data: 'NopeData'
     type: str = field(default='nope', init=False)
     
@@ -224,9 +237,9 @@ class NopeData:
     nickname: str
     content: any # MessageChain
 
-
+# TODO: Markdown
 @dataclass(frozen=True)
-class Markdown(OccupyElement, Element):
+class Markdown(OccupyElement):
     type: str = field(default='markdown', init=False)
     
     def __post_init__(self, markdown: str):

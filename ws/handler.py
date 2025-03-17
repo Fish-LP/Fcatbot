@@ -12,12 +12,12 @@ from typing import Any, Optional, Dict
 import uuid
 
 from ..utils import get_log
-from ..DataModels import GroupMessage
-from ..DataModels import PrivateMessage
-from ..DataModels import MessageChain
+from ..data_models import GroupMessage
+from ..data_models import PrivateMessage
+from ..data_models import MessageChain
 from .client import WebSocketClient
 from .api import Apis
-from ..DataModels import Nope
+from ..data_models import Nope
 
 _LOG = get_log('WsClient')
 

@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:54:12
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-22 01:21:24
+# @LastEditTime : 2025-03-17 19:13:12
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -17,5 +17,5 @@ __all__ = [
     'PrivateMessage',
     'MessageChain',
     'Status',
-    'Nope'
+    'Nope',
 ]

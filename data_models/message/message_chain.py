@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-16 21:58:55
+# @LastEditTime : 2025-03-17 19:05:13
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -10,7 +10,7 @@ import inspect
 from typing import Union, List, Dict, Any, Iterable
 import json
 
-from .Nope import *
+from .message_nope import *
 
 class MessageChain:
     """消息链类,用于管理多个消息元素"""

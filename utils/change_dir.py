@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-18 21:06:40
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-16 14:07:55
+# @LastEditTime : 2025-03-17 19:20:06
 # @Description  : 上下文管理器,用于暂时切换工作路径。
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -13,7 +13,7 @@ from uuid import UUID, uuid4
 from pathlib import Path
 from contextlib import ContextDecorator
 
-from .Logger import get_log
+from .logger import get_log
 
 LOG = get_log("ChangeDir")
 

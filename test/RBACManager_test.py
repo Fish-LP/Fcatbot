@@ -7,7 +7,7 @@
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 from Fcatbot.utils import TestSuite
-from Fcatbot.RBACManager import RBACManager,PermissionPath,Trie
+from Fcatbot.rbac_manager import RBACManager,PermissionPath,Trie
 from Fcatbot import Color
 
 
