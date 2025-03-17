@@ -2,13 +2,13 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-17 18:53:16
+# @LastEditTime : 2025-03-17 20:16:52
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 import base64
 from enum import Enum
-from typing import Union, List, Dict, Any, Iterable
+from typing import Literal
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -69,131 +69,150 @@ class OccupyTypeElement(Element):
 
 @dataclass(frozen=True)
 class Text(DafaultElement):
-    '''文本消息元素'''
+    '''[文本]消息元素'''
     text: str
+    '''文本'''
+    
     type: str = field(default='text', init=False)
-
-@dataclass(frozen=True)
-class Face(DafaultElement):
-    '''表情消息元素'''
-    id: int = None
-    type: str = field(default='face', init=False)
-    raw: dict = None
-    resultId: int = None
-    chainCount: Any = None
 
 
 @dataclass(frozen=True)
 class At(DafaultElement):
-    '''@消息元素'''
-    qq: Union[int, str]
+    '''[@]消息元素'''
+    qq: int
+    '''qq号'''
+    
+    type: str = field(default='at', init=False)
+
+@dataclass(frozen=True)
+class AtAll(DafaultElement):
+    '''[@全体]消息元素'''
+    qq: str = field(default='all', init=False)
+    
     type: str = field(default='at', init=False)
 
 
 @dataclass(frozen=True)
-class AtAll(DafaultElement):
-    '''@全体消息元素'''
-    type: str = field(default='at', init=False)
-
-    def to_dict(self) -> dict:
-        return {
-            'type': self.type,
-            'data': {
-                'qq': 'all'
-            }
-        }
+class Face(DafaultElement):
+    '''[表情]消息元素'''
+    id: int
+    
+    type: str = field(default='face', init=False)
 
 
 @dataclass(frozen=True)
 class Image(DafaultElement):
-    '''图片消息元素'''
-    sub_type: int = None
+    '''[图片]消息元素'''
+    file: str
+    '''[参见napcat]推荐使用base64'''
+    
+    name: str = None
+    '''[可选]'''
     summary: str = None
+    '''[可选]'''
+    # file: Union[str, bytes]
+    sub_type: int = None
+    '''[可选]'''
+    file_id: int = None
     url: str = None
-    file: Union[str, bytes] = None
-    file_size: int = None
     path: str = None
+    file_size: int = None
+    file_unique = None
+    
     type: str = field(default='image', init=False)
     
     def to_dict(self) -> dict:
         return {
             'type': 'image',
             'data': { 
-                'name': '图片', # [发] [选]
-                'summary': self.summary,
+                'name': self.name or '图片', # [发] [选]
                 'file': self.file,
+                'summary': self.summary,
                 'sub_type': self.sub_type, # [选]
-                'file_id': self.sub_type, # [收]
-                'url': self.sub_type, # [收]
-                'path': self.sub_type, # [收]
-                'file_size': self.sub_type, # [收]
-                'file_unique': self.sub_type, # [收]
                 }
             }
 
 
 @dataclass(frozen=True)
 class Reply(TopElement):
-    '''回复消息元素'''
+    '''[回复]消息元素'''
     id: int = None
     type: str = field(default='reply', init=False)
 
 
 @dataclass(frozen=True)
 class Json(OccupyElement):
-    '''JSON消息元素'''
+    '''[JSON]消息元素'''
     data: str
     type: str = field(default='json', init=False)
 
 
 @dataclass(frozen=True)
 class Record(OccupyElement):
-    '''语音消息元素'''
+    '''[语音]消息元素'''
     file: str
+    '''[参见napcat]'''
     type: str = field(default='record', init=False)
 
 
 @dataclass(frozen=True)
 class Video(OccupyElement):
-    '''视频消息元素'''
+    '''[视频]消息元素'''
     file: str
+    '''[参见napcat]'''
     type: str = field(default='video', init=False)
+
 
 @dataclass(frozen=True)
 class Dice(OccupyElement):
-    '''骰子消息元素'''
+    '''[骰子]消息元素'''
     type: str = field(default='dice', init=False)
 
 
 @dataclass(frozen=True)
 class Rps(OccupyElement):
-    '''猜拳消息元素'''
+    '''[猜拳]消息元素'''
     type: str = field(default='rps', init=False)
 
 
 @dataclass(frozen=True)
 class Music(OccupyElement):
-    '''音乐分享消息元素'''
-    id: int
-    music_type: str
+    '''[音乐分享]消息元素'''
+    music_id: int
+    '''[参见napcat]'''
+    music_type: Literal['qq','163','kugou','migu','kuwo']
+    '''[必选]'''
     type: str = field(default='music', init=False)
+    
+    def to_dict(self):
+        return {
+            'type': 'music',
+            'data': {
+                'type': self.music_type,
+                'id': self.music_id
+            }
+        }
 
 
 @dataclass(frozen=True)
 class CustomMusic(OccupyElement):
-    '''自定义音乐分享消息元素'''
+    '''[自定义音乐分享]消息元素'''
+    music_type: str = field(default='custom', init=False)
     url: str = None
+    '''[网址]点击后跳转目标 URL'''
     audio: str = None
+    '''[网址]音乐 URL'''
     title: str = None
-    image: str = None
-    singer: str = None
+    '''[参见napcat]'''
+    image: str = "kuwo"
+    singer: str = "kuwo"
     type: str = field(default='music', init=False)
 
     def to_dict(self) -> dict:
         return {
             'type': self.type,
             'data': {
-                'type': 'custom',
+                'type': self.music_type,
                 'url': self.url,
                 'audio': self.audio,
                 'title': self.title,
@@ -211,10 +230,6 @@ class File(OccupyElement):
     path: str = None
     url: str = None
 
-@dataclass(frozen=True)
-class Markdown(OccupyElement):
-    '''Markdown消息元素'''
-    markdown: dict
 
 @dataclass(frozen=True)
 class Nope(OccupyTypeElement):
@@ -236,14 +251,15 @@ class NopeData:
     user_id: int
     nickname: str
     content: any # MessageChain
+    '''MessageChain'''
 
 # TODO: Markdown
-@dataclass(frozen=True)
-class Markdown(OccupyElement):
-    type: str = field(default='markdown', init=False)
+# @dataclass(frozen=True)
+# class Markdown(OccupyElement):
+#     type: str = field(default='markdown', init=False)
     
-    def __post_init__(self, markdown: str):
-        ValueError('这是TODO,还没实现呢')
+#     def __post_init__(self, markdown: str):
+#         ValueError('这是TODO,还没实现呢')
 
-    def to_dict(self) -> dict:
-        ValueError('这是TODO,还没实现呢')
+#     def to_dict(self) -> dict:
+#         ValueError('这是TODO,还没实现呢')
