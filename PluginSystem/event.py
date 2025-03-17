@@ -2,13 +2,13 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:31:16
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-16 15:09:46
+# @LastEditTime : 2025-03-17 18:32:38
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 from typing import List, Any, Callable, Tuple
 from copy import copy
-import inspect
+from .custom_err import EventHandlerError
 import re
 import asyncio
 import uuid
@@ -168,12 +168,14 @@ class EventBus:
             if event._propagation_stopped:
                 break
 
-            if inspect.iscoroutinefunction(handler):
-                await handler(event)
-            else:
-                # 将同步函数包装为异步任务
-                await asyncio.get_running_loop().run_in_executor(None, handler, event)
-            
+            try:
+                if asyncio.iscoroutinefunction(handler):
+                    await handler(event)
+                else:
+                    # 将同步函数包装为异步任务
+                    await asyncio.get_running_loop().run_in_executor(None, handler, event)
+            except Exception as e:
+                raise EventHandlerError(e,handler)
             # 收集结果
             results.extend(event._results)
         

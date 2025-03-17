@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:26:43
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-02-22 01:19:57
+# @LastEditTime : 2025-03-17 18:33:18
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -33,10 +33,10 @@ class PluginUnloadError(PluginSystemError):
     def __init__(self, plugin_name, reason):
         super().__init__(f"无法卸载插件 '{plugin_name}': {reason}")
 
-class PluginSecurityError(PluginSystemError):
-    def __init__(self, plugin_name, reason):
-        super().__init__(f"插件 '{plugin_name}' 存在安全问题: {reason}")
-
 class InvalidPluginStateError(PluginSystemError):
     def __init__(self, plugin_name, state):
         super().__init__(f"插件 '{plugin_name}' 处于无效状态: {state}")
+
+class EventHandlerError(PluginSystemError):
+    def __init__(self, error_info, handler):
+        super().__init__(f"事件处理器错误[{handler.__model__}]: {error_info}")

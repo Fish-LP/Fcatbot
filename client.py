@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-16 21:35:25
+# @LastEditTime : 2025-03-17 18:35:41
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -46,7 +46,7 @@ class BotClient:
         headers = {"Content-Type": "application/json"}
         if token:
             headers["Authorization"] = f"Bearer {token}"
-        self.ws = WebSocketHandler(uri, headers)
+        self.ws = WebSocketHandler(uri, headers, message_handler = self.on_message)
 
     def close(self):
         _log.info('用户主动触发关闭事件...')
@@ -124,7 +124,7 @@ class BotClient:
                 message = GroupMessage(**msg)
                 group_info = await self.api('get_group_info', group_id = message.group_id)
                 _LOG.info(f"[{group_info['group_name']}({message.group_id})] {message.sender.nickname}({message.user_id}) -> {message.raw_message}")
-                if message.message['text'][0].startswith(self.command_prefix):
+                if message.raw_message.startswith(self.command_prefix):
                     await self.event_bus.publish_async(Event(OFFICIAL_GROUP_COMMAND_EVENT, message))
                 else:
                     await self.event_bus.publish_async(Event(OFFICIAL_GROUP_MESSAGE_EVENT, message))
@@ -132,7 +132,7 @@ class BotClient:
                 # 私聊消息
                 message = PrivateMessage(**msg)
                 _LOG.info(f"Bot.{message.self_id}: [{message.sender.nickname}({message.user_id})] -> {message.raw_message}")
-                if message.message['text'][0].startswith(self.command_prefix):
+                if message.raw_message.startswith(self.command_prefix):
                     await self.event_bus.publish_async(Event(OFFICIAL_PRIVATE_COMMAND_EVENT, message))
                 else:
                     await self.event_bus.publish_async(Event(OFFICIAL_PRIVATE_MESSAGE_EVENT, message))
