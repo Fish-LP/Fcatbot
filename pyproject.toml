@@ -25,15 +25,12 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "aiofile ~=3.9.0",   # UniversalLoaderError 支持异步文件读写
     "aiohttp ~=3.11.12", # HTTP 客户端/服务器
     "websockets ~=10.4", # WebSocket 支持
     "packaging ~=24.2",  # 包版本解析
     "tqdm ~=4.67.1",     # 进度条
 ]
-optional-dependencies = { "json" = [
-    "ujson ~=5.10.0",
-], "yaml" = [
+optional-dependencies = { "yaml" = [
     "pyyaml ~=6.0.2",
 ], "toml" = [
     "pytoml ~=0.1.21",
