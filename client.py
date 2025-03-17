@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-17 18:35:41
+# @LastEditTime : 2025-03-17 20:54:32
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -137,9 +137,9 @@ class BotClient:
                 else:
                     await self.event_bus.publish_async(Event(OFFICIAL_PRIVATE_MESSAGE_EVENT, message))
         elif msg["post_type"] == "notice":
-            self.event_bus.publish_async(Event(OFFICIAL_NOTICE_EVENT, msg))
+            await self.event_bus.publish_async(Event(OFFICIAL_NOTICE_EVENT, msg))
         elif msg["post_type"] == "request":
-            self.event_bus.publish_async(Event(OFFICIAL_REQUEST_EVENT, msg))
+            await self.event_bus.publish_async(Event(OFFICIAL_REQUEST_EVENT, msg))
         elif msg["post_type"] == "meta_event":
             if msg["meta_event_type"] == "lifecycle":
                 _LOG.info(f"机器人 {msg.get('self_id')} 成功启动")
