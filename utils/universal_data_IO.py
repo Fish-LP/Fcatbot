@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-13 21:47:01
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-16 15:30:20
+# @LastEditTime : 2025-03-17 21:44:50
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -202,26 +202,26 @@ class UniversalLoader:
     def __getitem__(self, key: str) -> Any:
         """字典式数据访问"""
         if self.easy_mod:
-            return self.data.get(key, None)
+            return self.data.get(str(key), None)
         return self.data[key]
 
     def __setitem__(self, key: str, value: Any) -> None:
         """字典式数据设置"""
-        self.data[key] = value
+        self.data[str(key)] = value
 
     def __delitem__(self, key: str) -> None:
         """字典式数据删除"""
         if self.easy_mod and key in self.data:
-            del self.data[key]
-        del self.data[key]
+            del self.data[str(key)]
+        del self.data[str(key)]
 
     def __str__(self) -> str:
         """友好的字符串表示"""
         return str(self.data)
 
-    def get(self, key, default = None):
+    def get(self, key: str, default = None):
         """安全获取数据方法"""
-        return self.data.get(key, default)
+        return self.data.get(str(key), default)
 
     def keys(self):
         """获取所有键"""
@@ -239,9 +239,9 @@ class UniversalLoader:
         """用给定的字典或键值对更新数据（类似 dict.update）"""
         self.data.update(*args, **kwargs)
 
-    def pop(self, key, default = None):
+    def pop(self, key: str, default = None):
         """删除指定键并返回其对应的值；如果键不存在,则返回默认值"""
-        return self.data.pop(key, default)
+        return self.data.pop(str(key), default)
 
     def popitem(self):
         """随机删除一个键值对并返回 (key, value) 元组"""
@@ -251,13 +251,13 @@ class UniversalLoader:
         """清空所有数据"""
         self.data.clear()
 
-    def setdefault(self, key, default = None):
+    def setdefault(self, key: str, default = None):
         """如果键不存在,则将键的值设为default并返回该值,否则返回原有值"""
-        return self.data.setdefault(key, default)
+        return self.data.setdefault(str(key), default)
 
-    def __contains__(self, key):
+    def __contains__(self, key: str):
         """判断数据中是否包含指定键"""
-        return key in self.data
+        return str(key) in self.data
 
     def __iter__(self):
         """返回数据字典的迭代器"""
@@ -281,12 +281,18 @@ class UniversalLoader:
     # region 数据加载实现（同步）
     # ---------------------
 
+    def _stringify_keys(self, data):
+        """递归地将字典中的所有键转换为字符串类型"""
+        if not isinstance(data, dict):
+            return data
+        return {str(k): self._stringify_keys(v) for k, v in data.items()}
+
     def _load_data_sync(self) -> Dict[str, Any]:
         """根据文件类型选择对应的同步加载方法"""
         if self.file_type == 'json':
-            with open(self.file_path, 'r') as f:
-                # 优先使用ujson提升性能
-                return ujson.load(f) if UJSON_AVAILABLE else json.load(f)
+            with open(self.file_path, 'r', encoding='utf-8') as f:
+                # 确保加载后的数据键都是字符串类型
+                return self._stringify_keys(ujson.load(f) if UJSON_AVAILABLE else json.load(f))
         
         elif self.file_type == 'toml':
             if not TOML_AVAILABLE:
@@ -332,11 +338,12 @@ class UniversalLoader:
         """异步加载数据核心逻辑"""
         if AIOFILES_AVAILABLE:
             # 使用aiofiles进行真正的异步文件读取
-            async with _open_file(self.file_path, 'r') as f:
+            async with aiofiles.open(self.file_path, 'r', encoding='utf-8') as f:
                 content = await f.read()
                 
                 if self.file_type == 'json':
-                    return ujson.loads(content) if UJSON_AVAILABLE else json.loads(content)
+                    data = ujson.loads(content) if UJSON_AVAILABLE else json.loads(content)
+                    return self._stringify_keys(data)
                 
                 elif self.file_type == 'toml':
                     if not TOML_AVAILABLE:
@@ -353,7 +360,7 @@ class UniversalLoader:
                     return await asyncio.to_thread(self._load_data_sync)
         
         else:
-            # 无aiofiles时回退到同步方法
+            # 无aiofiles时回退到同步方法，但仍使用线程池避免阻塞
             return await asyncio.to_thread(self._load_data_sync)
     # endregion
 
@@ -363,14 +370,16 @@ class UniversalLoader:
 
     def _save_data_sync(self, save_path: Optional[str] = None) -> None:
         """同步保存数据到文件"""
-        save_path = save_path or self.file_path
+        save_path = save_path or str(self.file_path)
         
         if self.file_type == 'json':
-            with open(save_path, 'w') as f:
+            # 保存前确保所有键都是字符串类型
+            save_data = self._stringify_keys(self.data)
+            with open(save_path, 'w', encoding='utf-8') as f:
                 if UJSON_AVAILABLE:
-                    ujson.dump(self.data, f, ensure_ascii=False, indent=4)
+                    ujson.dump(save_data, f, ensure_ascii=False, indent=4)
                 else:
-                    json.dump(self.data, f, ensure_ascii=False, indent=4)
+                    json.dump(save_data, f, ensure_ascii=False, indent=4)
         
         elif self.file_type == 'toml':
             if not TOML_AVAILABLE:
@@ -422,19 +431,27 @@ class UniversalLoader:
 
     async def _save_data_async(self, save_path: Optional[str] = None) -> None:
         """异步保存数据到文件"""
-        save_path = save_path or self.file_path
+        save_path = save_path or str(self.file_path)
         
         if self.file_type == 'json':
-            # 先序列化再异步写入
-            serialized = ujson.dumps(self.data, ensure_ascii=False, indent=4) \
-                if UJSON_AVAILABLE else json.dumps(self.data, ensure_ascii=False, indent=4)
-            async with _open_file(save_path, 'w') as f:
-                await f.write(serialized)
+            # 确保所有键都是字符串类型
+            save_data = self._stringify_keys(self.data)
+            serialized = (ujson.dumps(save_data, ensure_ascii=False, indent=4) 
+                         if UJSON_AVAILABLE else 
+                         json.dumps(save_data, ensure_ascii=False, indent=4))
+            
+            if AIOFILES_AVAILABLE:
+                async with aiofiles.open(save_path, 'w', encoding='utf-8') as f:
+                    await f.write(serialized)
+            else:
+                # 使用线程池执行同步写入
+                await asyncio.to_thread(self._save_data_sync, save_path)
+                return
         
         elif self.file_type == 'toml':
             if not TOML_AVAILABLE:
                 raise ModuleNotInstalledError("请安装 toml 模块以支持 TOML 文件")
-            async with _open_file(save_path, 'w') as f:
+            async with aiofiles.open(save_path, 'w', encoding='utf-8') as f:
                 await f.write(toml.dumps(self.data))
         
         elif self.file_type == 'yaml':
@@ -444,7 +461,7 @@ class UniversalLoader:
                                    allow_unicode=True,
                                    default_flow_style=False,
                                    sort_keys=False)
-            async with _open_file(save_path, 'w') as f:
+            async with aiofiles.open(save_path, 'w', encoding='utf-8') as f:
                 await f.write(yaml_output)
         
         else:
