@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:27
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-15 23:04:57
+# @LastEditTime : 2025-03-19 21:46:51
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -34,7 +34,7 @@ class WebSocketHandler(WebSocketClient, Apis):
 
     def __init__(self, uri, headers=None, initial_reconnect_interval=5, 
                  max_reconnect_interval=60, max_reconnect_attempts=5,
-                 message_handler=None):
+                 message_handler=None, close_handler=None):
         """初始化WebSocket处理器
 
         Args:
@@ -45,11 +45,21 @@ class WebSocketHandler(WebSocketClient, Apis):
             max_reconnect_attempts: 最大重连尝试次数
             message_handler: 消息处理函数
         """
-        super().__init__(uri, headers, initial_reconnect_interval, max_reconnect_interval, max_reconnect_attempts, message_handler)
+        super().__init__(uri, headers, initial_reconnect_interval, max_reconnect_interval, max_reconnect_attempts, message_handler, close_handler)
         self.ws_client = self
         self.ping:int = -1
         self.request_cache:Dict[uuid.UUID: dict] = {}
+        self.request_interceptor = None
 
+    def set_request_interceptor(self, interceptor):
+        """设置请求拦截器函数
+        
+        Args:
+            interceptor: 接收 action 和 params 参数的函数,返回修改后的响应数据
+        """
+        _LOG.warning(f'当前ws连接已被内部拦截: {self.uri} [{interceptor.__doc__}]')
+        self.request_interceptor = interceptor
+    
     async def api(self,
                 action: str,
                 param: Optional[Any] = None, 
@@ -79,6 +89,11 @@ class WebSocketHandler(WebSocketClient, Apis):
             "params": param or params,
             "echo": echo,
         }
+
+        # 如果在debug模式下且设置了拦截器,则使用拦截器处理请求
+        if self.request_interceptor is not None:
+            return await self.request_interceptor(action, param or params)
+
         re = await self.send_data(json.dumps(data), wait=wait)
         if not wait:
             return None
