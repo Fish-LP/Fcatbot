@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-19 21:55:13
+# @LastEditTime : 2025-03-19 22:15:47
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -14,6 +14,7 @@ from Fcatbot.data_models.message.message_chain import MessageChain
 from Fcatbot.utils import visualize_tree
 from .ws import WebSocketHandler
 from .utils import get_log
+from .utils import Color
 from .data_models import GroupMessage
 from .data_models import PrivateMessage
 from .data_models import HeartbeatEvent
@@ -137,56 +138,87 @@ class BotClient:
                         args = parts[1:]
                         
                         if command == 'help':
-                            print("""调试命令帮助:
-.help               - 显示此帮助
-.state             - 显示当前状态
-.set <key> <value> - 设置状态值
-.group <id/none>   - 切换群聊/私聊环境
-.user <id>         - 设置用户ID
-.name <name>       - 设置用户昵称
-.role <role>       - 设置用户角色(owner/admin/member)
-.exit              - 退出调试模式
-所有非.开头的输入都会被视为消息内容发送""")
+                            print(f"""{Color.CYAN}调试命令帮助:{Color.RESET}
+{Color.GREEN}.help{Color.RESET}               - 显示此帮助
+{Color.GREEN}.state{Color.RESET}             - 显示当前状态
+{Color.GREEN}.set <key> <value>{Color.RESET} - 设置状态值
+{Color.GREEN}.group <id/none>{Color.RESET}   - 切换群聊/私聊环境
+{Color.GREEN}.user <id>{Color.RESET}         - 设置用户ID
+{Color.GREEN}.name <name>{Color.RESET}       - 设置用户昵称
+{Color.GREEN}.role <role>{Color.RESET}       - 设置用户角色(owner/admin/member)
+{Color.GREEN}.reload <plugin>{Color.RESET}   - 重载指定插件(all表示重载所有)
+{Color.GREEN}.plugins{Color.RESET}           - 显示已加载的插件列表 
+{Color.GREEN}.exit{Color.RESET}              - 退出调试模式
+{Color.YELLOW}所有非.开头的输入都会被视为消息内容发送{Color.RESET}""")
                             return None
-                            
+
+                        elif command == 'plugins':
+                            print(f"{Color.CYAN}已加载的插件:{Color.RESET}")
+                            for name, plugin in self.plugin_sys.plugins.items():
+                                print(f"{Color.GREEN}- {name}{Color.RESET} {Color.GRAY}v{plugin.version}{Color.RESET}")
+                            return None
+
+                        elif command == 'reload':
+                            if not args:
+                                print(f"{Color.YELLOW}请指定要重载的插件名称,使用 all 重载所有插件{Color.RESET}")
+                                return None
+                            try:
+                                plugin_name = args[0]
+                                if plugin_name == 'all':
+                                    print(f"{Color.YELLOW}正在重载所有插件...{Color.RESET}")
+                                    self.plugin_sys.unload_all()
+                                    asyncio.run(self.plugin_sys.load_plugins(api=self.ws))
+                                    print(f"{Color.GREEN}已重载所有插件{Color.RESET}")
+                                else:
+                                    if plugin_name not in self.plugin_sys.plugins:
+                                        print(f"{Color.RED}插件 '{plugin_name}' 未加载{Color.RESET}")
+                                        return None
+                                    print(f"{Color.YELLOW}正在重载插件 {plugin_name}...{Color.RESET}")
+                                    asyncio.run(self.plugin_sys.reload_plugin(plugin_name))
+                                    print(f"{Color.GREEN}已重载插件 {plugin_name}{Color.RESET}")
+                            except Exception as e:
+                                print(f"{Color.RED}重载插件时出错: {e}{Color.RESET}")
+                            return None
+
                         elif command == 'state':
-                            print("当前状态\n", '\n'.join(visualize_tree(debug_state)), sep='')
+                            print(f"{Color.CYAN}当前状态{Color.RESET}")
+                            print('\n'.join(f"{Color.GRAY}{line}{Color.RESET}" for line in visualize_tree(debug_state)))
                             return None
                             
                         elif command == 'set' and len(args) >= 2:
                             key, value = args[0], ' '.join(args[1:])
                             if key in debug_state:
                                 debug_state[key] = value
-                                print(f"已设置 {key} = {value}")
+                                print(f"{Color.GREEN}已设置 {key} = {value}{Color.RESET}")
                             return None
                             
                         elif command == 'group':
                             if not args:
                                 debug_state['group_id'] = None
-                                print("已切换到私聊环境")
+                                print(f"{Color.GREEN}已切换到私聊环境{Color.RESET}")
                             elif args:
                                 debug_state['group_id'] = args[0]
-                                print(f"已切换到群 {args[0]}")
+                                print(f"{Color.GREEN}已切换到群 {args[0]}{Color.RESET}")
                             return None
                             
                         elif command == 'user':
                             if args:
                                 debug_state['user_id'] = args[0]
-                                print(f"已设置用户ID为 {args[0]}")
+                                print(f"{Color.GREEN}已设置用户ID为 {args[0]}{Color.RESET}")
                             return None
                             
                         elif command == 'name':
                             if args:
                                 debug_state['user_name'] = ' '.join(args)
-                                print(f"已设置用户名为 {debug_state['user_name']}")
+                                print(f"{Color.GREEN}已设置用户名为 {debug_state['user_name']}{Color.RESET}")
                             return None
                             
                         elif command == 'role':
                             if args and args[0] in ('owner', 'admin', 'member'):
                                 debug_state['user_role'] = args[0]
-                                print(f"已设置用户角色为 {args[0]}")
+                                print(f"{Color.GREEN}已设置用户角色为 {args[0]}{Color.RESET}")
                             else:
-                                print("角色必须是 owner/admin/member 之一")
+                                print(f"{Color.YELLOW}角色必须是 owner/admin/member 之一{Color.RESET}")
                             return None
                             
                         elif command == 'exit':
@@ -194,10 +226,10 @@ class BotClient:
                             
                     return cmd  # 返回非命令内容作为消息
 
-                print("输入 .help 查看调试命令帮助")
+                print(f"{Color.CYAN}输入 {Color.GREEN}.help{Color.CYAN} 查看调试命令帮助{Color.RESET}")
                 while True:
                     try:
-                        text = input('> ')
+                        text = input(f'{Color.MAGENTA}>{Color.RESET} ')
                         msg_text = process_debug_command(text)
                         if msg_text is None:
                             continue
@@ -239,9 +271,9 @@ class BotClient:
                             )
                             out = self.publish_sync(Event(OFFICIAL_PRIVATE_MESSAGE_EVENT, msg))
                         if out:
-                            print(f'收集到的返回: {out}')
+                            print(f'{Color.CYAN}收集到的返回:{Color.RESET} {out}')
                     except Exception as e:
-                        LOG.error(f"调试模式错误: {e}")
+                        LOG.error(f"{Color.RED}调试模式错误: {e}{Color.RESET}")
                         
             except KeyboardInterrupt:
                 print()

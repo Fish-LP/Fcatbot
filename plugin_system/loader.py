@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:26:43
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-15 20:10:05
+# @LastEditTime : 2025-03-19 22:37:22
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -195,14 +195,30 @@ class PluginLoader:
         old_plugin = self.plugins[plugin_name]
         await self.unload_plugin(plugin_name)
 
-        module = importlib.import_module(old_plugin.__class__.__module__)
-        # 如果模块有依赖项,这些依赖项不会自动重新加载
+        # 获取插件模块路径
+        module_path = old_plugin.__class__.__module__
+        module = importlib.import_module(module_path)
+        
+        # 强制重新加载
         importlib.reload(module)
 
-        new_cls = getattr(module, old_plugin.__class__.__name__)
-        new_plugin = new_cls(self.event_bus)
-        new_plugin._init_()
-        await new_plugin.on_load()
+        # 获取插件类
+        plugin_class = None
+        for item_name in dir(module):
+            item = getattr(module, item_name)
+            if (isinstance(item, type) and 
+                issubclass(item, BasePlugin) and 
+                hasattr(item, 'name') and 
+                item.name == plugin_name):
+                plugin_class = item
+                break
+
+        if not plugin_class:
+            raise ValueError(f"无法在模块中找到插件类 '{plugin_name}'")
+
+        # 创建新的插件实例
+        new_plugin = plugin_class(self.event_bus, meta_data=self.meta_data.copy(), api=old_plugin.api)
+        await new_plugin.__onload__()
         self.plugins[plugin_name] = new_plugin
 
     def _load_modules_from_directory(
