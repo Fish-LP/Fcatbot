@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-17 20:16:52
+# @LastEditTime : 2025-03-19 20:25:56
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -254,12 +254,12 @@ class NopeData:
     '''MessageChain'''
 
 # TODO: Markdown
-# @dataclass(frozen=True)
-# class Markdown(OccupyElement):
-#     type: str = field(default='markdown', init=False)
+@dataclass(frozen=True)
+class Markdown(OccupyElement):
+    type: str = field(default='markdown', init=False)
     
-#     def __post_init__(self, markdown: str):
-#         ValueError('这是TODO,还没实现呢')
+    def __post_init__(self, markdown: str):
+        ValueError('这是TODO,还没实现呢')
 
-#     def to_dict(self) -> dict:
-#         ValueError('这是TODO,还没实现呢')
+    def to_dict(self) -> dict:
+        ValueError('这是TODO,还没实现呢')

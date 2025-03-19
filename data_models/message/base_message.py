@@ -2,20 +2,34 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 15:16:05
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-15 19:47:14
+# @LastEditTime : 2025-03-19 20:26:29
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 from dataclasses import dataclass, field
-from typing import Optional, Dict
+from typing import Literal, Optional, Dict
 
-@dataclass
+@dataclass(frozen=True)
 class Sender:
     """消息发送者"""
     user_id: int = field(default=None)
+    '''发送者 QQ 号'''
     nickname: str = field(default=None)
-    card: str = field(default=None)
-    role: str = field(default=None)
+    '''昵称'''
+    card: str = field(default='')
+    '''群名片／备注'''
+    sex: Literal['male', 'female', 'unknown'] = field(default='unknown')
+    '''性别'''
+    age	:int = field(default=0)
+    '''年龄'''
+    area :str = field(default=None)
+    '''地区'''
+    level :str = field(default=None)
+    '''成员等级'''
+    role: Literal['owner', 'admin', 'member'] = field(default=None)
+    '''角色'''
+    title :str = field(default=None)
+    '''专属头衔'''
 
     def __repr__(self):
         return f"Sender([{self.nickname}]({self.user_id}))"
