@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-17 21:18:38
+# @LastEditTime : 2025-03-20 20:35:20
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -14,10 +14,15 @@ from uuid import UUID
 from .custom_err import PluginLoadError
 from .event import EventBus, Event
 from ..utils import ChangeDir
+from ..utils import Color
 from ..utils import UniversalLoader
+from ..utils import get_log
+from ..utils import visualize_tree
 from ..utils.universal_data_IO import FileTypeUnknownError, SaveError, LoadError
 from ..config import PERSISTENT_DIR
 from ..ws import WebSocketHandler
+
+LOG = get_log('BasePlugin')
 
 class BasePlugin:
     """插件基类
@@ -44,19 +49,22 @@ class BasePlugin:
     meta_data: dict
     api: WebSocketHandler
     first_load: bool
+    _debug: bool = False  # 调试模式标记
     
     @final
-    def __init__(self, event_bus: EventBus, **kwd):
+    def __init__(self, event_bus: EventBus, debug: bool = False, **kwd):
         """初始化插件实例
         
         Args:
             event_bus: 事件总线实例
+            debug: 是否启用调试模式
             **kwd: 额外的关键字参数,将被设置为插件属性
             
         Raises:
             ValueError: 当缺少插件名称或版本号时抛出
             PluginLoadError: 当工作目录无效时抛出
         """
+        self._debug = debug
         if not self.name: raise ValueError('缺失插件名称')
         if not self.version: raise ValueError('缺失插件版本号')
         if kwd:
@@ -83,6 +91,32 @@ class BasePlugin:
 
         self.work_space = ChangeDir(self._work_path)
 
+    @property
+    def debug(self) -> bool:
+        """是否处于调试模式"""
+        return self._debug
+
+    @final
+    def check_debug(self, func_name: str) -> None:
+        """检查是否允许在当前模式下调用某功能
+        
+        Args:
+            func_name: 功能名称
+        
+        Raises:
+            RuntimeError: 当在调试模式下调用受限功能时抛出
+        """
+        restricted_funcs = {
+            'send_group_msg': '发送群消息',
+            'send_private_msg': '发送私聊消息',
+            'set_group_ban': '设置群禁言',
+            'set_group_admin': '设置群管理员',
+            # 添加其他需要限制的功能
+        }
+        
+        if self._debug and func_name in restricted_funcs:
+            raise RuntimeError(f"调试模式下禁止使用 {restricted_funcs[func_name]} 功能,触发者: {self.name}")
+
     @final
     async def __unload__(self, *arg, **kwd):
         """卸载插件时的清理操作
@@ -96,7 +130,11 @@ class BasePlugin:
         await asyncio.to_thread(self._close_, *arg, **kwd)
         await self.on_close(*arg, **kwd)
         try:
-            self.data.save()
+            if self._debug:
+                LOG.warning(f"{Color.YELLOW}debug模式{Color.RED}取消{Color.RESET}退出时的保存行为")
+                print(f'{Color.GRAY}{self.name}\n', '\n'.join(visualize_tree(self.data.data)), sep='')
+            else:
+                self.data.save()
         except (FileTypeUnknownError, SaveError, FileNotFoundError) as e:
             raise RuntimeError(self.name, f"保存持久化数据时出错: {e}")
 

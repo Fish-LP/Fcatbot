@@ -2,26 +2,37 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-19 22:15:47
+# @LastEditTime : 2025-03-20 23:17:45
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 import os
+import readline
+import asyncio
+import json
+
 from typing import Any, List
+
+from .ws import WebSocketHandler
+
+from .utils import get_log
+from .utils import Color
 
 from Fcatbot.data_models.message.base_message import Sender
 from Fcatbot.data_models.message.message_chain import MessageChain
 from Fcatbot.utils import visualize_tree
-from .ws import WebSocketHandler
-from .utils import get_log
-from .utils import Color
+
 from .data_models import GroupMessage
 from .data_models import PrivateMessage
 from .data_models import HeartbeatEvent
 from .data_models import LifecycleEvent
 from .data_models import GroupRequestEvent
 from .data_models import FriendRequestEvent
-from .plugin_system import EventBus, Event, PluginLoader
+
+from .plugin_system import EventBus
+from .plugin_system import Event
+from .plugin_system import PluginLoader
+
 from .config import OFFICIAL_HEARTBEAT_EVENT
 from .config import OFFICIAL_LIFECYCLE_EVENT
 from .config import OFFICIAL_PRIVATE_MESSAGE_EVENT
@@ -33,16 +44,42 @@ from .config import OFFICIAL_PRIVATE_COMMAND_EVENT
 from .config import OFFICIAL_NOTICE_EVENT
 from .config import PLUGINS_DIR
 
-import asyncio
-import json
+from .data_models import GroupFileUpload
+from .data_models import GroupAdminChange
+from .data_models import GroupMemberDecrease
+from .data_models import GroupMemberIncrease
+from .data_models import GroupBan
+from .data_models import FriendAdd
+from .data_models import GroupRecall
+from .data_models import FriendRecall
+from .data_models import PokeNotify
+from .data_models import LuckyKingNotify
+from .data_models import HonorNotify
 
 LOG = get_log('FcatBot')
 
-from .data_models import (
-    GroupFileUpload, GroupAdminChange, GroupMemberDecrease, 
-    GroupMemberIncrease, GroupBan, FriendAdd, GroupRecall,
-    FriendRecall, PokeNotify, LuckyKingNotify, HonorNotify
-)
+class CommandCompleter:
+    def __init__(self, options):
+        self.options = sorted(options)
+        self.matches = []
+
+    def complete(self, text, state):
+        print(f"Completing: {text} (state={state})")
+        
+        # 转换为小写进行匹配
+        clean_text = text.lower()
+        if text.startswith('.'):
+            if state == 0:
+                self.matches = [s for s in self.options if s.lower().startswith(clean_text)]
+                print(f"Possible matches: {self.matches}")
+            try:
+                return self.matches[state]
+            except IndexError:
+                return None
+        return None
+    
+    def __str__(self):
+        return f"CommandCompleter({self.options})"
 
 class BotClient:
     """QQ机器人客户端类.
@@ -82,6 +119,8 @@ class BotClient:
             LOG.info('准备加载插件')
             if not os.path.exists(PLUGINS_DIR):
                 os.makedirs(PLUGINS_DIR, exist_ok=True)
+            # 设置插件系统的调试模式
+            self.plugin_sys.set_debug(debug)
             asyncio.run(self.plugin_sys.load_plugins(api=self.ws))
         LOG.info('准备启动Fcatbot')
         if debug:
@@ -139,14 +178,15 @@ class BotClient:
                         
                         if command == 'help':
                             print(f"""{Color.CYAN}调试命令帮助:{Color.RESET}
-{Color.GREEN}.help{Color.RESET}               - 显示此帮助
+{Color.GREEN}.help{Color.RESET}              - 显示此帮助
 {Color.GREEN}.state{Color.RESET}             - 显示当前状态
 {Color.GREEN}.set <key> <value>{Color.RESET} - 设置状态值
 {Color.GREEN}.group <id/none>{Color.RESET}   - 切换群聊/私聊环境
 {Color.GREEN}.user <id>{Color.RESET}         - 设置用户ID
 {Color.GREEN}.name <name>{Color.RESET}       - 设置用户昵称
 {Color.GREEN}.role <role>{Color.RESET}       - 设置用户角色(owner/admin/member)
-{Color.GREEN}.reload <plugin>{Color.RESET}   - 重载指定插件(all表示重载所有)
+{Color.GREEN}.reload <plugin>{Color.RESET}   - 重载指定插件(all表示所有)
+{Color.GREEN}.show <plugin>{Color.RESET}     - 查看指定插件数据(all表示所有)
 {Color.GREEN}.plugins{Color.RESET}           - 显示已加载的插件列表 
 {Color.GREEN}.exit{Color.RESET}              - 退出调试模式
 {Color.YELLOW}所有非.开头的输入都会被视为消息内容发送{Color.RESET}""")
@@ -155,7 +195,7 @@ class BotClient:
                         elif command == 'plugins':
                             print(f"{Color.CYAN}已加载的插件:{Color.RESET}")
                             for name, plugin in self.plugin_sys.plugins.items():
-                                print(f"{Color.GREEN}- {name}{Color.RESET} {Color.GRAY}v{plugin.version}{Color.RESET}")
+                                print(f"{Color.YELLOW}- {Color.GREEN}{name}{Color.RESET} {Color.GRAY}v{plugin.version}{Color.RESET}")
                             return None
 
                         elif command == 'reload':
@@ -178,6 +218,28 @@ class BotClient:
                                     print(f"{Color.GREEN}已重载插件 {plugin_name}{Color.RESET}")
                             except Exception as e:
                                 print(f"{Color.RED}重载插件时出错: {e}{Color.RESET}")
+                            return None
+
+                        elif command == 'show':
+                            if not args:
+                                print(f"{Color.YELLOW}请指定要查看的插件名称,使用 all 查看所有插件{Color.RESET}")
+                                return None
+                            try:
+                                plugin_name = args[0]
+                                if plugin_name == 'all':
+                                    print(f"{Color.YELLOW}正在查看所有插件...{Color.RESET}")
+                                    for plugin in self.plugin_sys.plugins.values():
+                                        print(f'{Color.GRAY}{plugin.name}\n', '\n'.join(visualize_tree(plugin.data.data)), sep='')
+                                        print()
+                                    print(f"{Color.GREEN}已查看所有插件{Color.RESET}")
+                                else:
+                                    if plugin_name not in self.plugin_sys.plugins:
+                                        print(f"{Color.RED}插件 '{plugin_name}' 未加载{Color.RESET}")
+                                        return None
+                                    plugin = self.plugin_sys.plugins[plugin_name]
+                                    print(f'{Color.GRAY}{plugin.name}\n', '\n'.join(visualize_tree(plugin.data.data)), sep='')
+                            except Exception as e:
+                                print(f"{Color.RED}查看插件时出错: {e}{Color.RESET}")
                             return None
 
                         elif command == 'state':
@@ -227,6 +289,10 @@ class BotClient:
                     return cmd  # 返回非命令内容作为消息
 
                 print(f"{Color.CYAN}输入 {Color.GREEN}.help{Color.CYAN} 查看调试命令帮助{Color.RESET}")
+                try:
+                    readline.read_history_file('.history.txt')
+                except FileNotFoundError:
+                    pass
                 while True:
                     try:
                         text = input(f'{Color.MAGENTA}>{Color.RESET} ')
@@ -278,6 +344,7 @@ class BotClient:
             except KeyboardInterrupt:
                 print()
                 LOG.info("退出调试模式")
+                readline.write_history_file('.history.txt')
                 exit(0)
         else:
             try:

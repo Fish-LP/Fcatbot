@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:26:43
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-19 22:37:22
+# @LastEditTime : 2025-03-20 20:33:12
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -46,10 +46,20 @@ class PluginLoader:
         self.event_bus = event_bus  # 事件总线
         self._dependency_graph: Dict[str, Set[str]] = {}  # 插件依赖关系图
         self._version_constraints: Dict[str, Dict[str, str]] = {}  # 插件版本约束
+        self._debug = False  # 调试模式标记
         if META_CONFIG_PATH:
             self.meta_data = UniversalLoader(META_CONFIG_PATH).load().data
         else:
             self.meta_data = {}
+
+    def set_debug(self, debug: bool = False):
+        """设置调试模式
+        
+        Args:
+            debug: 是否启用调试模式
+        """
+        self._debug = debug
+        LOG.warning("插件系统已切换为调试模式") if debug else None
 
     def _validate_plugin(self, plugin_cls: Type[BasePlugin]) -> bool:
         """
@@ -126,7 +136,12 @@ class PluginLoader:
         temp_plugins = {}
         for name in load_order:
             plugin_cls = next(p for p in valid_plugins if p.name == name)
-            temp_plugins[name] = plugin_cls(self.event_bus, meta_data = self.meta_data.copy(), **kwargs)
+            temp_plugins[name] = plugin_cls(
+                self.event_bus, 
+                debug=self._debug,  # 传递调试模式标记 
+                meta_data=self.meta_data.copy(), 
+                **kwargs
+            )
 
         self.plugins = temp_plugins
         self._validate_dependencies()
@@ -217,7 +232,12 @@ class PluginLoader:
             raise ValueError(f"无法在模块中找到插件类 '{plugin_name}'")
 
         # 创建新的插件实例
-        new_plugin = plugin_class(self.event_bus, meta_data=self.meta_data.copy(), api=old_plugin.api)
+        new_plugin = plugin_class(
+            self.event_bus, 
+            debug=self._debug,
+            meta_data=self.meta_data.copy(), 
+            api=old_plugin.api
+        )
         await new_plugin.__onload__()
         self.plugins[plugin_name] = new_plugin
 
