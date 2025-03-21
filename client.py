@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-21 22:03:58
+# @LastEditTime : 2025-03-21 22:21:08
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -224,7 +224,12 @@ class BotClient:
                                         print(f"{Color.RED}插件 '{plugin_name}' 未加载{Color.RESET}")
                                         return None
                                     plugin = self.plugin_sys.plugins[plugin_name]
-                                    getattr(plugin, args[1])()
+                                    func = getattr(plugin, args[1])
+                                    if isinstance(func, asyncio.Task):
+                                        loop = asyncio.get_event_loop()
+                                        loop.run_until_complete(asyncio.gather(func))
+                                    else:
+                                        func()
                             except Exception as e:
                                 print(f"{Color.RED}执行插件方法时出错: {e}{Color.RESET}")
                             return None
