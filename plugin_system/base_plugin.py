@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-20 20:35:20
+# @LastEditTime : 2025-03-21 18:36:32
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -41,6 +41,7 @@ class BasePlugin:
         data (UniversalLoader): 插件数据管理器
         work_space (ChangeDir): 插件工作目录上下文管理器
         first_load (bool): 是否首次加载标志
+        _debug (bool): 调试模式标记
     """
 
     name: str
