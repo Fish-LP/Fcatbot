@@ -2,13 +2,13 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-24 21:52:42
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-15 17:44:51
+# @LastEditTime : 2025-03-21 18:32:44
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 from Fcatbot import Color
 from Fcatbot.utils import visualize_tree
-from .RBACManager import PermissionPath
+from .RBAC_manager import PermissionPath
 
 class Trie:
     def __init__(self, case_sensitive: bool = True):

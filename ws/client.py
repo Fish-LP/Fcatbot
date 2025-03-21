@@ -9,9 +9,7 @@
 from typing import Optional, Callable
 import asyncio
 import websockets
-import json
 import collections  # 用于双端队列
-from urllib.parse import urlparse, urlencode, urlunparse
 
 import websockets.client
 

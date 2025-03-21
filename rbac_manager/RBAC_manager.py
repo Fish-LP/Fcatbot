@@ -8,8 +8,8 @@
 # -------------------------
 from typing import Dict, Literal, Set
 from functools import lru_cache
-from .PermissionPath import PermissionPath
-from .Trie import Trie
+from .permission_path import PermissionPath
+from .permission_trie import Trie
 
 class RBACManager():
     case_sensitive: bool = None

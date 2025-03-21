@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:27
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-19 21:46:51
+# @LastEditTime : 2025-03-21 18:31:00
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -12,12 +12,9 @@ from typing import Any, Optional, Dict
 import uuid
 
 from ..utils import get_log
-from ..data_models import GroupMessage
-from ..data_models import PrivateMessage
 from ..data_models import MessageChain
 from .client import WebSocketClient
 from .api import Apis
-from ..data_models import Nope
 
 _LOG = get_log('WsClient')
 

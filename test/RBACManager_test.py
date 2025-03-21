@@ -2,13 +2,12 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 15:58:15
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-15 17:56:13
+# @LastEditTime : 2025-03-21 18:31:59
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 from Fcatbot.utils import TestSuite
 from Fcatbot.rbac_manager import RBACManager,PermissionPath,Trie
-from Fcatbot import Color
 
 
 # 创建测试套件实例
