@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 [project]
 # 项目元数据
 name = "Fcatbot" # 包名称
-version = "2.0.2-alpha" # 版本号
+version = "2.0.3-alpha" # 版本号
 description = "基于ncatbot开发" # 简短描述
 authors = [
     { name = "Fish-LP", email = "fish.zh@outlook.com" }, # 作者姓名和邮箱
@@ -29,6 +29,7 @@ dependencies = [
     "websockets ~=10.4", # WebSocket 支持
     "packaging ~=24.2",  # 包版本解析
     "tqdm ~=4.67.1",     # 进度条
+    "schedul ~=1.2.2",   # 定时任务库
 ]
 optional-dependencies = { "yaml" = [
     "pyyaml ~=6.0.2",
