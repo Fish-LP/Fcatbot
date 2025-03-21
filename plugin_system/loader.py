@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:26:43
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-20 20:33:12
+# @LastEditTime : 2025-03-21 20:53:40
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -29,6 +29,7 @@ from ..config import PLUGINS_DIR, META_CONFIG_PATH
 from ..utils import get_log
 from ..utils import UniversalLoader
 from ..utils import PipTool
+from ..utils import TimeTaskScheduler
 
 PM = PipTool()
 LOG = get_log('PluginLoader')
@@ -47,6 +48,7 @@ class PluginLoader:
         self._dependency_graph: Dict[str, Set[str]] = {}  # 插件依赖关系图
         self._version_constraints: Dict[str, Dict[str, str]] = {}  # 插件版本约束
         self._debug = False  # 调试模式标记
+        self.time_task_scheduler:TimeTaskScheduler = TimeTaskScheduler()
         if META_CONFIG_PATH:
             self.meta_data = UniversalLoader(META_CONFIG_PATH).load().data
         else:
@@ -137,9 +139,10 @@ class PluginLoader:
         for name in load_order:
             plugin_cls = next(p for p in valid_plugins if p.name == name)
             temp_plugins[name] = plugin_cls(
-                self.event_bus, 
-                debug=self._debug,  # 传递调试模式标记 
-                meta_data=self.meta_data.copy(), 
+                event_bus = self.event_bus,
+                time_task_scheduler = self.time_task_scheduler,
+                debug = self._debug,  # 传递调试模式标记 
+                meta_data=self.meta_data.copy(),
                 **kwargs
             )
 
