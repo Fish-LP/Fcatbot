@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-21 21:11:35
+# @LastEditTime : 2025-03-21 22:03:58
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -180,18 +180,77 @@ class BotClient:
                         
                         if command == 'help':
                             print(f"""{Color.CYAN}调试命令帮助:{Color.RESET}
-{Color.GREEN}.help{Color.RESET}              - 显示此帮助
-{Color.GREEN}.state{Color.RESET}             - 显示当前状态
-{Color.GREEN}.set <key> <value>{Color.RESET} - 设置状态值
-{Color.GREEN}.group <id/none>{Color.RESET}   - 切换群聊/私聊环境
-{Color.GREEN}.user <id>{Color.RESET}         - 设置用户ID
-{Color.GREEN}.name <name>{Color.RESET}       - 设置用户昵称
-{Color.GREEN}.role <role>{Color.RESET}       - 设置用户角色(owner/admin/member)
-{Color.GREEN}.reload <plugin>{Color.RESET}   - 重载指定插件(all表示所有)
-{Color.GREEN}.show <plugin>{Color.RESET}     - 查看指定插件数据(all表示所有)
-{Color.GREEN}.plugins{Color.RESET}           - 显示已加载的插件列表 
-{Color.GREEN}.exit{Color.RESET}              - 退出调试模式
+{Color.GREEN}.help{Color.RESET}                         - 显示此帮助
+{Color.GREEN}.state{Color.RESET}                        - 显示当前状态
+{Color.GREEN}.set <key> <value>{Color.RESET}            - 设置状态值
+{Color.GREEN}.group <id/none>{Color.RESET}              - 切换群聊/私聊环境
+{Color.GREEN}.user <id>{Color.RESET}                    - 设置用户ID
+{Color.GREEN}.name <name>{Color.RESET}                  - 设置用户昵称
+{Color.GREEN}.role <role>{Color.RESET}                  - 设置用户角色(owner/admin/member)
+{Color.GREEN}.reload <plugin>{Color.RESET}              - 重载指定插件(all表示所有)
+{Color.GREEN}.show <plugin>{Color.RESET}                - 查看指定插件数据(all表示所有)
+{Color.GREEN}.look <plugin> <key>{Color.RESET}          - 查看指定插件属性
+{Color.GREEN}.edit <plugin> <key> <var>{Color.RESET}    - 修改已加载插件的数据
+{Color.GREEN}.run <plugin> <func>{Color.RESET}          - 运行已加载插件的函数
+{Color.GREEN}.plugins{Color.RESET}                      - 显示已加载的插件列表
+{Color.GREEN}.exit{Color.RESET}                         - 退出调试模式
 {Color.YELLOW}所有非.开头的输入都会被视为消息内容发送{Color.RESET}""")
+                            return None
+
+                        elif command == 'look':
+                            if not args and len(args) < 2:
+                                print(f"{Color.YELLOW}请指定要查看的插件名称与键名{Color.RESET}")
+                                return None
+                            try:
+                                plugin_name = args[0]
+                                if plugin_name:
+                                    if plugin_name not in self.plugin_sys.plugins:
+                                        print(f"{Color.RED}插件 '{plugin_name}' 未加载{Color.RESET}")
+                                        return None
+                                    plugin = self.plugin_sys.plugins[plugin_name]
+                                    print(f'{Color.GRAY}{plugin.name}\n', '\n'.join(visualize_tree(getattr(plugin, args[1]))), sep='')
+                            except Exception as e:
+                                print(f"{Color.RED}获取插件属性时出错: {e}{Color.RESET}")
+                            return None
+
+                        elif command == 'run':
+                            if not args and len(args) < 2:
+                                print(f"{Color.YELLOW}请指定要查看的插件名称与修改键值对{Color.RESET}")
+                                return None
+                            try:
+                                plugin_name = args[0]
+                                if plugin_name:
+                                    if plugin_name not in self.plugin_sys.plugins:
+                                        print(f"{Color.RED}插件 '{plugin_name}' 未加载{Color.RESET}")
+                                        return None
+                                    plugin = self.plugin_sys.plugins[plugin_name]
+                                    getattr(plugin, args[1])()
+                            except Exception as e:
+                                print(f"{Color.RED}执行插件方法时出错: {e}{Color.RESET}")
+                            return None
+
+                        elif command == 'edit':
+                            if not args and len(args) < 2:
+                                print(f"{Color.YELLOW}请指定要查看的插件名称与修改对{Color.RESET}")
+                                return None
+                            try:
+                                plugin_name = args[0]
+                                if plugin_name:
+                                    if plugin_name not in self.plugin_sys.plugins:
+                                        print(f"{Color.RED}插件 '{plugin_name}' 未加载{Color.RESET}")
+                                        return None
+                                    plugin = self.plugin_sys.plugins[plugin_name]
+                                    try:
+                                        var = args[2]
+                                    except IndexError:
+                                        var = None
+                                    if var:
+                                        plugin.data[args[1]] = var
+                                    else:
+                                        del plugin.data[args[1]]
+                                    print(f'{Color.GRAY}{plugin.name}\n', '\n'.join(visualize_tree(plugin.data.data)), sep='')
+                            except Exception as e:
+                                print(f"{Color.RED}修改插件数据时出错: {e}{Color.RESET}")
                             return None
 
                         elif command == 'plugins':

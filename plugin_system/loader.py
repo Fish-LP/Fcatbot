@@ -262,6 +262,7 @@ class PluginLoader:
             for filename in os.listdir(directory_path):
                 if not os.path.isdir(os.path.join(directory_path, filename)):
                     continue
+                print(f"work in {os.getcwd()}")
                 if os.path.isfile(os.path.join(directory_path, filename, "requirements.txt")):
                     requirements = set(open(os.path.join(directory_path, filename, "requirements.txt")).readlines())
                     if all_install <= requirements:
