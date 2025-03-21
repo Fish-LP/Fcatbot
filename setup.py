@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-16 12:50:14
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-19 22:42:25
+# @LastEditTime : 2025-03-21 18:57:32
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -23,12 +23,12 @@ setup(
     packages=find_packages(),  # 自动发现所有包
     include_package_data=True,  # 包含包中的数据文件
     install_requires=[  # 依赖项
-        'aifile',
         'aiohttp',
         'websockets',
         'tqdm',
         'packaging',
-        'aiofile',
+        'aiofiles',
+        'schedule',
     ],
     python_requires='>=3.9',  # 所需 Python 版本
     # entry_points={
