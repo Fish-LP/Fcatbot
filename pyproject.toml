@@ -29,7 +29,7 @@ dependencies = [
     "websockets ~=10.4", # WebSocket 支持
     "packaging ~=24.2",  # 包版本解析
     "tqdm ~=4.67.1",     # 进度条
-    "schedul ~=1.2.2",   # 定时任务库
+    "schedule ~=1.2.2",  # 定时任务库
 ]
 optional-dependencies = { "yaml" = [
     "pyyaml ~=6.0.2",
