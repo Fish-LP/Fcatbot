@@ -2,12 +2,14 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-21 18:21:23
+# @LastEditTime : 2025-03-21 21:11:35
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 import os
-import readline
+import sys
+if 'win' not in sys.platform:
+    import readline
 import asyncio
 import json
 
@@ -290,7 +292,8 @@ class BotClient:
 
                 print(f"{Color.CYAN}输入 {Color.GREEN}.help{Color.CYAN} 查看调试命令帮助{Color.RESET}")
                 try:
-                    readline.read_history_file('.history.txt')
+                    if 'win' not in sys.platform:
+                        readline.read_history_file('.history.txt')
                 except FileNotFoundError:
                     pass
                 while True:
@@ -344,7 +347,8 @@ class BotClient:
             except KeyboardInterrupt:
                 print()
                 LOG.info("退出调试模式")
-                readline.write_history_file('.history.txt')
+                if 'win' not in sys.platform:
+                    readline.write_history_file('.history.txt')
                 exit(0)
         else:
             try:

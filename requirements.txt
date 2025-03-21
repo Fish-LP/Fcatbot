@@ -1,4 +1,4 @@
-# pip install -e ./Fcatbot
+https://github.com/Fish-LP/Fcatbot.git@main
 # 核心
 aiohttp~=3.11.12 # 异步网络通信
 websockets~=10.4 # ws连接
@@ -7,6 +7,8 @@ tqdm~=4.67.1 # 进度题
 aiofiles~=24.1.0 # UniversalLoaderError支持异步文件读写
 schedule~=1.2.2 # 定时任务
 # 可选
-# ujson~=5.10.0 # 加速json操作
-# pyyaml~=6.0.2 # UniversalLoaderError 读取yaml格式文件
-# pytoml~=0.1.21 # UniversalLoaderError 读取toml格式文件
+ujson~=5.10.0 # 加速json操作
+pyyaml~=6.0.2 # UniversalLoaderError 读取yaml格式文件
+pytoml~=0.1.21 # UniversalLoaderError 读取toml格式文件
+
+windows-curses~=2.4.1; sys_platform == "win"
