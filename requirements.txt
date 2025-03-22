@@ -1,7 +1,5 @@
-https://github.com/Fish-LP/Fcatbot.git@main
 # 核心
-aiohttp~=3.11.12 # 异步网络通信
-websockets~=10.4 # ws连接
+websockets==10.4 # ws连接
 packaging~=24.2 # 插件系统
 tqdm~=4.67.1 # 进度题
 aiofiles~=24.1.0 # UniversalLoaderError支持异步文件读写

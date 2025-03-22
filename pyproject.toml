@@ -1,10 +1,10 @@
-[build-system]
 # 构建系统相关配置
+[build-system]
 requires = ["setuptools >= 64", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[project]
 # 项目元数据
+[project]
 name = "Fcatbot" # 包名称
 version = "2.0.3-alpha" # 版本号
 description = "基于ncatbot开发" # 简短描述
@@ -25,21 +25,25 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "aiohttp ~=3.11.12", # HTTP 客户端/服务器
-    "websockets ~=10.4", # WebSocket 支持
-    "packaging ~=24.2",  # 包版本解析
-    "tqdm ~=4.67.1",     # 进度条
-    "schedule ~=1.2.2",  # 定时任务库
+    "websockets==10.4",                             # ws连接
+    "packaging~=24.2",                              # 插件系统
+    "tqdm~=4.67.1",                                 # 进度条
+    "aiofiles~=24.1.0",                             # UniversalLoaderError支持异步文件读写
+    "schedule~=1.2.2",                              # 定时任务
+    "windows-curses~=2.4.1; sys_platform == 'win'", # Windows平台下的curses支持
+    "pyreadline; sys_platform == 'win'",            # Windows平台下的readline支持
 ]
 optional-dependencies = { "yaml" = [
     "pyyaml ~=6.0.2",
 ], "toml" = [
     "pytoml ~=0.1.21",
+], "ujson" = [
+    "ujson~=5.10.0",
 ] }
 requires-python = ">=3.9" # 所需 Python 版本
 
-[tool.setuptools]
 # Setuptools 特定的配置
+[tool.setuptools]
 # packages = ["Fcatbot"]      # 自动发现所有包
 include-package-data = true # 包含包中的数据文件
 
