@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:26:43
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-22 15:34:30
+# @LastEditTime : 2025-03-22 15:45:09
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -254,6 +254,7 @@ class PluginLoader:
         modules = {}
         original_sys_path = sys.path.copy()
         all_install = {pack['name'].strip().lower() for pack in PM.list_installed() if 'name' in pack}
+        download_new = False
 
         try:
             directory_path = os.path.abspath(directory_path)
