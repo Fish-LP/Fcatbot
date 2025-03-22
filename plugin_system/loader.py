@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:26:43
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-22 14:49:48
+# @LastEditTime : 2025-03-22 15:34:30
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -253,7 +253,7 @@ class PluginLoader:
         """
         modules = {}
         original_sys_path = sys.path.copy()
-        all_install = {pack['name'] for pack in PM.list_installed() if 'name' in pack}
+        all_install = {pack['name'].strip().lower() for pack in PM.list_installed() if 'name' in pack}
 
         try:
             directory_path = os.path.abspath(directory_path)
@@ -263,7 +263,7 @@ class PluginLoader:
                 if not os.path.isdir(os.path.join(directory_path, filename)):
                     continue
                 if os.path.isfile(os.path.join(directory_path, filename, "requirements.txt")):
-                    requirements = set([pack.strip() for pack in open(os.path.join(directory_path, filename, "requirements.txt")).readlines()])
+                    requirements = set([pack.strip().lower() for pack in open(os.path.join(directory_path, filename, "requirements.txt")).readlines()])
                     download = requirements - all_install
                     if download:
                         download_new = True
