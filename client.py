@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-22 20:19:16
+# @LastEditTime : 2025-03-22 20:22:07
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -275,9 +275,9 @@ class BotClient:
                                     except IndexError:
                                         var = None
                                     if var is None:
-                                        plugin.data[args[1]] = var
-                                    else:
                                         del plugin.data[args[1]]
+                                    else:
+                                        plugin.data[args[1]] = var
                                     print(f'{Color.GRAY}{plugin.name}\n', '\n'.join(visualize_tree(plugin.data.data)), sep='')
                             except Exception as e:
                                 print(f"{Color.RED}修改插件数据时出错: {e}{Color.RESET}")
