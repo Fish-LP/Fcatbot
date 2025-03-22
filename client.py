@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-22 20:09:07
+# @LastEditTime : 2025-03-22 20:19:16
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -274,7 +274,7 @@ class BotClient:
                                         var = smart_convert(args[2])
                                     except IndexError:
                                         var = None
-                                    if var:
+                                    if var is None:
                                         plugin.data[args[1]] = var
                                     else:
                                         del plugin.data[args[1]]
