@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-19 20:25:56
+# @LastEditTime : 2025-03-22 21:14:19
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -96,7 +96,7 @@ class AtAll(DafaultElement):
 class Face(DafaultElement):
     '''[表情]消息元素'''
     id: int
-    
+    raw: dict = field(default=None)
     type: str = field(default='face', init=False)
 
 

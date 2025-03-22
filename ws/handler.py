@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:27
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-21 18:31:00
+# @LastEditTime : 2025-03-22 21:20:25
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -106,7 +106,7 @@ class WebSocketHandler(WebSocketClient, Apis):
 
         if re.get('wording', None):
             _LOG.error(f"API异常 {re['wording']}")
-        if re.get('status', None) in ('OK', 'ok', '200'):
+        if re.get('status', None).lower() in ('ok', '200') or 'self_id' in re:
             if re.get('echo', None) == echo:
                 return re['data']
             else:
