@@ -22,6 +22,9 @@ class MetaEvent:
 
 @dataclass(frozen=True)
 class LifecycleEvent(MetaEvent):
+    time: int
+    self_id: int
+    post_type: Literal['meta_event'] 
     """生命周期事件"""
     meta_event_type: Literal['lifecycle'] = field(default='lifecycle')
     '''元事件类型'''
@@ -31,6 +34,9 @@ class LifecycleEvent(MetaEvent):
 
 @dataclass(frozen=True)
 class HeartbeatEvent(MetaEvent):
+    time: int
+    self_id: int
+    post_type: Literal['meta_event'] 
     """心跳事件"""
     meta_event_type: Literal['heartbeat'] = field(default='heartbeat')
     '''元事件类型'''

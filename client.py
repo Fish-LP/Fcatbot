@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-22 20:22:07
+# @LastEditTime : 2025-03-22 22:26:58
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -583,16 +583,16 @@ class BotClient:
             elif msg["meta_event_type"] == "heartbeat":
                 message = HeartbeatEvent(msg)
                 try:
-                    self.ping = abs(self.last_heartbeat['time'] + self.last_heartbeat['interval'] - msg['time'])
-                    self.last_heartbeat = msg
-                    if 'status' in msg:
-                        status: dict = msg['status']
+                    self.ping = abs(self.last_heartbeat.time + self.last_heartbeat.interval - message.time)
+                    self.last_heartbeat: HeartbeatEvent = message
+                    if message.status:
+                        status: dict = message.status
                         if all(status.values()):
                             _LOG.debug(f'Status: {status}')
                         else:
                             _LOG.error(f'Status: {status}')
                 except Exception:
-                    self.last_heartbeat = msg
+                    self.last_heartbeat: HeartbeatEvent = message
                 await self.event_bus.publish_async(Event(OFFICIAL_HEARTBEAT_EVENT, message))
         else:
             _LOG.error("这是一个错误,请反馈给开发者\n" + str(msg))
