@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-17 19:05:13
+# @LastEditTime : 2025-03-22 15:57:16
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -168,12 +168,26 @@ class MessageChain:
             ValueError(f"添加的元素必须是消息元素或元素列表或字典,但收到类型为 {type(element)}")
 
     def add_text(self, text: str) -> 'MessageChain':
-        """添加文本消息元素"""
+        """添加文本消息元素到消息链中。
+
+        Args:
+            text (str): 要发送的文本内容。
+
+        Returns:
+            MessageChain: 返回消息链本身，支持链式调用。
+        """
         self.elements.append(Text(text=text))
         return self
 
     def add_at(self, qq: Union[int, str]) -> 'MessageChain':
-        """添加 @ 消息元素"""
+        """添加@消息元素到消息链中。
+
+        Args:
+            qq (Union[int, str]): 要@的目标QQ号。
+
+        Returns:
+            MessageChain: 返回消息链本身，支持链式调用。
+        """
         self.elements.append(At(qq=qq))
         return self
 
@@ -183,62 +197,147 @@ class MessageChain:
         return self
 
     def add_image(self, file: Union[str, bytes]) -> 'MessageChain':
-        """添加图片消息元素"""
+        """添加图片消息元素到消息链中。
+
+        Args:
+            file (Union[str, bytes]): 图片文件路径或图片二进制数据。
+
+        Returns:
+            MessageChain: 返回消息链本身，支持链式调用。
+        """
         self.elements.append(Image(file=file))
         return self
 
     def add_face(self, id: str) -> 'MessageChain':
-        """添加表情消息元素"""
+        """添加QQ表情元素到消息链中。
+
+        Args:
+            id (str): QQ表情的ID。
+
+        Returns:
+            MessageChain: 返回消息链本身，支持链式调用。
+        """
         self.elements.append(Face(id=id))
         return self
 
     def add_reply(self, reply_to: str) -> 'MessageChain':
-        """添加回复消息元素"""
+        """添加回复消息元素到消息链中。
+
+        Args:
+            reply_to (str): 要回复的消息ID。
+
+        Returns:
+            MessageChain: 返回消息链本身，支持链式调用。
+        """
         self.elements.append(Reply(reply_to=reply_to))
         return self
 
     def add_json(self, data: str) -> 'MessageChain':
-        """添加 JSON 消息元素"""
+        """添加JSON消息元素到消息链中。
+
+        Args:
+            data (str): 要发送的JSON字符串。
+
+        Returns:
+            MessageChain: 返回消息链本身，支持链式调用。
+        """
         self.elements.append(Json(data=data))
         return self
 
     def add_record(self, file: str) -> 'MessageChain':
-        """添加语音消息元素"""
+        """添加语音消息元素到消息链中。
+
+        Args:
+            file (str): 语音文件的路径。
+
+        Returns:
+            MessageChain: 返回消息链本身，支持链式调用。
+        """
         self.elements.append(Record(file=file))
         return self
 
     def add_video(self, file: str) -> 'MessageChain':
-        """添加视频消息元素"""
+        """添加视频消息元素到消息链中。
+
+        Args:
+            file (str): 视频文件的路径。
+
+        Returns:
+            MessageChain: 返回消息链本身，支持链式调用。
+        """
         self.elements.append(Video(file=file))
         return self
 
     def add_dice(self) -> 'MessageChain':
-        """添加骰子消息元素"""
+        """添加骰子消息元素到消息链中。
+
+        Returns:
+            MessageChain: 返回消息链本身，支持链式调用。
+        """
         self.elements.append(Dice())
         return self
 
     def add_rps(self) -> 'MessageChain':
-        """添加猜拳消息元素"""
+        """添加猜拳消息元素到消息链中。
+
+        Returns:
+            MessageChain: 返回消息链本身，支持链式调用。
+        """
         self.elements.append(Rps())
         return self
 
-    def add_music(self, music_type: str, id: str) -> 'MessageChain':
-        """添加音乐分享消息元素"""
-        self.elements.append(Music(music_type=music_type, id=id))
+    def add_music(self, music_type: str, music_id: int) -> 'MessageChain':
+        """添加音乐分享消息元素到消息链中。
+
+        Args:
+            music_type (str): 音乐平台类型，可选值：'qq'、'163'、'kugou'、'migu'、'kuwo'。
+            music_id (int): 音乐ID。
+
+        Returns:
+            MessageChain: 返回消息链本身，支持链式调用。
+        """
+        self.elements.append(Music(music_type=music_type, music_id=music_id))
         return self
 
     def add_custom_music(self, url: str, audio: str, title: str, image: str = "", singer: str = "") -> 'MessageChain':
-        """添加自定义音乐分享消息元素"""
+        """添加自定义音乐分享消息元素到消息链中。
+
+        Args:
+            url (str): 点击后跳转的目标URL。
+            audio (str): 音乐文件的URL。
+            title (str): 音乐标题。
+            image (str, optional): 音乐封面图片URL。默认为空字符串。
+            singer (str, optional): 歌手名称。默认为空字符串。
+
+        Returns:
+            MessageChain: 返回消息链本身，支持链式调用。
+        """
         self.elements.append(CustomMusic(url=url, audio=audio, title=title, image=image, singer=singer))
         return self
 
     def add_markdown(self, markdown: dict) -> 'MessageChain':
-        """添加 Markdown 消息元素"""
+        """添加Markdown消息元素到消息链中。
+
+        Args:
+            markdown (dict): Markdown格式的消息内容字典。
+
+        Returns:
+            MessageChain: 返回消息链本身，支持链式调用。
+        """
         self.elements.append(Markdown(markdown=markdown))
         return self
 
     def add_nope(self, user_id: str, nickname: str, content: 'MessageChain') -> 'MessageChain':
-        '''添加转发消息节点'''
+        """添加转发消息节点到消息链中。
+
+        Args:
+            user_id (str): 转发消息的用户ID。
+            nickname (str): 转发消息的用户昵称。
+            content (MessageChain): 转发消息的内容。
+
+        Returns:
+            MessageChain: 返回消息链本身，支持链式调用。
+        """
         self.elements.append(Nope(NopeData(user_id=user_id, nickname=nickname, content=content)))
         return self
 
