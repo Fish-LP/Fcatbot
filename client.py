@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-22 14:54:26
+# @LastEditTime : 2025-03-22 20:09:07
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -15,6 +15,7 @@ except ImportError:
 import asyncio
 import json
 import inspect
+import ast
 
 from typing import Any, List
 
@@ -62,6 +63,17 @@ from .data_models import LuckyKingNotify
 from .data_models import HonorNotify
 
 LOG = get_log('FcatBot')
+
+def smart_convert(s: str):
+    """
+    尝试将字符串智能转换为最合适的 Python 类型。
+    """
+    try:
+        # 尝试使用 ast.literal_eval 安全地解析字符串
+        return ast.literal_eval(s)
+    except (ValueError, SyntaxError):
+        # 解析失败
+        return s
 
 class CommandCompleter:
     def __init__(self, options):
@@ -259,7 +271,7 @@ class BotClient:
                                         return None
                                     plugin = self.plugin_sys.plugins[plugin_name]
                                     try:
-                                        var = args[2]
+                                        var = smart_convert(args[2])
                                     except IndexError:
                                         var = None
                                     if var:
