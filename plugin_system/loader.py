@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:26:43
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-22 08:09:11
+# @LastEditTime : 2025-03-22 14:49:48
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -236,8 +236,7 @@ class PluginLoader:
 
         # 创建新的插件实例
         new_plugin = plugin_class(
-            event_bus=self.event_bus, 
-            time_task_scheduler=self.time_task_scheduler,
+            self.event_bus, 
             debug=self._debug,
             meta_data=self.meta_data.copy(), 
             api=old_plugin.api
@@ -263,13 +262,16 @@ class PluginLoader:
             for filename in os.listdir(directory_path):
                 if not os.path.isdir(os.path.join(directory_path, filename)):
                     continue
-                print(f"work in {os.getcwd()}")
                 if os.path.isfile(os.path.join(directory_path, filename, "requirements.txt")):
-                    requirements = set(open(os.path.join(directory_path, filename, "requirements.txt")).readlines())
-                    if all_install <= requirements:
-                        download = requirements - requirements
-                        for pack in download:
-                            PM.install(pack)
+                    requirements = set([pack.strip() for pack in open(os.path.join(directory_path, filename, "requirements.txt")).readlines()])
+                    download = requirements - all_install
+                    if download:
+                        download_new = True
+                        LOG.warning(f'即将安装 {filename} 中要求的库: {" ".join(download)}')
+                        if input('是否安装(Y/n):').lower() in ('y', ''):
+                            for pack in download:
+                                LOG.info(f'开始安装库: {pack}')
+                                PM.install(pack)
 
                 try:
                     module = importlib.import_module(filename)
@@ -277,6 +279,9 @@ class PluginLoader:
                 except ImportError as e:
                     LOG.error(f"导入模块 {filename} 时出错: {e}")
                     continue
+
+            if download_new:
+                LOG.warning('在某些环境中, 动态安装的库可能不会立即生效, 需要重新启动。')
 
         finally:
             sys.path = original_sys_path

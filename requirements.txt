@@ -12,3 +12,4 @@ pyyaml~=6.0.2 # UniversalLoaderError 读取yaml格式文件
 pytoml~=0.1.21 # UniversalLoaderError 读取toml格式文件
 
 windows-curses~=2.4.1; sys_platform == "win"
+pyreadline; sys_platform == "win"
