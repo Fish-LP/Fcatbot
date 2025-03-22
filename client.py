@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-21 22:21:08
+# @LastEditTime : 2025-03-22 07:59:40
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -12,6 +12,7 @@ if 'win' not in sys.platform:
     import readline
 import asyncio
 import json
+import inspect
 
 from typing import Any, List
 
@@ -214,22 +215,32 @@ class BotClient:
                             return None
 
                         elif command == 'run':
-                            if not args and len(args) < 2:
-                                print(f"{Color.YELLOW}请指定要查看的插件名称与修改键值对{Color.RESET}")
+                            if not args or len(args) < 2:
+                                print(f"{Color.YELLOW}请指定要执行的插件名称和函数名称{Color.RESET}")
                                 return None
                             try:
                                 plugin_name = args[0]
-                                if plugin_name:
-                                    if plugin_name not in self.plugin_sys.plugins:
-                                        print(f"{Color.RED}插件 '{plugin_name}' 未加载{Color.RESET}")
-                                        return None
-                                    plugin = self.plugin_sys.plugins[plugin_name]
-                                    func = getattr(plugin, args[1])
-                                    if isinstance(func, asyncio.Task):
-                                        loop = asyncio.get_event_loop()
-                                        loop.run_until_complete(asyncio.gather(func))
-                                    else:
-                                        func()
+                                func_name = args[1]
+                                func_args = args[2:] if len(args) > 2 else []
+                                
+                                if plugin_name not in self.plugin_sys.plugins:
+                                    print(f"{Color.RED}插件 '{plugin_name}' 未加载{Color.RESET}")
+                                    return None
+                                    
+                                plugin = self.plugin_sys.plugins[plugin_name]
+                                if not hasattr(plugin, func_name):
+                                    print(f"{Color.RED}函数 '{func_name}' 在插件中不存在{Color.RESET}")
+                                    return None
+                                    
+                                func = getattr(plugin, func_name)
+                                print(f"{Color.YELLOW}执行函数 {func_name} 参数: {func_args}{Color.RESET}")
+                                
+                                if inspect.iscoroutinefunction(func):
+                                    result = asyncio.run(func(*func_args))
+                                else:
+                                    result = func(*func_args)
+                                    
+                                print(f"{Color.GREEN}执行结果: {result}{Color.RESET}")
                             except Exception as e:
                                 print(f"{Color.RED}执行插件方法时出错: {e}{Color.RESET}")
                             return None
