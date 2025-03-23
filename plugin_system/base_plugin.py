@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-23 20:39:25
+# @LastEditTime : 2025-03-23 21:34:27
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -56,7 +56,7 @@ class BasePlugin:
         work_space (ChangeDir): 插件工作目录上下文管理器
         save_type (str): 私有数据保存类型
         first_load (bool): 是否首次加载标志
-        _debug (bool): 调试模式标记
+        debug (bool): 调试模式标记
     """
 
     name: str
@@ -68,8 +68,8 @@ class BasePlugin:
     api: WebSocketHandler
     save_type: str = 'json'
     first_load: bool = 'True'
-    _debug: bool = False  # 调试模式标记
-    
+    debug: bool = False  # 调试模式标记
+
     @final
     def __init__(self,
                 event_bus: EventBus,
@@ -113,8 +113,8 @@ class BasePlugin:
         self._event_handlers = []
         self._event_bus = event_bus
         self._time_task_scheduler = time_task_scheduler
-        self._work_path = Path(PERSISTENT_DIR).resolve() / extract_relative_path('.', self.self_path)
-        self._data_path = self._work_path / f"{self.name}.{self.save_type}"
+        self._work_path = Path(PERSISTENT_DIR).resolve() / self.self_path.name
+        self._data_path = self._work_path / f"{self.self_path.name}.{self.save_type}"
 
         # 检查是否为第一次启动
         self.first_load = False
