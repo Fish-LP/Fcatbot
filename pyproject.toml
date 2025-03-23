@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 # 项目元数据
 [project]
 name = "Fcatbot" # 包名称
-version = "2.0.4-alpha" # 版本号
+version = "2.1.0-alpha" # 版本号
 description = "基于ncatbot开发" # 简短描述
 authors = [
     { name = "Fish-LP", email = "fish.zh@outlook.com" }, # 作者姓名和邮箱
