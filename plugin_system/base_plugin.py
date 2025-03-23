@@ -2,11 +2,12 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-21 21:00:51
+# @LastEditTime : 2025-03-23 20:39:25
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 import asyncio
+import inspect
 
 from pathlib import Path
 from typing import Any, Dict, List, Callable, Awaitable, Optional, Tuple, Union, final
@@ -21,10 +22,19 @@ from ..utils import UniversalLoader
 from ..utils import get_log
 from ..utils import visualize_tree
 from ..utils.universal_data_IO import FileTypeUnknownError, SaveError, LoadError
-from ..config import PERSISTENT_DIR
+from ..config import PERSISTENT_DIR, PLUGINS_DIR
 from ..ws import WebSocketHandler
 
 LOG = get_log('BasePlugin')
+
+def extract_relative_path(base_path, target_path):
+    base = Path(base_path).resolve()
+    target = Path(target_path).resolve()
+    try:
+        relative_path = target.relative_to(base)
+        return relative_path
+    except ValueError:
+        return None
 
 class BasePlugin:
     """插件基类
@@ -35,6 +45,8 @@ class BasePlugin:
         name (str): 插件名称
         version (str): 插件版本号 
         dependencies (dict): 插件依赖项配置
+        self_path (Path): 插件目录
+        this_file_path (Path): 此文件路径
         meta_data (dict): 插件元数据
         api (WebSocketHandler): API接口处理器
         event_bus (EventBus): 事件总线实例
@@ -42,6 +54,7 @@ class BasePlugin:
         work_path (Path): 插件工作目录路径
         data (UniversalLoader): 插件数据管理器
         work_space (ChangeDir): 插件工作目录上下文管理器
+        save_type (str): 私有数据保存类型
         first_load (bool): 是否首次加载标志
         _debug (bool): 调试模式标记
     """
@@ -49,9 +62,12 @@ class BasePlugin:
     name: str
     version: str
     dependencies: dict
+    self_path: Path
+    this_file_path: Path
     meta_data: dict
     api: WebSocketHandler
-    first_load: bool
+    save_type: str = 'json'
+    first_load: bool = 'True'
     _debug: bool = False  # 调试模式标记
     
     @final
@@ -82,19 +98,23 @@ class BasePlugin:
         if kwd:
             for k, v in kwd.items():
                 setattr(self, k, v)
-        if not self.dependencies: self.dependencies = {}
+        if not self.save_type:
+            self.save_type = 'json'
+        if not self.dependencies:
+            self.dependencies = {}
+
+        # 固定属性
+        self.this_file_path = Path(inspect.getmodule(self.__class__).__file__).resolve()
+        self.self_path = Path(PLUGINS_DIR).resolve() / extract_relative_path(Path(PLUGINS_DIR).resolve() ,self.this_file_path.parent)
+        self.lock = asyncio.Lock()  # 创建一个异步锁对象
 
         # 隐藏属性
         self._debug = debug
         self._event_handlers = []
         self._event_bus = event_bus
         self._time_task_scheduler = time_task_scheduler
-        self._work_path = Path(PERSISTENT_DIR) / self.name
-        self._data_path = self._work_path / f"{self.name}.json"
-
-        # 暴露的属性
-        self.lock = asyncio.Lock()  # 创建一个异步锁对象
-        self.data = UniversalLoader(self._work_path / f"{self.name}.json")
+        self._work_path = Path(PERSISTENT_DIR).resolve() / extract_relative_path('.', self.self_path)
+        self._data_path = self._work_path / f"{self.name}.{self.save_type}"
 
         # 检查是否为第一次启动
         self.first_load = False
@@ -107,6 +127,7 @@ class BasePlugin:
         if not self._work_path.is_dir():
             raise PluginLoadError(self.name, f"{self._work_path} 不是目录文件夹")
 
+        self.data = UniversalLoader(self._data_path)
         self.work_space = ChangeDir(self._work_path)
 
     @property
