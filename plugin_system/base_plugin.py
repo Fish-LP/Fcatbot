@@ -194,7 +194,7 @@ class BasePlugin:
                 self.data = data
             self.data.load()
         except (FileTypeUnknownError, LoadError, FileNotFoundError) as e:
-            open(self._data_path,'w').write('{}')
+            open(self._data_path,'w').write('')
             self.data.load()
         await asyncio.to_thread(self._init_)
         await self.on_load()
