@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-23 21:44:27
+# @LastEditTime : 2025-03-23 21:48:16
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -195,6 +195,7 @@ class BasePlugin:
             self.data.load()
         except (FileTypeUnknownError, LoadError, FileNotFoundError) as e:
             open(self._data_path,'w').write('')
+            self.data.save()
             self.data.load()
         await asyncio.to_thread(self._init_)
         await self.on_load()
