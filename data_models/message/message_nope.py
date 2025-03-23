@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-22 22:23:12
+# @LastEditTime : 2025-03-23 12:17:25
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -118,8 +118,8 @@ class Image(DafaultElement):
     url: str = None
     path: str = None
     file_size: int = None
-    file_unique = None
-    key: Any
+    file_unique: Any = None
+    key: Any = None
     
     type: str = field(default='image', init=False)
     
