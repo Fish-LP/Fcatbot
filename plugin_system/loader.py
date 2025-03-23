@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:26:43
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-22 15:45:09
+# @LastEditTime : 2025-03-23 21:02:34
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -224,10 +224,10 @@ class PluginLoader:
         plugin_class = None
         for item_name in dir(module):
             item = getattr(module, item_name)
-            if (isinstance(item, type) and 
-                issubclass(item, BasePlugin) and 
-                hasattr(item, 'name') and 
-                item.name == plugin_name):
+            if (isinstance(item, type)  
+                and issubclass(item, BasePlugin)  
+                and hasattr(item, 'name')  
+                and item.name == plugin_name):
                 plugin_class = item
                 break
 
@@ -236,8 +236,9 @@ class PluginLoader:
 
         # 创建新的插件实例
         new_plugin = plugin_class(
-            self.event_bus, 
+            self.event_bus,
             debug=self._debug,
+            time_task_scheduler = self.time_task_scheduler,
             meta_data=self.meta_data.copy(), 
             api=old_plugin.api
         )
