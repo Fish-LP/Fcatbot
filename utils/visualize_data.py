@@ -1,3 +1,11 @@
+# -------------------------
+# @Author       : Fish-LP fish.zh@outlook.com
+# @Date         : 2025-03-21 18:07:00
+# @LastEditors  : Fish-LP fish.zh@outlook.com
+# @LastEditTime : 2025-03-23 15:29:01
+# @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
+# @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
+# -------------------------
 from .logger import Color
 
 def visualize_tree(data, parent_prefix='', is_last=True, is_root=True, level=0):
