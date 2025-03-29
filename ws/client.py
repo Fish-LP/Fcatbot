@@ -250,7 +250,6 @@ class WebSocketClient:
         self, 
         data: str, 
         wait: bool = True, 
-        response_prefer: str = 'oldest'
     ) -> Optional[str]:
         """
         发送数据并可选等待响应。

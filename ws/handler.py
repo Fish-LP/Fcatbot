@@ -106,7 +106,9 @@ class WebSocketHandler(WebSocketClient, Apis):
 
         if re.get('wording', None):
             _LOG.error(f"API异常 {re['wording']}")
-        if re.get('status', None).lower() in ('ok', '200') or 'self_id' in re:
+        if isinstance(re.get('status', ''), dict):
+            return re
+        elif re.get('status', '').lower() in ('ok', '200') or 'self_id' in re:
             if re.get('echo', None) == echo:
                 return re['data']
             else:
