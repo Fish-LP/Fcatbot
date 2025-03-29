@@ -34,9 +34,12 @@ def extract_relative_path(base_path, target_path):
         relative_path = target.relative_to(base)
         return relative_path
     except ValueError:
-        return None
+        # 当路径不能求得相对路径时,返回目标路径的最后一级目录名
+        return Path(target.name)
 
-class BasePlugin:
+from .plugin_mixins import EventHandlerMixin, SchedulerMixin
+
+class BasePlugin(EventHandlerMixin, SchedulerMixin):
     """插件基类
 
     所有插件必须继承此类来实现插件功能。提供了插件系统所需的基本功能支持。
@@ -104,8 +107,11 @@ class BasePlugin:
             self.dependencies = {}
 
         # 固定属性
-        self.this_file_path = Path(inspect.getmodule(self.__class__).__file__).resolve()
-        self.self_path = Path(PLUGINS_DIR).resolve() / extract_relative_path(Path(PLUGINS_DIR).resolve() ,self.this_file_path.parent)
+        plugin_file = Path(inspect.getmodule(self.__class__).__file__).resolve()
+        # plugins_dir = Path(PLUGINS_DIR).resolve()
+        self.this_file_path = plugin_file
+        # 使用插件文件所在目录作为self_path
+        self.self_path = plugin_file.parent
         self.lock = asyncio.Lock()  # 创建一个异步锁对象
 
         # 隐藏属性
@@ -113,8 +119,10 @@ class BasePlugin:
         self._event_handlers = []
         self._event_bus = event_bus
         self._time_task_scheduler = time_task_scheduler
-        self._work_path = Path(PERSISTENT_DIR).resolve() / self.self_path.name
-        self._data_path = self._work_path / f"{self.self_path.name}.{self.save_type}"
+        # 使用插件目录名作为工作目录名
+        plugin_dir_name = self.self_path.name
+        self._work_path = Path(PERSISTENT_DIR).resolve() / plugin_dir_name
+        self._data_path = self._work_path / f"{plugin_dir_name}.{self.save_type}"
 
         # 检查是否为第一次启动
         self.first_load = False
@@ -135,7 +143,7 @@ class BasePlugin:
         """是否处于调试模式"""
         return self._debug
 
-    @final
+    @final 
     def check_debug(self, func_name: str) -> None:
         """检查是否允许在当前模式下调用某功能
         
@@ -199,126 +207,6 @@ class BasePlugin:
             self.data.load()
         await asyncio.to_thread(self._init_)
         await self.on_load()
-
-    @final
-    def add_scheduled_task(self,
-                job_func: Callable,
-                name: str,
-                interval: Union[str, int, float],
-                conditions: Optional[List[Callable[[], bool]]] = None,
-                max_runs: Optional[int] = None,
-                args: Optional[Tuple] = None,
-                kwargs: Optional[Dict] = None,
-                args_provider: Optional[Callable[[], Tuple]] = None,
-                kwargs_provider: Optional[Callable[[], Dict[str, Any]]] = None) -> bool:
-        """
-        添加定时任务
-
-        Args:
-            job_func (Callable): 要执行的任务函数
-            name (str): 任务唯一标识名称
-            interval (Union[str, int, float]): 调度时间参数
-            conditions (Optional[List[Callable]]): 执行条件列表
-            max_runs (Optional[int]): 最大执行次数
-            args (Optional[Tuple]): 静态位置参数
-            kwargs (Optional[Dict]): 静态关键字参数
-            args_provider (Optional[Callable]): 动态位置参数生成函数
-            kwargs_provider (Optional[Callable]): 动态关键字参数生成函数
-
-        Returns:
-            bool: 是否添加成功
-
-        Raises:
-            ValueError: 当参数冲突或时间格式无效时
-        """
-        
-        job_info = {
-            'name': name,
-            'job_func': job_func,
-            'interval': interval,
-            'max_runs': max_runs,
-            'run_count': 0,
-            'conditions': conditions or [],
-            'args': args,
-            'kwargs': kwargs or {},
-            'args_provider': args_provider,
-            'kwargs_provider': kwargs_provider
-        }
-        return self._time_task_scheduler.add_job(**job_info)
-
-    @final
-    def remove_scheduled_task(self, task_name:str):
-        """
-        移除指定名称的定时任务
-        
-        Args:
-            name (str): 要移除的任务名称
-            
-        Returns:
-            bool: 是否成功找到并移除任务
-        """
-        return self._time_task_scheduler.remove_job(name = task_name)
-
-    @final
-    def publish_sync(self, event: Event) -> List[Any]:
-        """同步发布事件
-
-        Args:
-            event (Event): 要发布的事件对象
-
-        Returns:
-            List[Any]: 事件处理器返回的结果列表
-        """
-        return self._event_bus.publish_sync(event)
-
-    @final
-    def publish_async(self, event: Event) -> Awaitable[List[Any]]:
-        """异步发布事件
-
-        Args:
-            event (Event): 要发布的事件对象
-
-        Returns:
-            List[Any]: 事件处理器返回的结果列表
-        """
-        return self._event_bus.publish_async(event)
-
-    @final
-    def register_handler(self, event_type: str, handler: Callable[[Event], Any], priority: int = 0) -> UUID:
-        """注册事件处理器
-        
-        Args:
-            event_type (str): 事件类型
-            handler (Callable[[Event], Any]): 事件处理函数
-            priority (int, optional): 处理器优先级,默认为0
-            
-        Returns:
-            处理器的唯一标识UUID
-        """
-        handler_id = self._event_bus.subscribe(event_type, handler, priority)
-        self._event_handlers.append(handler_id)
-        return handler_id
-
-    @final
-    def unregister_handler(self, handler_id: UUID) -> bool:
-        """注销指定的事件处理器
-        
-        Args:
-            handler_id (UUID): 事件id
-        
-        Returns:
-            bool: 操作结果
-        """
-        if handler_id in self._event_handlers:
-            self._event_handlers.append(handler_id)
-            return True
-        return False
-
-    @final
-    def unregister_handlers(self):
-        """注销所有已注册的事件处理器"""
-        for handler_id in self._event_handlers:
-            self._event_bus.unsubscribe(handler_id)
 
     async def on_load(self):
         """插件初始化时的子函数,可被子类重写"""
