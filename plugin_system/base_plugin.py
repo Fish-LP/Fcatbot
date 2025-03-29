@@ -57,6 +57,7 @@ class BasePlugin(EventHandlerMixin, SchedulerMixin):
         work_path (Path): 插件工作目录路径
         data (UniversalLoader): 插件数据管理器
         work_space (ChangeDir): 插件工作目录上下文管理器
+        self_space (ChangeDir): 插件目录上下文管理器
         save_type (str): 私有数据保存类型
         first_load (bool): 是否首次加载标志
         debug (bool): 调试模式标记
@@ -137,6 +138,7 @@ class BasePlugin(EventHandlerMixin, SchedulerMixin):
 
         self.data = UniversalLoader(self._data_path)
         self.work_space = ChangeDir(self._work_path)
+        self.self_space = ChangeDir(self.self_path)
 
     @property
     def debug(self) -> bool:
