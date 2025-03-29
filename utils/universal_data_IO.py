@@ -195,81 +195,89 @@ class UniversalLoader:
     # endregion
 
     # ---------------------
-    # region 数据访问相关魔术方法
+    # region 数据访问相关方法
     # ---------------------
 
-    def __getitem__(self, key: str) -> Any:
-        """字典式数据访问"""
-        return self.data[key]
+    def __getitem__(self, key: str) -> Union[Any]:
+        """支持链式访问的字典式获取: instance['a']['b']"""
+        key = str(key)
+        if key not in self.data:
+            self.data[key] = {}
+        value = self.data[key]
+        if isinstance(value, dict):
+            return value
+        return value
 
-    def __setitem__(self, key: str, value: Any) -> None:
-        """字典式数据设置"""
+    def __setitem__(self, key: str, value: Any) -> 'UniversalLoader':
+        """字典式设置数据: instance[key] = value"""
         self.data[str(key)] = value
+        return self
 
     def __delitem__(self, key: str) -> None:
-        """字典式数据删除"""
+        """字典式删除数据: del instance[key]"""
         del self.data[str(key)]
 
-    def __str__(self) -> str:
-        """友好的字符串表示"""
-        return str(self.data)
-
-    def get(self, key: str, default = None):
-        """安全获取数据方法"""
-        return self.data.get(str(key), default)
-
-    def keys(self):
-        """获取所有键"""
-        return self.data.keys()
-
-    def values(self):
-        """获取所有值"""
-        return self.data.values()
-
-    def items(self):
-        """获取所有键值对"""
-        return self.data.items()
-
-    def update(self, *args, **kwargs):
-        """用给定的字典或键值对更新数据（类似 dict.update）"""
-        self.data.update(*args, **kwargs)
-
-    def pop(self, key: str, default = None):
-        """删除指定键并返回其对应的值；如果键不存在,则返回默认值"""
-        return self.data.pop(str(key), default)
-
-    def popitem(self):
-        """随机删除一个键值对并返回 (key, value) 元组"""
-        return self.data.popitem()
-
-    def clear(self):
-        """清空所有数据"""
-        self.data.clear()
-
-    def setdefault(self, key: str, default = None):
-        """如果键不存在,则将键的值设为default并返回该值,否则返回原有值"""
-        return self.data.setdefault(str(key), default)
-
-    def __contains__(self, key: str):
-        """判断数据中是否包含指定键"""
+    def __contains__(self, key: str) -> bool:
+        """成员检查: key in instance"""
         return str(key) in self.data
 
     def __iter__(self):
-        """返回数据字典的迭代器"""
+        """迭代支持: for key in instance"""
         return iter(self.data)
 
-    def __len__(self):
-        """返回数据的键数目"""
+    def __len__(self) -> int:
+        """长度获取: len(instance)"""
         return len(self.data)
 
+    def __str__(self) -> str:
+        """字符串表示: str(instance)"""
+        return str(self.data)
+
     def __enter__(self) -> 'UniversalLoader':
-        """进入with环境"""
+        """上下文管理器入口: with instance as data"""
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        """退出with环境"""
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        """上下文管理器退出时自动保存"""
         if self.data:
             self.save()
+
+    # 常规数据访问方法
+    def get(self, key: str, default=None) -> Any:
+        """安全获取数据,支持默认值"""
+        return self.data.get(str(key), default)
+
+    def update(self, *args, **kwargs) -> None:
+        """批量更新数据"""
+        self.data.update(*args, **kwargs)
+
+    def pop(self, key: str, default=None) -> Any:
+        """移除并返回指定键的值"""
+        return self.data.pop(str(key), default)
+
+    def popitem(self) -> tuple:
+        """移除并返回最后一个键值对"""
+        return self.data.popitem()
+
+    def clear(self) -> None:
+        """清空所有数据"""
+        self.data.clear()
+
+    def setdefault(self, key: str, default=None) -> Any:
+        """获取键值,如果不存在则设置默认值"""
+        return self.data.setdefault(str(key), default)
+
+    def keys(self):
+        """返回所有键的视图"""
+        return self.data.keys()
+
+    def values(self):
+        """返回所有值的视图"""
+        return self.data.values()
+
+    def items(self):
+        """返回所有键值对的视图"""
+        return self.data.items()
     # endregion
 
     # ---------------------
