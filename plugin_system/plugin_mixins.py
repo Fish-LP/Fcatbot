@@ -1,3 +1,11 @@
+# -------------------------
+# @Author       : Fish-LP fish.zh@outlook.com
+# @Date         : 2025-03-29 15:36:57
+# @LastEditors  : Fish-LP fish.zh@outlook.com
+# @LastEditTime : 2025-03-29 22:25:50
+# @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
+# @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
+# -------------------------
 from typing import Any, Dict, List, Callable, Optional, Tuple, Union, final
 
 from uuid import UUID

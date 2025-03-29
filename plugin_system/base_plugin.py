@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-23 21:48:16
+# @LastEditTime : 2025-03-29 22:30:16
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -134,27 +134,6 @@ class BasePlugin(EventHandlerMixin, SchedulerMixin):
     def debug(self) -> bool:
         """是否处于调试模式"""
         return self._debug
-
-    @final 
-    def check_debug(self, func_name: str) -> None:
-        """检查是否允许在当前模式下调用某功能
-        
-        Args:
-            func_name: 功能名称
-        
-        Raises:
-            RuntimeError: 当在调试模式下调用受限功能时抛出
-        """
-        restricted_funcs = {
-            'send_group_msg': '发送群消息',
-            'send_private_msg': '发送私聊消息',
-            'set_group_ban': '设置群禁言',
-            'set_group_admin': '设置群管理员',
-            # 添加其他需要限制的功能
-        }
-        
-        if self._debug and func_name in restricted_funcs:
-            raise RuntimeError(f"调试模式下禁止使用 {restricted_funcs[func_name]} 功能,触发者: {self.name}")
 
     @final
     async def __unload__(self, *arg, **kwd):
