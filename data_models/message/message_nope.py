@@ -96,7 +96,7 @@ class AtAll(DafaultElement):
 class Face(DafaultElement):
     '''[表情]消息元素'''
     id: int
-    resultId: int
+    resultId: int = field(default=None)
     raw: dict = field(default=None)
     type: str = field(default='face', init=False)
 
