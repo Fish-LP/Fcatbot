@@ -27,16 +27,6 @@ from ..ws import WebSocketHandler
 
 LOG = get_log('BasePlugin')
 
-def extract_relative_path(base_path, target_path):
-    base = Path(base_path).resolve()
-    target = Path(target_path).resolve()
-    try:
-        relative_path = target.relative_to(base)
-        return relative_path
-    except ValueError:
-        # 当路径不能求得相对路径时,返回目标路径的最后一级目录名
-        return Path(target.name)
-
 from .plugin_mixins import EventHandlerMixin, SchedulerMixin
 
 class BasePlugin(EventHandlerMixin, SchedulerMixin):
