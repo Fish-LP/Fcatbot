@@ -136,7 +136,7 @@ class BasePlugin(EventHandlerMixin, SchedulerMixin):
         if not self._work_path.is_dir():
             raise PluginLoadError(self.name, f"{self._work_path} 不是目录文件夹")
 
-        self.data = UniversalLoader(self._data_path)
+        self.data = UniversalLoader(self._data_path, self.save_type)
         self.work_space = ChangeDir(self._work_path)
         self.self_space = ChangeDir(self.self_path)
 
@@ -197,11 +197,10 @@ class BasePlugin(EventHandlerMixin, SchedulerMixin):
             RuntimeError: 读取持久化数据失败时抛出
         """
         # load时传入的参数作为属性被保存在self中
+        if isinstance(self.data, (dict, list)):
+            self.data = UniversalLoader(self._data_path, self.save_type)
+            self.data.data = self.data
         try:
-            if isinstance(self.data,dict):
-                data = UniversalLoader()
-                data.data = self.data
-                self.data = data
             self.data.load()
         except (FileTypeUnknownError, LoadError, FileNotFoundError) as e:
             open(self._data_path,'w').write('')

@@ -430,7 +430,10 @@ class BotClient:
                                 group_id=int(debug_state['group_id']),
                                 sub_type='normal'
                             )
-                            out = self.publish_sync(Event(OFFICIAL_GROUP_MESSAGE_EVENT, msg))
+                            if msg.raw_message.startswith(self.command_prefix):
+                                out = self.publish_sync(Event(OFFICIAL_GROUP_COMMAND_EVENT, msg))
+                            else:
+                                out = self.publish_sync(Event(OFFICIAL_GROUP_MESSAGE_EVENT, msg))
                         else:
                             # 私聊消息
                             msg = PrivateMessage(
@@ -438,7 +441,10 @@ class BotClient:
                                 message_type='private',
                                 sub_type='friend'
                             )
-                            out = self.publish_sync(Event(OFFICIAL_PRIVATE_MESSAGE_EVENT, msg))
+                            if msg.raw_message.startswith(self.command_prefix):
+                                out = self.publish_sync(Event(OFFICIAL_PRIVATE_COMMAND_EVENT, msg))
+                            else:
+                                out = self.publish_sync(Event(OFFICIAL_PRIVATE_MESSAGE_EVENT, msg))
                         if out:
                             print(f'{Color.CYAN}收集到的返回:{Color.RESET} {out}')
                     except Exception as e:
