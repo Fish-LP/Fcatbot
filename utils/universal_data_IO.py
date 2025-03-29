@@ -202,7 +202,8 @@ class UniversalLoader:
     def __getitem__(self, key: str) -> Any:
         """字典式数据访问"""
         if self.easy_mod:
-            return self.data.get(str(key), None)
+            self.data[str(key)] = None
+            return self.data[str(key)]
         return self.data[key]
 
     def __setitem__(self, key: str, value: Any) -> None:
@@ -213,7 +214,8 @@ class UniversalLoader:
         """字典式数据删除"""
         if self.easy_mod and key in self.data:
             del self.data[str(key)]
-        del self.data[str(key)]
+        else:
+            del self.data[str(key)]
 
     def __str__(self) -> str:
         """友好的字符串表示"""
