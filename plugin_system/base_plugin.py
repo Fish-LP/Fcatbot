@@ -179,7 +179,7 @@ class BasePlugin(EventHandlerMixin, SchedulerMixin):
         await asyncio.to_thread(self._close_, *arg, **kwd)
         await self.on_close(*arg, **kwd)
         try:
-            if self._debug:
+            if self.debug:
                 LOG.warning(f"{Color.YELLOW}debug模式{Color.RED}取消{Color.RESET}退出时的保存行为")
                 print(f'{Color.GRAY}{self.name}\n', '\n'.join(visualize_tree(self.data.data)), sep='')
             else:
@@ -203,9 +203,12 @@ class BasePlugin(EventHandlerMixin, SchedulerMixin):
         try:
             self.data.load()
         except (FileTypeUnknownError, LoadError, FileNotFoundError) as e:
-            open(self._data_path,'w').write('')
-            self.data.save()
-            self.data.load()
+            if self.debug:
+                pass
+            else:
+                open(self._data_path,'w').write('')
+                self.data.save()
+                self.data.load()
         await asyncio.to_thread(self._init_)
         await self.on_load()
 
