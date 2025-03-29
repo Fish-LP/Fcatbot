@@ -106,7 +106,7 @@ class ModuleNotInstalledError(UniversalLoaderError):
 # ---------------------
 
 class UniversalLoader:
-    def __init__(self, file_path: Union[str, Path], easy_mod: bool = True, file_type: Optional[str] = None):
+    def __init__(self, file_path: Union[str, Path], file_type: Optional[str] = None):
         """
         初始化通用加载器
         :param file_path: 文件路径
@@ -114,7 +114,6 @@ class UniversalLoader:
         :param easy_mod: 简易模式,当 修改｜读取 数据时尝试阻止错误
         """
         # 统一路径为 Path 类型
-        self.easy_mod = easy_mod
         self.file_path: Path = Path(file_path).resolve()  # 获取绝对路径
         self.data: Dict[str, Any] = {}
         self.file_type = file_type.lower() if file_type else self._detect_file_type()
@@ -201,9 +200,6 @@ class UniversalLoader:
 
     def __getitem__(self, key: str) -> Any:
         """字典式数据访问"""
-        if self.easy_mod:
-            self.data[str(key)] = None
-            return self.data[str(key)]
         return self.data[key]
 
     def __setitem__(self, key: str, value: Any) -> None:
@@ -212,10 +208,7 @@ class UniversalLoader:
 
     def __delitem__(self, key: str) -> None:
         """字典式数据删除"""
-        if self.easy_mod and key in self.data:
-            del self.data[str(key)]
-        else:
-            del self.data[str(key)]
+        del self.data[str(key)]
 
     def __str__(self) -> str:
         """友好的字符串表示"""
