@@ -25,13 +25,13 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "websockets==10.4",                             # ws连接
-    "packaging~=24.2",                              # 插件系统
-    "tqdm~=4.67.1",                                 # 进度条
-    "aiofiles~=24.1.0",                             # UniversalLoaderError支持异步文件读写
-    "schedule~=1.2.2",                              # 定时任务
-    "windows-curses~=2.4.1; sys_platform == 'win'", # Windows平台下的curses支持
-    "pyreadline; sys_platform == 'win'",            # Windows平台下的readline支持
+    "websockets==10.4",                                  # ws连接
+    "packaging~=24.2",                                   # 插件系统
+    "tqdm~=4.67.1",                                      # 进度条
+    "aiofiles~=24.1.0",                                  # UniversalLoaderError支持异步文件读写
+    "schedule~=1.2.2",                                   # 定时任务
+    "windows-curses~=2.4.1; platform_system=='Windows'", # Windows平台下的curses支持
+    "pyreadline3; platform_system=='Windows'",           # Windows平台下的readline支持
 ]
 optional-dependencies = { "yaml" = [
     "pyyaml ~=6.0.2",

@@ -8,10 +8,18 @@
 # -------------------------
 import os
 try:
-    import readline
-    readline_err = False
-except ImportError:
-    readline_err = True
+    # 尝试导入readline或pyreadline3
+    try:
+        import readline
+    except ImportError:
+        try:
+            import pyreadline3 as readline # type: ignore
+        except ImportError:
+            readline = None
+    readline_support = True if readline else False
+except Exception:
+    readline_support = False
+    readline = None
 import asyncio
 import json
 import inspect
@@ -381,8 +389,11 @@ class BotClient:
 
                 print(f"{Color.CYAN}输入 {Color.GREEN}.help{Color.CYAN} 查看调试命令帮助{Color.RESET}")
                 try:
-                    if readline_err:
-                        readline.read_history_file('.history.txt')
+                    if readline_support:
+                        try:
+                            readline.read_history_file('.history.txt')
+                        except FileNotFoundError:
+                            pass
                 except FileNotFoundError:
                     pass
                 while True:
@@ -436,8 +447,11 @@ class BotClient:
             except KeyboardInterrupt:
                 print()
                 LOG.info("退出调试模式")
-                if readline_err:
-                    readline.write_history_file('.history.txt')
+                if readline_support:
+                    try:
+                        readline.write_history_file('.history.txt')
+                    except Exception:
+                        pass
                 exit(0)
         else:
             try:

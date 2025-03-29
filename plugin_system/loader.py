@@ -35,13 +35,27 @@ PM = PipTool()
 LOG = get_log('PluginLoader')
 
 class PluginLoader:
-    """
-    插件加载器,用于加载、卸载和管理插件
+    """插件加载器,用于加载、卸载和管理插件。
+    
+    该类负责处理插件的完整生命周期管理，包括:
+    - 插件的加载和初始化
+    - 插件依赖关系的管理
+    - 插件的版本控制
+    - 插件的热重载
+    - 插件的卸载清理
+    
+    Attributes:
+        plugins (Dict[str, BasePlugin]): 存储已加载的插件实例
+        event_bus (EventBus): 用于处理插件间事件通信的事件总线
+        time_task_scheduler (TimeTaskScheduler): 管理定时任务的调度器
+        meta_data (dict): 插件元数据配置信息
     """
 
     def __init__(self, event_bus: EventBus):
-        """
-        初始化插件加载器
+        """初始化插件加载器。
+
+        Args:
+            event_bus (EventBus): 事件总线实例，用于处理插件间的事件通信
         """
         self.plugins: Dict[str, BasePlugin] = {}  # 存储已加载的插件
         self.event_bus = event_bus  # 事件总线
@@ -55,25 +69,38 @@ class PluginLoader:
             self.meta_data = {}
 
     def set_debug(self, debug: bool = False):
-        """设置调试模式
-        
+        """设置插件系统的调试模式。
+
         Args:
-            debug: 是否启用调试模式
+            debug (bool, optional): 是否启用调试模式。默认为 False
+
+        Note:
+            启用调试模式后会输出更详细的日志信息。
         """
         self._debug = debug
         LOG.warning("插件系统已切换为调试模式") if debug else None
 
     def _validate_plugin(self, plugin_cls: Type[BasePlugin]) -> bool:
-        """
-        验证插件类是否符合规范
+        """验证插件类是否符合规范要求。
+
+        Args:
+            plugin_cls (Type[BasePlugin]): 待验证的插件类
+
+        Returns:
+            bool: 如果插件符合规范返回 True，否则返回 False
         """
         return all(
             hasattr(plugin_cls, attr) for attr in ("name", "version", "dependencies")
         )
 
     def _build_dependency_graph(self, plugins: List[Type[BasePlugin]]):
-        """
-        构建插件依赖关系图
+        """构建插件之间的依赖关系图。
+
+        Args:
+            plugins (List[Type[BasePlugin]]): 插件类列表
+
+        Note:
+            会同时更新依赖图(_dependency_graph)和版本约束(_version_constraints)
         """
         self._dependency_graph.clear()
         self._version_constraints.clear()
@@ -83,8 +110,11 @@ class PluginLoader:
             self._version_constraints[plugin.name] = plugin.dependencies.copy()
 
     def _validate_dependencies(self):
-        """
-        验证插件依赖关系是否满足
+        """验证所有插件的依赖关系是否满足要求。
+
+        Raises:
+            PluginDependencyError: 当缺少某个依赖插件时抛出
+            PluginVersionError: 当依赖插件的版本不满足要求时抛出
         """
         for plugin_name, deps in self._version_constraints.items():
             for dep_name, constraint in deps.items():
@@ -98,8 +128,13 @@ class PluginLoader:
                     )
 
     def _resolve_load_order(self) -> List[str]:
-        """
-        解析插件加载顺序,确保依赖关系正确
+        """解析插件的加载顺序，确保依赖关系正确。
+
+        Returns:
+            List[str]: 按正确顺序排列的插件名称列表
+
+        Raises:
+            PluginCircularDependencyError: 当发现循环依赖时抛出
         """
         in_degree = {k: 0 for k in self._dependency_graph}
         adj_list = defaultdict(list)
@@ -127,9 +162,15 @@ class PluginLoader:
         return load_order
 
     async def from_class_load_plugins(self, plugins: List[Type[BasePlugin]], **kwargs):
-        """
-        从插件类加载插件
-        :param plugins: 插件类列表
+        """从插件类列表加载插件。
+
+        Args:
+            plugins (List[Type[BasePlugin]]): 待加载的插件类列表
+            **kwargs: 传递给插件实例化的额外参数
+
+        Raises:
+            PluginDependencyError: 依赖检查失败时抛出
+            PluginVersionError: 版本检查失败时抛出
         """
         valid_plugins = [p for p in plugins if self._validate_plugin(p)]
         self._build_dependency_graph(valid_plugins)
@@ -153,9 +194,11 @@ class PluginLoader:
             await self.plugins[name].__onload__()
 
     async def load_plugins(self, plugins_path: str = PLUGINS_DIR, **kwargs):
-        """
-        从指定目录加载插件
-        :param plugins_path: 插件目录路径
+        """从指定目录加载所有插件。
+
+        Args:
+            plugins_path (str, optional): 插件目录路径。默认为 PLUGINS_DIR
+            **kwargs: 传递给插件实例化的额外参数
         """
         if not plugins_path: plugins_path = PLUGINS_DIR
         if os.path.exists(plugins_path):
@@ -176,8 +219,10 @@ class PluginLoader:
 
 
     def load_compatible_data(self):
-        """
-        加载兼容注册事件
+        """加载并注册兼容性事件处理函数。
+
+        Note:
+            处理使用装饰器注册的兼容性事件，并将其绑定到对应的插件实例。
         """
         compatible = CompatibleEnrollment.events
         for event_type, packs in compatible.items():
@@ -192,9 +237,12 @@ class PluginLoader:
                     self.event_bus.subscribe(event_type, func, priority)
 
     async def unload_plugin(self, plugin_name: str, *arg, **kwd):
-        """
-        卸载插件
-        :param plugin_name: 插件名称
+        """卸载指定的插件。
+
+        Args:
+            plugin_name (str): 要卸载的插件名称
+            *arg: 传递给插件卸载方法的位置参数
+            **kwd: 传递给插件卸载方法的关键字参数
         """
         if plugin_name not in self.plugins:
             return
@@ -203,9 +251,13 @@ class PluginLoader:
         del self.plugins[plugin_name]
 
     async def reload_plugin(self, plugin_name: str):
-        """
-        重新加载插件
-        :param plugin_name: 插件名称
+        """重新加载指定的插件。
+
+        Args:
+            plugin_name (str): 要重新加载的插件名称
+
+        Raises:
+            ValueError: 当插件未加载或无法找到插件类时抛出
         """
         if plugin_name not in self.plugins:
             raise ValueError(f"插件 '{plugin_name}' 未加载")
@@ -248,9 +300,16 @@ class PluginLoader:
     def _load_modules_from_directory(
         self, directory_path: str
     ) -> Dict[str, ModuleType]:
-        """
-        从指定文件夹动态加载模块,返回模块名到模块的字典。
-        不修改 `sys.path`,仅在必要时临时添加路径。
+        """从指定目录动态加载Python模块。
+
+        Args:
+            directory_path (str): 模块所在的目录路径
+
+        Returns:
+            Dict[str, ModuleType]: 模块名称到模块对象的映射字典
+
+        Note:
+            会自动处理模块的依赖安装
         """
         modules = {}
         original_sys_path = sys.path.copy()
@@ -291,6 +350,15 @@ class PluginLoader:
         return modules
 
     def unload_all(self, *arg, **kwd):
+        """卸载所有已加载的插件。
+
+        Args:
+            *arg: 传递给插件卸载方法的位置参数
+            **kwd: 传递给插件卸载方法的关键字参数
+
+        Note:
+            会创建新的事件循环来处理异步卸载操作
+        """
         # 创建一个新的事件循环
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)  # 设置当前线程的事件循环
