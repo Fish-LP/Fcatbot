@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-03-06 18:30:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-22 17:11:43
+# @LastEditTime : 2025-03-30 12:03:21
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -26,10 +26,12 @@ class RBACManager():
     def __str__(self):
         return self.permissions_trie.__str__()
 
-    def refresh_cache(self, user_name: str = None, role_name: str = None):
+    def refresh_permission_cache(self, user_name: str = None, role_name: str = None):
         """
-        刷新权限缓存（当权限数据变化时调用）
-        策略: 清除相关用户或角色的缓存计算结果
+        刷新权限缓存
+        Args:
+            user_name: 需要刷新缓存的用户名
+            role_name: 需要刷新缓存的角色名
         """
         if user_name:  # 清除指定用户的缓存
             self._get_user_permissions.cache_clear()
@@ -59,7 +61,7 @@ class RBACManager():
         # 更新用户的白名单
         if len(valid_user_white) != len(user['white_permissions_list']):
             self.users[user_name]['white_permissions_list'] = valid_user_white
-            self.refresh_cache(user_name=user_name)  # 使缓存失效
+            self.refresh_permission_cache(user_name=user_name)  # 使缓存失效
 
         valid_user_black = []
         for path in user['black_permissions_list']:
@@ -67,7 +69,7 @@ class RBACManager():
                 valid_user_black.append(path)
         if len(valid_user_black) != len(user['black_permissions_list']):
             self.users[user_name]['black_permissions_list'] = valid_user_black
-            self.refresh_cache(user_name=user_name)
+            self.refresh_permission_cache(user_name=user_name)
 
         white.update(valid_user_white)
         black.update(valid_user_black)
@@ -87,7 +89,7 @@ class RBACManager():
                     valid_role_white.append(path)
             if len(valid_role_white) != len(role.get('white_permissions_list', [])):
                 role['white_permissions_list'] = valid_role_white
-                self.refresh_cache(role_name=role_name)
+                self.refresh_permission_cache(role_name=role_name)
             white.update(valid_role_white)
 
             valid_role_black = []
@@ -96,7 +98,7 @@ class RBACManager():
                     valid_role_black.append(path)
             if len(valid_role_black) != len(role.get('black_permissions_list', [])):
                 role['black_permissions_list'] = valid_role_black
-                self.refresh_cache(role_name=role_name)
+                self.refresh_permission_cache(role_name=role_name)
             black.update(valid_role_black)
             
             # 处理继承的角色
@@ -109,21 +111,22 @@ class RBACManager():
 
         return {"white": white, "black": black}
 
-    def check_permission(self, user_name: str, path: str, strict: bool = False) -> bool:
+    def check_has_permission(self, user_name: str, permission_path: str, strict_match: bool = False) -> bool:
         """
-        检查用户是否拥有某路径的权限
-        规则优先级: 黑名单 > 白名单 > 默认拒绝
+        检查用户是否拥有指定权限
         
         Args:
             user_name: 用户名
-            path: 权限路径
-            strict: 是否严格匹配。True时仅允许完全匹配，False时允许通配符匹配
+            permission_path: 权限路径
+            strict_match: 是否启用严格匹配模式（True=仅完全匹配，False=允许通配符）
+        Returns:
+            bool: 是否拥有权限
         """
         if not self.check_availability(user_name=user_name):
             raise ValueError(f"用户 {user_name} 不存在")
         
         permissions = self._get_user_permissions(user_name)
-        formatted_path = self.permissions_trie.format_path(path)
+        formatted_path = self.permissions_trie.format_path(permission_path)
         
         # 快速路径: 精确匹配黑名单
         if formatted_path.row_path in permissions['black']:
@@ -133,7 +136,7 @@ class RBACManager():
         if formatted_path.row_path in permissions['white']:
             return True
             
-        if strict:
+        if strict_match:
             return False
             
         # 通配符匹配
@@ -168,36 +171,66 @@ class RBACManager():
             result.append(self.permissions_trie.check_path(permissions_path, complete=True))
         return all(result)
 
-    def add_permissions(self, permissions_path: str):
-        """添加权限路径到Trie树"""
-        self.permissions_trie.add_path(permissions_path)
+    def add_permission_path(self, permission_path: str):
+        """
+        添加新的权限路径
+        
+        Args:
+            permission_path: 权限路径
+        """
+        self.permissions_trie.add_path(permission_path)
 
-    def del_permissions(self, permissions_path: str):
-        self.permissions_trie.del_path(permissions_path)
-        self.refresh_cache()
+    def remove_permission_path(self, permission_path: str):
+        """
+        移除权限路径
+        
+        Args:
+            permission_path: 权限路径
+        """
+        self.permissions_trie.del_path(permission_path)
+        self.refresh_permission_cache()
 
-    def add_role(self, role_name: str, force: bool = False):
-        if not force and self.check_availability(role_name=role_name):
+    def create_role(self, role_name: str, overwrite: bool = False):
+        """
+        创建新角色
+        
+        Args:
+            role_name: 角色名称
+            overwrite: 是否覆盖已存在的同名角色
+        """
+        if not overwrite and self.check_availability(role_name=role_name):
             raise IndexError(f'角色 {role_name} 已经存在')
-        self.refresh_cache(role_name=role_name)
+        self.refresh_permission_cache(role_name=role_name)
         self.roles[role_name] = {
             'white_permissions_list': [],
             'black_permissions_list': [],
         }
 
-    def add_user(self, user_name: str, force: bool = False):
-        if not force and self.check_availability(user_name=user_name):
+    def create_user(self, user_name: str, overwrite: bool = False):
+        """
+        创建新用户
+        
+        Args:
+            user_name: 用户名称
+            overwrite: 是否覆盖已存在的同名用户
+        """
+        if not overwrite and self.check_availability(user_name=user_name):
             raise IndexError(f'用户 {user_name} 已经存在')
-        self.refresh_cache(user_name=user_name)
+        self.refresh_permission_cache(user_name=user_name)
         self.users[user_name] = {
             'white_permissions_list': [],
             'black_permissions_list': [],
             'role_list': [self.default_role] if self.default_role else []
         }
 
-    def del_role(self, role_name: str):
-        """删除角色时同时清理继承关系"""
-        self.refresh_cache(role_name=role_name)
+    def delete_role(self, role_name: str):
+        """
+        删除角色及其所有关联
+        
+        Args:
+            role_name: 角色名称
+        """
+        self.refresh_permission_cache(role_name=role_name)
         # 删除该角色作为继承者的记录
         if role_name in self.role_inheritance:
             del self.role_inheritance[role_name]
@@ -207,50 +240,104 @@ class RBACManager():
                 self.role_inheritance[role].remove(role_name)
         del self.roles[role_name]
 
-    def del_user(self, user_name: str):
-        self.refresh_cache(user_name=user_name)
+    def delete_user(self, user_name: str):
+        """
+        删除用户及其所有权限关联
+        
+        Args:
+            user_name: 用户名称
+        """
+        self.refresh_permission_cache(user_name=user_name)
         del self.users[user_name]
 
-    def assign_permissions_to_role(self, role_name: str, permissions_path: str, mode: Literal['white', 'black'] = 'white'):
-        """为角色分配权限"""
+    def grant_permission_to_role(self, role_name: str, permission_path: str, 
+                               permission_type: Literal['white', 'black'] = 'white'):
+        """
+        为角色授予权限
+        
+        Args:
+            role_name: 角色名称
+            permission_path: 权限路径
+            permission_type: 权限类型（white=白名单，black=黑名单）
+        """
         if not self.check_availability(role_name=role_name):
             raise IndexError(f'角色 {role_name} 不存在')
-        if not self.check_availability(permissions_path=permissions_path):
-            raise ValueError(f"权限路径 {permissions_path} 不存在,无法分配给角色 {role_name}")
-        self.refresh_cache(role_name=role_name)
-        self.roles[role_name][f'{mode}_permissions_list'].append(permissions_path)
+        if not self.check_availability(permissions_path=permission_path):
+            raise ValueError(f"权限路径 {permission_path} 不存在,无法分配给角色 {role_name}")
+        self.refresh_permission_cache(role_name=role_name)
+        self.roles[role_name][f'{permission_type}_permissions_list'].append(permission_path)
 
-    def assign_permissions_to_user(self, user_name: str, permissions_path: str, mode: Literal['white', 'black']):
-        """为用户直接分配权限,确保权限路径存在"""
+    def grant_permission_to_user(self, user_name: str, permission_path: str, 
+                               permission_type: Literal['white', 'black']):
+        """
+        为用户直接授予权限
+        
+        Args:
+            user_name: 用户名称
+            permission_path: 权限路径
+            permission_type: 权限类型（white=白名单，black=黑名单）
+        """
         if not self.check_availability(user_name=user_name):
             raise IndexError(f'用户 {user_name} 不存在')
-        if not self.check_availability(permissions_path=permissions_path):
-            raise ValueError(f"权限路径 {permissions_path} 不存在,无法分配给用户 {user_name}")
-        self.refresh_cache(user_name=user_name)
-        self.users[user_name][f'{mode}_permissions_list'].append(permissions_path)
+        if not self.check_availability(permissions_path=permission_path):
+            raise ValueError(f"权限路径 {permission_path} 不存在,无法分配给用户 {user_name}")
+        self.refresh_permission_cache(user_name=user_name)
+        self.users[user_name][f'{permission_type}_permissions_list'].append(permission_path)
 
-    def assign_role_to_user(self, role_name: str, user_name: str):
+    def assign_role(self, user_name: str, role_name: str):
+        """
+        将角色分配给用户
+        
+        Args:
+            user_name: 用户名称
+            role_name: 角色名称
+        """
         if not self.check_availability(user_name=user_name, role_name=role_name):
             raise IndexError(f'角色 {role_name} 或用户 {user_name} 不存在')
-        self.refresh_cache(role_name=role_name, user_name=user_name)
+        self.refresh_permission_cache(role_name=role_name, user_name=user_name)
         self.users[user_name]['role_list'].append(role_name)
 
-    def unassign_permissions_to_role(self, role_name: str, permissions_path: str, mode:Literal['white', 'black']):
+    def revoke_permission_from_role(self, role_name: str, permission_path: str, 
+                                  permission_type: Literal['white', 'black']):
+        """
+        撤销角色的权限
+        
+        Args:
+            role_name: 角色名称
+            permission_path: 权限路径
+            permission_type: 权限类型（white=白名单，black=黑名单）
+        """
         if not self.check_availability(role_name=role_name):
             raise IndexError(f'角色 {role_name} 不存在')
-        self.refresh_cache(role_name=role_name)
-        self.roles[role_name][f'{mode}_permissions_list'].remove(permissions_path)
+        self.refresh_permission_cache(role_name=role_name)
+        self.roles[role_name][f'{permission_type}_permissions_list'].remove(permission_path)
 
-    def unassign_permissions_to_user(self, user_name: str, permissions_path: str, mode:Literal['white', 'black']):
+    def revoke_permission_from_user(self, user_name: str, permission_path: str, 
+                                  permission_type: Literal['white', 'black']):
+        """
+        撤销用户的直接权限
+        
+        Args:
+            user_name: 用户名称
+            permission_path: 权限路径
+            permission_type: 权限类型（white=白名单，black=黑名单）
+        """
         if not self.check_availability(user_name=user_name):
             raise IndexError(f'用户 {user_name} 不存在')
-        self.refresh_cache(user_name=user_name)
-        self.users[user_name][f'{mode}_permissions_list'].remove(permissions_path)
+        self.refresh_permission_cache(user_name=user_name)
+        self.users[user_name][f'{permission_type}_permissions_list'].remove(permission_path)
 
-    def unassign_role_to_user(self, role_name: str, user_name: str):
+    def remove_role(self, user_name: str, role_name: str):
+        """
+        移除用户的角色
+        
+        Args:
+            user_name: 用户名称
+            role_name: 角色名称
+        """
         if not self.check_availability(user_name=user_name, role_name=role_name):
             raise IndexError(f'角色 {role_name} 或用户 {user_name} 不存在')
-        self.refresh_cache(role_name=role_name, user_name=user_name)
+        self.refresh_permission_cache(role_name=role_name, user_name=user_name)
         self.users[user_name]['role_list'].remove(role_name)
 
     def _check_circular_inheritance(self, role: str, inherited_role: str, visited: set = None) -> bool:
@@ -283,13 +370,13 @@ class RBACManager():
         
         if inherited_role not in self.role_inheritance[role]:
             self.role_inheritance[role].append(inherited_role)
-            self.refresh_cache(role_name=role)
+            self.refresh_permission_cache(role_name=role)
 
     def remove_role_inheritance(self, role: str, inherited_role: str):
         """移除角色继承关系"""
         if role in self.role_inheritance and inherited_role in self.role_inheritance[role]:
             self.role_inheritance[role].remove(inherited_role)
-            self.refresh_cache(role_name=role)
+            self.refresh_permission_cache(role_name=role)
 
     def to_dict(self) -> dict:
         """将RBACManager实例转换为可序列化字典"""
@@ -373,5 +460,5 @@ class RBACManager():
             }
         
         # 强制刷新所有缓存
-        instance.refresh_cache()
+        instance.refresh_permission_cache()
         return instance

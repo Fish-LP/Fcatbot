@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-24 21:59:13
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-15 17:46:15
+# @LastEditTime : 2025-03-29 22:50:43
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -38,7 +38,7 @@ from .permission_trie import Trie
 ! 警告: 没有进行完全的安全检查
 """
 __all__ = [
-    'RBAC_manager',
+    'RBACManager',
     'PermissionPath',
-    'permission_trie',
+    'Trie',
 ]
