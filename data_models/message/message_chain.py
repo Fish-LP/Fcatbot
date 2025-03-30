@@ -2,15 +2,26 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-22 15:57:16
+# @LastEditTime : 2025-03-30 13:15:10
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 import inspect
 from typing import Callable, Union, List, Dict, Any, Iterable, Type, Optional
 import json
+import os
+import time
 
+from ...utils import get_log
+from ...config import MESSAGE_ERROR_LOG, PERSISTENT_DIR
+LOG = get_log('MessageChain')
 from .message_nope import *
+
+class MessageElementError(Exception):
+    """消息元素错误类"""
+    def __init__(self, message: str, element: Any):
+        self.element = element
+        super().__init__(f"消息元素错误: {message}, 元素: {element}")
 
 class MessageChain:
     """消息链类，用于管理多个消息元素。
@@ -53,23 +64,57 @@ class MessageChain:
         """
         self.decorate_add_methods(self.check_message_chain)
         self.elements = []
+        self.error_elements = []  # 记录初始化失败的元素
+        
         if isinstance(elements, Iterable):
             for element in elements:
-                if isinstance(element, dict):
-                    self.elements.append(self._guessing_type(
-                        data=element.get('data'), 
-                        type_=element.get('type', None)
-                    ))
-                elif isinstance(element, Element):
-                    self.elements.append(element)
+                try:
+                    if isinstance(element, dict):
+                        self.elements.append(self._guessing_type(
+                            data=element.get('data'), 
+                            type_=element.get('type', None)
+                        ))
+                    elif isinstance(element, Element):
+                        self.elements.append(element)
+                    else:
+                        raise MessageElementError("不支持的元素类型", element)
+                except Exception as e:
+                    self.error_elements.append({
+                        'element': element,
+                        'error': str(e)
+                    })
         elif isinstance(elements, Element):
             self.elements.append(elements)
         elif isinstance(elements, dict):
-            self.elements.append(self._guessing_type( 
-                        data=element.get('data'), 
-                        type_=element.get('type', None))
-                        )
+            try:
+                self.elements.append(self._guessing_type( 
+                    data=elements.get('data'), 
+                    type_=elements.get('type', None))
+                )
+            except Exception as e:
+                self.error_elements.append({
+                    'element': elements,
+                    'error': str(e)
+                })
         self.check_message_chain()
+        if self.error_elements:
+            self._save_error_log()
+    
+    def get_error_elements(self) -> List[Dict[str, Any]]:
+        """获取初始化失败的元素列表。
+
+        Returns:
+            List[Dict[str, Any]]: 包含错误元素和错误信息的列表。
+        """
+        return self.error_elements
+    
+    def has_errors(self) -> bool:
+        """检查是否有初始化失败的元素。
+
+        Returns:
+            bool: 如果有错误元素返回True，否则返回False。
+        """
+        return len(self.error_elements) > 0
 
     # region 魔术方法定义
 
@@ -465,3 +510,34 @@ class MessageChain:
 
                 # 替换原始方法
                 setattr(self, method_name, wrapper(method))
+
+    def _save_error_log(self) -> None:
+        """保存错误日志到文件"""
+        try:
+            if not os.path.exists(PERSISTENT_DIR):
+                os.makedirs(PERSISTENT_DIR)
+                
+            error_data = {
+                'timestamp': time.time(),
+                'errors': self.error_elements
+            }
+            
+            # 读取现有日志
+            existing_logs = []
+            if os.path.exists(MESSAGE_ERROR_LOG):
+                try:
+                    with open(MESSAGE_ERROR_LOG, 'r', encoding='utf-8') as f:
+                        existing_logs = json.load(f)
+                except json.JSONDecodeError:
+                    pass
+            
+            # 添加新的错误记录
+            if not isinstance(existing_logs, list):
+                existing_logs = []
+            existing_logs.append(error_data)
+            
+            # 保存到文件
+            with open(MESSAGE_ERROR_LOG, 'w', encoding='utf-8') as f:
+                json.dump(existing_logs, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            LOG.error(f"保存消息错误日志失败: {e}")

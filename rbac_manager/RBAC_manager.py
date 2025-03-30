@@ -10,6 +10,7 @@ from typing import Dict, Literal, Set
 from functools import lru_cache
 from .permission_path import PermissionPath
 from .permission_trie import Trie
+from .models import User, Role
 
 class RBACManager():
     case_sensitive: bool = None
@@ -462,3 +463,11 @@ class RBACManager():
         # 强制刷新所有缓存
         instance.refresh_permission_cache()
         return instance
+
+    def get_user(self, user_name: str) -> User:
+        """获取用户实例"""
+        return User(self, user_name)
+
+    def get_role(self, role_name: str) -> Role:
+        """获取角色实例"""
+        return Role(self, role_name)

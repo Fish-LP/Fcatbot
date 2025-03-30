@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-22 22:26:58
+# @LastEditTime : 2025-03-30 13:17:42
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -182,227 +182,249 @@ class BotClient:
                 from time import time
                 
                 debug_state = {
-                    'group_id': 2233,
+                    'group_id': None,  # None表示私聊环境
                     'user_id': 10086,
                     'bot_id': 114514,
                     'user_role': 'member',
                     'user_name': 'DEBUG_USER',
-                    'group_name': 'DEBUG_GROUP',
                 }
-                
-                def process_debug_command(cmd: str):
-                    """处理调试命令"""
-                    cmd = cmd.strip()
-                    if cmd.startswith('.'):
-                        parts = cmd[1:].split()
-                        if not parts:
-                            return None
+
+                # 定义命令处理函数
+                debug_commands = {}
+                def command(name):
+                    def decorator(func):
+                        debug_commands[name] = func
+                        return func
+                    return decorator
+
+                @command('help')
+                def cmd_help(*_):
+                    """显示帮助信息"""
+                    print(f"""{Color.CYAN}调试命令帮助:{Color.RESET}
+{Color.GREEN}.help{Color.RESET}                    - 显示此帮助
+{Color.GREEN}.env{Color.RESET}                     - 显示当前调试环境
+{Color.GREEN}.env set <key> <value>{Color.RESET}   - 设置环境变量
+{Color.GREEN}.g <id>{Color.RESET}                  - 切换到指定群聊
+{Color.GREEN}.p{Color.RESET}                       - 切换到私聊环境
+{Color.GREEN}.p list{Color.RESET}                 - 显示已加载的插件
+{Color.GREEN}.p info <name>{Color.RESET}          - 查看插件信息
+{Color.GREEN}.p data <name>{Color.RESET}          - 查看插件数据
+{Color.GREEN}.p set <name> <k> <v>{Color.RESET}   - 设置插件数据
+{Color.GREEN}.p call <name> <func>{Color.RESET}   - 调用插件方法
+{Color.GREEN}.reload [plugin]{Color.RESET}        - 重载插件(无参数时重载所有)
+{Color.GREEN}.exit{Color.RESET}                   - 退出调试模式
+所有非.开头的输入都会被作为消息发送""")
+
+                @command('env')
+                def cmd_env(*args):
+                    """环境变量管理"""
+                    if not args:
+                        print(f"{Color.CYAN}当前环境:{Color.RESET}")
+                        for k, v in debug_state.items():
+                            print(f"{Color.GRAY}{k} = {v}{Color.RESET}")
+                        return
+                    
+                    if args[0] == 'set' and len(args) >= 3:
+                        key, value = args[1], smart_convert(' '.join(args[2:]))
+                        if key in debug_state:
+                            debug_state[key] = value
+                            print(f"{Color.GREEN}已设置 {key} = {value}{Color.RESET}")
+
+                @command('g')
+                def cmd_group(group_id=None, *_):
+                    """切换群聊"""
+                    if group_id:
+                        debug_state['group_id'] = int(group_id)
+                        print(f"{Color.GREEN}已切换到群 {group_id}{Color.RESET}")
+                    else:
+                        print(f"{Color.YELLOW}请指定群号{Color.RESET}")
+
+                @command('p')
+                def cmd_private(*args):
+                    """切换私聊/插件管理"""
+                    if not args:
+                        debug_state['group_id'] = None
+                        print(f"{Color.GREEN}已切换到私聊环境{Color.RESET}")
+                        return
+
+                    subcmd = args[0]
+                    if subcmd == 'list':
+                        # 显示插件列表,添加更多信息
+                        print(f"{Color.CYAN}已加载的插件列表:{Color.RESET}")
+                        for name, plugin in self.plugin_sys.plugins.items():
+                            print(f"{Color.YELLOW}- {Color.GREEN}{name}{Color.RESET} {Color.GRAY}v{plugin.version}{Color.RESET}")
+                            print(f"  作者: {plugin.meta_data.get('author', '未知')}")
+                            print(f"  描述: {plugin.meta_data.get('description', '无')}")
+                            if plugin.dependencies:
+                                print(f"  依赖: {', '.join(plugin.dependencies)}")
                             
-                        command = parts[0]
-                        args = parts[1:]
-                        
-                        if command == 'help':
-                            print(f"""{Color.CYAN}调试命令帮助:{Color.RESET}
-{Color.GREEN}.help{Color.RESET}                         - 显示此帮助
-{Color.GREEN}.state{Color.RESET}                        - 显示当前状态
-{Color.GREEN}.set <key> <value>{Color.RESET}            - 设置状态值
-{Color.GREEN}.group <id/none>{Color.RESET}              - 切换群聊/私聊环境
-{Color.GREEN}.user <id>{Color.RESET}                    - 设置用户ID
-{Color.GREEN}.name <name>{Color.RESET}                  - 设置用户昵称
-{Color.GREEN}.role <role>{Color.RESET}                  - 设置用户角色(owner/admin/member)
-{Color.GREEN}.reload <plugin>{Color.RESET}              - 重载指定插件(all表示所有)
-{Color.GREEN}.show <plugin>{Color.RESET}                - 查看指定插件数据(all表示所有)
-{Color.GREEN}.look <plugin> <key>{Color.RESET}          - 查看指定插件属性
-{Color.GREEN}.edit <plugin> <key> <var>{Color.RESET}    - 修改已加载插件的数据
-{Color.GREEN}.run <plugin> <func>{Color.RESET}          - 运行已加载插件的函数
-{Color.GREEN}.plugins{Color.RESET}                      - 显示已加载的插件列表
-{Color.GREEN}.exit{Color.RESET}                         - 退出调试模式
-{Color.YELLOW}所有非.开头的输入都会被视为消息内容发送{Color.RESET}""")
-                            return None
-
-                        elif command == 'look':
-                            if not args and len(args) < 2:
-                                print(f"{Color.YELLOW}请指定要查看的插件名称与键名{Color.RESET}")
-                                return None
-                            try:
-                                plugin_name = args[0]
-                                if plugin_name:
-                                    if plugin_name not in self.plugin_sys.plugins:
-                                        print(f"{Color.RED}插件 '{plugin_name}' 未加载{Color.RESET}")
-                                        return None
-                                    plugin = self.plugin_sys.plugins[plugin_name]
-                                    print(f'{Color.GRAY}{plugin.name}\n', '\n'.join(visualize_tree(getattr(plugin, args[1]))), sep='')
-                            except Exception as e:
-                                print(f"{Color.RED}获取插件属性时出错: {e}{Color.RESET}")
-                            return None
-
-                        elif command == 'run':
-                            if not args or len(args) < 2:
-                                print(f"{Color.YELLOW}请指定要执行的插件名称和函数名称{Color.RESET}")
-                                return None
-                            try:
-                                plugin_name = args[0]
-                                func_name = args[1]
-                                func_args = args[2:] if len(args) > 2 else []
-                                
-                                if plugin_name not in self.plugin_sys.plugins:
-                                    print(f"{Color.RED}插件 '{plugin_name}' 未加载{Color.RESET}")
-                                    return None
-                                    
-                                plugin = self.plugin_sys.plugins[plugin_name]
-                                if not hasattr(plugin, func_name):
-                                    print(f"{Color.RED}函数 '{func_name}' 在插件中不存在{Color.RESET}")
-                                    return None
-                                    
-                                func = getattr(plugin, func_name)
-                                print(f"{Color.YELLOW}执行函数 {func_name} 参数: {func_args}{Color.RESET}")
-                                
-                                if inspect.iscoroutinefunction(func):
-                                    result = asyncio.run(func(*func_args))
-                                else:
-                                    result = func(*func_args)
-                                    
-                                print(f"{Color.GREEN}执行结果: {result}{Color.RESET}")
-                            except Exception as e:
-                                print(f"{Color.RED}执行插件方法时出错: {e}{Color.RESET}")
-                            return None
-
-                        elif command == 'edit':
-                            if not args and len(args) < 2:
-                                print(f"{Color.YELLOW}请指定要查看的插件名称与修改对{Color.RESET}")
-                                return None
-                            try:
-                                plugin_name = args[0]
-                                if plugin_name:
-                                    if plugin_name not in self.plugin_sys.plugins:
-                                        print(f"{Color.RED}插件 '{plugin_name}' 未加载{Color.RESET}")
-                                        return None
-                                    plugin = self.plugin_sys.plugins[plugin_name]
-                                    try:
-                                        var = smart_convert(args[2])
-                                    except IndexError:
-                                        var = None
-                                    if var is None:
-                                        del plugin.data[args[1]]
-                                    else:
-                                        plugin.data[args[1]] = var
-                                    print(f'{Color.GRAY}{plugin.name}\n', '\n'.join(visualize_tree(plugin.data.data)), sep='')
-                            except Exception as e:
-                                print(f"{Color.RED}修改插件数据时出错: {e}{Color.RESET}")
-                            return None
-
-                        elif command == 'plugins':
-                            print(f"{Color.CYAN}已加载的插件:{Color.RESET}")
-                            for name, plugin in self.plugin_sys.plugins.items():
-                                print(f"{Color.YELLOW}- {Color.GREEN}{name}{Color.RESET} {Color.GRAY}v{plugin.version}{Color.RESET}")
-                            return None
-
-                        elif command == 'reload':
-                            if not args:
-                                print(f"{Color.YELLOW}请指定要重载的插件名称,使用 all 重载所有插件{Color.RESET}")
-                                return None
-                            try:
-                                plugin_name = args[0]
-                                if plugin_name == 'all':
-                                    print(f"{Color.YELLOW}正在重载所有插件...{Color.RESET}")
-                                    self.plugin_sys.unload_all()
-                                    asyncio.run(self.plugin_sys.load_plugins(api=self.ws))
-                                    print(f"{Color.GREEN}已重载所有插件{Color.RESET}")
-                                else:
-                                    if plugin_name not in self.plugin_sys.plugins:
-                                        print(f"{Color.RED}插件 '{plugin_name}' 未加载{Color.RESET}")
-                                        return None
-                                    print(f"{Color.YELLOW}正在重载插件 {plugin_name}...{Color.RESET}")
-                                    asyncio.run(self.plugin_sys.reload_plugin(plugin_name))
-                                    print(f"{Color.GREEN}已重载插件 {plugin_name}{Color.RESET}")
-                            except Exception as e:
-                                print(f"{Color.RED}重载插件时出错: {e}{Color.RESET}")
-                            return None
-
-                        elif command == 'show':
-                            if not args:
-                                print(f"{Color.YELLOW}请指定要查看的插件名称,使用 all 查看所有插件{Color.RESET}")
-                                return None
-                            try:
-                                plugin_name = args[0]
-                                if plugin_name == 'all':
-                                    print(f"{Color.YELLOW}正在查看所有插件...{Color.RESET}")
-                                    for plugin in self.plugin_sys.plugins.values():
-                                        print(f'{Color.GRAY}{plugin.name}\n', '\n'.join(visualize_tree(plugin.data.data)), sep='')
-                                        print()
-                                    print(f"{Color.GREEN}已查看所有插件{Color.RESET}")
-                                else:
-                                    if plugin_name not in self.plugin_sys.plugins:
-                                        print(f"{Color.RED}插件 '{plugin_name}' 未加载{Color.RESET}")
-                                        return None
-                                    plugin = self.plugin_sys.plugins[plugin_name]
-                                    print(f'{Color.GRAY}{plugin.name}\n', '\n'.join(visualize_tree(plugin.data.data)), sep='')
-                            except Exception as e:
-                                print(f"{Color.RED}查看插件时出错: {e}{Color.RESET}")
-                            return None
-
-                        elif command == 'state':
-                            print(f"{Color.CYAN}当前状态{Color.RESET}")
-                            print('\n'.join(f"{Color.GRAY}{line}{Color.RESET}" for line in visualize_tree(debug_state)))
-                            return None
+                    elif subcmd == 'info':
+                        if len(args) < 2:
+                            print(f"{Color.YELLOW}用法: .p info <插件名>{Color.RESET}")
+                            return
+                        name = args[1]
+                        if name in self.plugin_sys.plugins:
+                            plugin = self.plugin_sys.plugins[name]
+                            print(f"{Color.CYAN}插件详细信息:{Color.RESET}")
+                            print(f"名称: {plugin.name}")
+                            print(f"版本: {plugin.version}")
+                            print(f"作者: {getattr(plugin,'author','None')}")
+                            print(f"描述: {getattr(plugin,'info','None')}")
+                            print(f"工作目录: {plugin._work_path}")
+                            print(f"数据文件: {plugin._data_path}")
+                            print(f"调试模式: {'启用' if plugin.debug else '禁用'}")
+                            if plugin.dependencies:
+                                print(f"依赖项: {', '.join(plugin.dependencies)}")
+                        else:
+                            print(f"{Color.RED}插件 '{name}' 未加载{Color.RESET}")
                             
-                        elif command == 'set' and len(args) >= 2:
-                            key, value = args[0], ' '.join(args[1:])
-                            if key in debug_state:
-                                debug_state[key] = value
-                                print(f"{Color.GREEN}已设置 {key} = {value}{Color.RESET}")
-                            return None
-                            
-                        elif command == 'group':
-                            if not args:
-                                debug_state['group_id'] = None
-                                print(f"{Color.GREEN}已切换到私聊环境{Color.RESET}")
-                            elif args:
-                                debug_state['group_id'] = args[0]
-                                print(f"{Color.GREEN}已切换到群 {args[0]}{Color.RESET}")
-                            return None
-                            
-                        elif command == 'user':
-                            if args:
-                                debug_state['user_id'] = args[0]
-                                print(f"{Color.GREEN}已设置用户ID为 {args[0]}{Color.RESET}")
-                            return None
-                            
-                        elif command == 'name':
-                            if args:
-                                debug_state['user_name'] = ' '.join(args)
-                                print(f"{Color.GREEN}已设置用户名为 {debug_state['user_name']}{Color.RESET}")
-                            return None
-                            
-                        elif command == 'role':
-                            if args and args[0] in ('owner', 'admin', 'member'):
-                                debug_state['user_role'] = args[0]
-                                print(f"{Color.GREEN}已设置用户角色为 {args[0]}{Color.RESET}")
+                    elif subcmd == 'data':
+                        if len(args) < 2:
+                            print(f"{Color.YELLOW}用法: .p data <插件名>{Color.RESET}")
+                            return
+                        name = args[1]
+                        if name in self.plugin_sys.plugins:
+                            plugin = self.plugin_sys.plugins[name]
+                            print(f"{Color.CYAN}插件 {name} 的数据:{Color.RESET}")
+                            if plugin.data.data:
+                                print('\n'.join(visualize_tree(plugin.data.data)))
                             else:
-                                print(f"{Color.YELLOW}角色必须是 owner/admin/member 之一{Color.RESET}")
-                            return None
+                                print(f"{Color.GRAY}(空){Color.RESET}")
+                        else:
+                            print(f"{Color.RED}插件 '{name}' 未加载{Color.RESET}")
                             
-                        elif command == 'exit':
-                            raise KeyboardInterrupt
+                    elif subcmd == 'set':
+                        if len(args) < 3:
+                            print(f"{Color.YELLOW}用法: .p set <插件名> <键> [值]{Color.RESET}")
+                            print(f"提示: 不提供值时将删除该键")
+                            return
                             
-                    return cmd  # 返回非命令内容作为消息
-
-                print(f"{Color.CYAN}输入 {Color.GREEN}.help{Color.CYAN} 查看调试命令帮助{Color.RESET}")
-                try:
-                    if readline_support:
+                        name = args[1]
+                        if name not in self.plugin_sys.plugins:
+                            print(f"{Color.RED}插件 '{name}' 未加载{Color.RESET}")
+                            return
+                            
+                        plugin = self.plugin_sys.plugins[name]
+                        key = args[2]
+                        
                         try:
-                            readline.read_history_file('.history.txt')
-                        except FileNotFoundError:
-                            pass
-                except FileNotFoundError:
-                    pass
+                            if len(args) > 3:
+                                # 设置值
+                                value = smart_convert(' '.join(args[3:]))
+                                plugin.data[key] = value
+                                print(f"{Color.GREEN}已设置 {name}.{key} = {value}{Color.RESET}")
+                            else:
+                                # 删除键
+                                if key in plugin.data:
+                                    del plugin.data[key]
+                                    print(f"{Color.GREEN}已删除键 {name}.{key}{Color.RESET}")
+                                else:
+                                    print(f"{Color.YELLOW}键 {key} 不存在{Color.RESET}")
+                            
+                            # 显示更新后的数据
+                            print(f"{Color.CYAN}当前数据:{Color.RESET}")
+                            print('\n'.join(visualize_tree(plugin.data.data)))
+                        except Exception as e:
+                            print(f"{Color.RED}操作失败: {e}{Color.RESET}")
+                            
+                    elif subcmd == 'call':
+                        if len(args) < 3:
+                            print(f"{Color.YELLOW}用法: .p call <插件名> <方法名> [参数...]{Color.RESET}")
+                            return
+                            
+                        name, func = args[1:3]
+                        if name not in self.plugin_sys.plugins:
+                            print(f"{Color.RED}插件 '{name}' 未加载{Color.RESET}")
+                            return
+                            
+                        plugin = self.plugin_sys.plugins[name]
+                        if not hasattr(plugin, func):
+                            print(f"{Color.RED}方法 '{func}' 在插件中不存在{Color.RESET}")
+                            # 显示可用方法
+                            methods = [m for m in dir(plugin) if not m.startswith('_') 
+                                     and callable(getattr(plugin, m))]
+                            if methods:
+                                print(f"{Color.YELLOW}可用方法: {', '.join(methods)}{Color.RESET}")
+                            return
+                            
+                        fn = getattr(plugin, func)
+                        try:
+                            if inspect.iscoroutinefunction(fn):
+                                result = asyncio.run(fn(*args[3:]))
+                            else:
+                                result = fn(*args[3:])
+                            print(f"{Color.GREEN}返回值: {result}{Color.RESET}")
+                        except Exception as e:
+                            print(f"{Color.RED}调用出错: {e}{Color.RESET}")
+                    else:
+                        print(f"{Color.YELLOW}未知的子命令: {subcmd}{Color.RESET}")
+                        print("可用子命令: list, info, data, set, call")
+
+                @command('u')
+                def cmd_user(user_id=None, *name):
+                    """设置用户ID和昵称"""
+                    if user_id:
+                        debug_state['user_id'] = int(user_id)
+                        if name:
+                            debug_state['user_name'] = ' '.join(name)
+                        print(f"{Color.GREEN}已设置用户 {user_id} ({debug_state['user_name']}){Color.RESET}")
+                    else:
+                        print(f"{Color.YELLOW}请指定用户ID{Color.RESET}")
+
+                @command('r')
+                def cmd_role(role=None, *_):
+                    """设置用户角色"""
+                    if role in ('owner', 'admin', 'member'):
+                        debug_state['user_role'] = role
+                        print(f"{Color.GREEN}已设置用户角色为 {role}{Color.RESET}")
+                    else:
+                        print(f"{Color.YELLOW}角色必须是 owner/admin/member 之一{Color.RESET}")
+
+                @command('reload')
+                async def cmd_reload(name=None, *_):
+                    """重载插件"""
+                    try:
+                        if name:
+                            if name in self.plugin_sys.plugins:
+                                await self.plugin_sys.reload_plugin(name)
+                                print(f"{Color.GREEN}已重载插件 {name}{Color.RESET}")
+                            else:
+                                print(f"{Color.RED}插件 '{name}' 未加载{Color.RESET}")
+                        else:
+                            self.plugin_sys.unload_all()
+                            await self.plugin_sys.load_plugins(api=self.ws)
+                            print(f"{Color.GREEN}已重载所有插件{Color.RESET}")
+                    except Exception as e:
+                        print(f"{Color.RED}重载失败: {e}{Color.RESET}")
+
+                @command('exit')
+                def cmd_exit(*_):
+                    """退出调试模式"""
+                    raise KeyboardInterrupt
+
+                # 命令处理主循环
+                print(f"{Color.CYAN}输入 {Color.GREEN}.help{Color.CYAN} 查看调试命令帮助{Color.RESET}")
                 while True:
                     try:
-                        text = input(f'{Color.MAGENTA}>{Color.RESET} ')
-                        msg_text = process_debug_command(text)
-                        if msg_text is None:
+                        text = input(f'{Color.MAGENTA}>{Color.RESET} ').strip()
+                        if not text:
                             continue
                             
+                        if text.startswith('.'):
+                            parts = text[1:].split()
+                            if not parts:
+                                continue
+                            cmd, *args = parts
+                            
+                            if cmd in debug_commands:
+                                try:
+                                    result = debug_commands[cmd](*args)
+                                    if inspect.iscoroutinefunction(debug_commands[cmd]):
+                                        asyncio.run(result)
+                                except Exception as e:
+                                    print(f"{Color.RED}命令执行出错: {e}{Color.RESET}")
+                            continue
+                        
                         msg_id = randint(0,9999999999)
                         base_msg_data = {
                             'id': msg_id,
@@ -416,8 +438,8 @@ class BotClient:
                                 nickname=debug_state['user_name'],
                                 role=debug_state['user_role']
                             ),
-                            'message': MessageChain().add_text(msg_text),
-                            'raw_message': msg_text,
+                            'message': MessageChain().add_text(text),
+                            'raw_message': text,
                             'message_id': msg_id,
                             'user_id': int(debug_state['user_id'])
                         }

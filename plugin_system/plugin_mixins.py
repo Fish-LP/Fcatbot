@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-03-29 15:36:57
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-30 12:01:53
+# @LastEditTime : 2025-03-30 13:50:40
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
@@ -14,13 +14,22 @@ from ..utils import TimeTaskScheduler
 
 class EventHandlerMixin:
     """事件处理混入类，提供事件发布和订阅功能。
+    
+    # 描述
+    该混入类实现了完整的事件处理系统，包括事件的同步/异步发布以及处理器的管理功能。
+    作为一个Mixin类，它需要与具有 `_event_bus` 实例的类配合使用。
 
-    该类提供了同步和异步事件发布，以及事件处理器的注册和注销功能。作为一个Mixin类，
-    它需要与具有 _event_bus 实例的类配合使用。
-
-    Attributes:
-        _event_bus (EventBus): 事件总线实例。
-        _event_handlers (List[UUID]): 已注册的事件处理器ID列表。
+    # 属性
+    - `_event_bus` (EventBus): 事件总线实例，用于处理事件的发布与订阅
+    - `_event_handlers` (List[UUID]): 当前已注册的事件处理器ID列表
+    
+    # 使用示例
+    ```python
+    class MyClass(EventHandlerMixin):
+        def __init__(self):
+            self._event_bus = EventBus()
+            self._event_handlers = []
+    ```
     """
     
     _event_bus: EventBus
@@ -94,7 +103,21 @@ class EventHandlerMixin:
             self._event_bus.unsubscribe(handler_id)
 
 class SchedulerMixin:
-    """定时任务相关功能"""
+    """定时任务调度混入类，提供定时任务的管理功能。
+    
+    # 描述
+    该混入类提供了定时任务的添加、移除等管理功能。支持灵活的任务调度配置，
+    包括固定间隔执行、条件触发、参数动态生成等特性。
+
+    # 属性
+    - `_time_task_scheduler` (TimeTaskScheduler): 时间任务调度器实例
+
+    # 特性
+    - 支持固定时间间隔的任务调度
+    - 支持条件触发机制
+    - 支持最大执行次数限制
+    - 支持动态参数生成
+    """
     _time_task_scheduler: TimeTaskScheduler
     
     @final
