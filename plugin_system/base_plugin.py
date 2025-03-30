@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-30 13:49:20
+# @LastEditTime : 2025-03-30 14:27:02
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -136,11 +136,11 @@ class BasePlugin(EventHandlerMixin, SchedulerMixin):
             PluginLoadError: 当工作目录无效时抛出
         """
         # 插件信息检查
-        if getattr(self,'name',None):
+        if not getattr(self,'name',None):
             raise ValueError('缺失插件名称')
-        if getattr(self,'version',None):
+        if not getattr(self,'version',None):
             raise ValueError('缺失插件版本号')
-        if getattr(self,'dependencies',None):
+        if not getattr(self,'dependencies',None):
             self.dependencies = {}
         # 添加额外属性
         if kwd:
