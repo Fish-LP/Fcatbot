@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-30 13:17:42
+# @LastEditTime : 2025-03-30 14:41:57
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -72,40 +72,6 @@ from .data_models import LuckyKingNotify
 from .data_models import HonorNotify
 
 LOG = get_log('FcatBot')
-
-def smart_convert(s: str):
-    """
-    尝试将字符串智能转换为最合适的 Python 类型。
-    """
-    try:
-        # 尝试使用 ast.literal_eval 安全地解析字符串
-        return ast.literal_eval(s)
-    except (ValueError, SyntaxError):
-        # 解析失败
-        return s
-
-class CommandCompleter:
-    def __init__(self, options):
-        self.options = sorted(options)
-        self.matches = []
-
-    def complete(self, text, state):
-        print(f"Completing: {text} (state={state})")
-        
-        # 转换为小写进行匹配
-        clean_text = text.lower()
-        if text.startswith('.'):
-            if state == 0:
-                self.matches = [s for s in self.options if s.lower().startswith(clean_text)]
-                print(f"Possible matches: {self.matches}")
-            try:
-                return self.matches[state]
-            except IndexError:
-                return None
-        return None
-    
-    def __str__(self):
-        return f"CommandCompleter({self.options})"
 
 class BotClient:
     """QQ机器人客户端类.
