@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-13 21:47:01
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-04-04 14:44:06
+# @LastEditTime : 2025-04-04 17:35:35
 # @Description  : 通用文件加载器，支持JSON/TOML/YAML/PICKLE格式的同步/异步读写
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -75,6 +75,11 @@ try:
 except ImportError:
     pass  # 回退到标准json模块
 # endregion
+
+JSON_TYPE = [bool,str,float,'None']
+YAML_TYPE = [bool,str,int,float,'None']
+TOML_TYPE = [str,float]
+PICKLE_TYPE = [bool,str,'None']
 
 # ---------------------
 # region 异常类定义区块
@@ -246,22 +251,33 @@ class UniversalLoader(dict):
         """注册自定义类型的序列化与反序列化函数"""
         cls._custom_type_handlers[type_name] = (serialize_func, deserialize_func)
 
-    def _type_convert(self, data: Any, mode: Literal['restore', 'preserve'] = 'preserve') -> Any:
+    def _type_convert(
+        self, 
+        data: Any, 
+        mode: Literal['restore', 'preserve'] = 'preserve', 
+        exclude_types: list = [], 
+        encode_keys: bool = True, 
+        encode_values: bool = True
+    ) -> Any:
         """递归类型转换核心方法"""
+
         if isinstance(data, dict):
             return {
-                self._type_convert(k, mode): self._type_convert(v, mode)
+                (self._type_convert(k, mode, exclude_types, encode_keys, encode_values) if encode_keys else k):
+                (self._type_convert(v, mode, exclude_types, encode_keys, encode_values) if encode_values else v)
                 for k, v in data.items()
             }
         elif isinstance(data, (list, tuple)):
-            converted = [self._type_convert(item, mode) for item in data]
+            converted = [self._type_convert(item, mode, exclude_types, encode_keys, encode_values) for item in data]
             rest = converted if isinstance(data, list) else tuple(converted)
             if mode == 'preserve':
-                return f"{data.__class__.__name__}{self._flag}{rest}"
-            else:
-                return rest
+                if isinstance(data, tuple):
+                    return f"{data.__class__.__name__}{self._flag}{rest}"
+            return rest
         else:
             if mode == 'preserve':
+                if type(data) in exclude_types or str(data) in exclude_types:
+                    return data  # 不标记在过滤器中的类型
                 return self._preserve_item(data)
             else:
                 return self._restore_item(data)
@@ -422,10 +438,11 @@ class UniversalLoader(dict):
 
     def _save_data_sync(self, save_path: Path) -> None:
         """同步保存数据核心逻辑"""
-        converted_data = self._type_convert(self.copy(), 'preserve')
         
         # JSON格式保存
         if self.file_type == 'json':
+            converted_data = self._type_convert(self.copy(), 'preserve', JSON_TYPE)
+            print(converted_data)
             with save_path.open('w') as f:
                 if UJSON_AVAILABLE:
                     ujson.dump(converted_data, f, ensure_ascii=False, indent=4)
@@ -434,16 +451,19 @@ class UniversalLoader(dict):
         
         # TOML格式保存
         elif self.file_type == 'toml':
+            converted_data = self._type_convert(self.copy(), 'preserve', TOML_TYPE)
             with save_path.open('w') as f:
                 toml.dump(converted_data, f)
         
         # YAML格式保存
         elif self.file_type == 'yaml':
+            converted_data = self._type_convert(self.copy(), 'preserve', YAML_TYPE)
             with save_path.open('w') as f:
                 yaml.dump(converted_data, f, allow_unicode=True, default_flow_style=False)
         
         # Pickle格式保存
         elif self.file_type == 'pickle':
+            converted_data = self._type_convert(self.copy(), 'preserve', PICKLE_TYPE)
             with save_path.open('wb') as f:
                 pickle.dump(converted_data, f)
         
@@ -452,22 +472,24 @@ class UniversalLoader(dict):
 
     async def _save_data_async(self, save_path: Path) -> None:
         """异步保存数据核心逻辑"""
-        converted_data = self._type_convert(self.copy(), 'preserve')
         
         if AIOFILES_AVAILABLE:
             # JSON异步保存
             if self.file_type == 'json':
+                converted_data = self._type_convert(self.copy(), 'preserve', JSON_TYPE)
                 async with aiofiles.open(save_path, 'w', encoding='utf-8') as f:
                     content = ujson.dumps(converted_data) if UJSON_AVAILABLE else json.dumps(converted_data)
                     return await f.write(content)
             
             # TOML异步保存
             elif self.file_type == 'toml':
+                converted_data = self._type_convert(self.copy(), 'preserve', TOML_TYPE)
                 async with aiofiles.open(save_path, 'w') as f:
                     return await f.write(toml.dumps(converted_data))
             
             # YAML异步保存
             elif self.file_type == 'yaml':
+                converted_data = self._type_convert(self.copy(), 'preserve', YAML_TYPE)
                 async with aiofiles.open(save_path, 'w') as f:
                     return await f.write(yaml.dump(converted_data, allow_unicode=True))
         # 其他格式回退同步保存
