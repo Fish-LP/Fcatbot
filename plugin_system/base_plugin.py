@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-30 14:27:02
+# @LastEditTime : 2025-04-04 14:48:49
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -110,6 +110,7 @@ class BasePlugin(EventHandlerMixin, SchedulerMixin):
     info: str = '这个作者很懒且神秘,没有写一点点描述,真是一个神秘的插件'
     save_type: str = 'json'
     
+    data: UniversalLoader
     self_path: Path
     this_file_path: Path
     meta_data: dict
@@ -203,7 +204,7 @@ class BasePlugin(EventHandlerMixin, SchedulerMixin):
                 LOG.warning(f"{Color.YELLOW}debug模式{Color.RED}取消{Color.RESET}退出时的保存行为")
                 print(f'{Color.GRAY}{self.name}\n', '\n'.join(visualize_tree(self.data.data)), sep='')
             else:
-                self.data.save()
+                await self.data.asave()
         except (FileTypeUnknownError, SaveError, FileNotFoundError) as e:
             raise RuntimeError(self.name, f"保存持久化数据时出错: {e}")
 
@@ -217,18 +218,15 @@ class BasePlugin(EventHandlerMixin, SchedulerMixin):
             RuntimeError: 读取持久化数据失败时抛出
         """
         # load时传入的参数作为属性被保存在self中
-        if isinstance(self.data, (dict, list)):
+        if isinstance(self.data, dict):
             self.data = UniversalLoader(self._data_path, self.save_type)
-            self.data.data = self.data
         try:
-            self.data.load()
+            await self.data.aload()
         except (FileTypeUnknownError, LoadError, FileNotFoundError) as e:
             if self.debug:
                 pass
             else:
                 open(self._data_path,'w').write('')
-                self.data.save()
-                self.data.load()
         await asyncio.to_thread(self._init_)
         await self.on_load()
 

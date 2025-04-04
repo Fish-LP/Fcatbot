@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-30 14:41:57
+# @LastEditTime : 2025-04-04 15:49:41
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -97,23 +97,34 @@ class BotClient:
             uri,
             headers,
             message_handler = self.on_message,
-            close_handler=self.close
         )
 
     def close(self):
         LOG.info('用户主动触发关闭事件...')
         LOG.info('准备关闭所有插件...')
         self.plugin_sys.unload_all()
+        LOG.info('准备关闭ws连接...')
+        
         LOG.info('Fcatbot 关闭完成')
 
+    def link(self):
+        '''仅连接'''
+        self.ws.start()
+        return self.ws
+
+    def load_plugin(self, debug = False):
+        '''仅加载插件'''
+        if not os.path.exists(PLUGINS_DIR):
+            os.makedirs(PLUGINS_DIR, exist_ok=True)
+        # 设置插件系统的调试模式
+        self.plugin_sys.set_debug(debug)
+        asyncio.run(self.plugin_sys.load_plugins(api=self.ws))
+
     def run(self, load_plugins:bool = True, debug = False):
+        '''连接并启用bot客户端'''
         if load_plugins:
             LOG.info('准备加载插件')
-            if not os.path.exists(PLUGINS_DIR):
-                os.makedirs(PLUGINS_DIR, exist_ok=True)
-            # 设置插件系统的调试模式
-            self.plugin_sys.set_debug(debug)
-            asyncio.run(self.plugin_sys.load_plugins(api=self.ws))
+            self.load_plugin(debug)
         LOG.info('准备启动Fcatbot')
         if debug:
             LOG.warning('以 DEBUG 模式启动')
@@ -122,7 +133,11 @@ class BotClient:
         else:
             try:
                 self.ws.start()  # 启动 WebSocket 连接
+                while True:
+                    pass
             except KeyboardInterrupt:
+                print()
+                self.close()
                 exit(0)
 
     async def api(self, action: str, **params) -> dict:

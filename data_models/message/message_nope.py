@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-23 12:17:25
+# @LastEditTime : 2025-04-04 16:06:25
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -11,6 +11,7 @@ from enum import Enum
 from typing import Literal
 from dataclasses import dataclass, field
 from typing import Any
+from uuid import UUID
 
 class Behavior(Enum):
     DAFAULT: int = 0
@@ -98,6 +99,7 @@ class Face(DafaultElement):
     id: int
     resultId: int = field(default=None)
     raw: dict = field(default=None)
+    chainCount: int = field(default=None)
     type: str = field(default='face', init=False)
 
 
@@ -107,22 +109,26 @@ class Image(DafaultElement):
     file: str
     '''[参见napcat]推荐使用base64'''
     
-    name: str = None
+    name: str = field(default=None)
     '''[可选]'''
-    summary: str = None
+    summary: str = field(default=None)
     '''[可选]'''
     # file: Union[str, bytes]
-    sub_type: int = None
+    sub_type: int = field(default=None)
     '''[可选]'''
-    file_id: int = None
-    url: str = None
-    path: str = None
-    file_size: int = None
-    file_unique: Any = None
-    key: Any = None
+    file_id: int = field(default=None)
+    url: str = field(default=None)
+    path: str = field(default=None)
+    file_size: int = field(default=None)
+    # file_unique: Any = None
+    key: str = field(default=None, init=False)
+    emoji_id: UUID = field(default=None, init=False)
+    emoji_package_id: int = field(default=None, init=False)
     
     type: str = field(default='image', init=False)
-    
+    def __post_init__(self):
+        if self.emoji_id:
+            self.emoji_id = UUID(self.emoji_id)
     def to_dict(self) -> dict:
         return {
             'type': 'image',

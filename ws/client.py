@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:15
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-16 18:38:48
+# @LastEditTime : 2025-04-04 15:48:11
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -10,6 +10,8 @@ from typing import Optional, Callable
 import asyncio
 import websockets
 import collections  # 用于双端队列
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 import websockets.client
 
@@ -33,7 +35,8 @@ class WebSocketClient:
         max_reconnect_interval: int = 60,     # 最大重连间隔（秒）
         max_reconnect_attempts: int = 5,      # 最大重连尝试次数
         message_handler: Optional[Callable[[str], None]] = None,  # 自定义消息处理器
-        close_handler: Optional[Callable[[], None]] = None
+        close_handler: Optional[Callable[[], None]] = None,
+        loop: Optional[asyncio.AbstractEventLoop] = None,
     ):
         """
         WebSocket 客户端初始化方法。
@@ -45,6 +48,7 @@ class WebSocketClient:
         :param max_reconnect_attempts: 最大重连尝试次数,默认为 5 次
         :param message_handler: 消息处理器,可选
         :param close_handler: 额外关闭函数,可选
+        :param loop: 自定义事件循环,可选
         """
         self.uri = uri  # WebSocket 服务器地址
         self.websocket = None  # WebSocket 连接对象
@@ -56,11 +60,13 @@ class WebSocketClient:
         self.max_reconnect_interval = max_reconnect_interval  # 最大重连间隔
         self.max_reconnect_attempts = max_reconnect_attempts  # 最大重连尝试次数
         self.message_handler = message_handler  # 自定义消息处理器
-        self.close_handler = close_handler  # 额外关闭函数
         self._closed = False  # 连接是否已主动关闭
         # 使用双端队列存储消息,支持获取最新或最旧消息
         self._message_deque = collections.deque()
         self._message_available = None
+        self.loop = loop or asyncio.new_event_loop()
+        self._thread: Optional[threading.Thread] = None
+        self._executor = ThreadPoolExecutor(max_workers=1)
 
     async def connect(self):
         """
@@ -111,7 +117,14 @@ class WebSocketClient:
         """
         try:
             # 调用自定义处理器,处理接收到的消息
-            return await self.message_handler(data)
+            if asyncio.iscoroutinefunction(self.message_handler):
+                await self.message_handler(data)
+            else:
+                await self.loop.run_in_executor(
+                    self._executor,
+                    self.message_handler,
+                    data
+                )
         except Exception as e:
             _LOG.error(f"自定义处理器抛出异常: {e}")
 
@@ -167,49 +180,38 @@ class WebSocketClient:
             finally:
                 # 确保连接对象被清理
                 self.websocket = None
+        if self.loop.is_running():
+            self.loop.call_soon_threadsafe(self.loop.stop)
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=timeout)
 
     def start(self):
         """
-        启动客户端,进入事件循环并尝试连接 WebSocket 服务器。
+        启动客户端，运行在后台线程中。
         """
+        if self._thread and self._thread.is_alive():
+            _LOG.warning("客户端已在运行中")
+            return
+
+        self.running = True
+        self._thread = threading.Thread(
+            target=self._run_event_loop,
+            daemon=True,
+            name="WebSocketClientThread"
+        )
+        self._thread.start()
+
+    def _run_event_loop(self):
+        """
+        在独立线程中运行事件循环。
+        """
+        asyncio.set_event_loop(self.loop)
         try:
-            # 获取或创建事件循环
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-            
-            # 运行客户端
-            loop.run_until_complete(self._start_client())
-        
-        except KeyboardInterrupt:
-            # 处理用户中断
-            if self.close_handler:
-                try:
-                    print()
-                    self.close_handler()
-                except Exception as e:
-                    _LOG.error(f"自定义关闭函数产生错误: {e}")
-            raise  # 确保 KeyboardInterrupt 被重新抛出
-        
+            self.loop.run_until_complete(self._start_client())
         except Exception as e:
-            _LOG.error(f"客户端启动时发生错误: {e}")
-        
+            _LOG.error(f"事件循环异常终止: {e}")
         finally:
-            # 确保断开连接
-            try:
-                if loop.is_running():
-                    loop.call_soon_threadsafe(loop.stop)
-                elif not loop.is_closed():
-                    loop.run_until_complete(self.disconnect(5))
-            except NameError:
-                # 如果 loop 未定义（如初始化失败），直接运行 disconnect
-                asyncio.run(self.disconnect(5))
-            
-            # 关闭循环（如果存在）
-            if 'loop' in locals() and not loop.is_closed():
-                loop.close()
+            self._cleanup()
 
     async def _start_client(self):
         self.running = True
@@ -279,6 +281,22 @@ class WebSocketClient:
             _LOG.error(f"发送异常: {e}")
             return False
 
+    def send_sync(self, data: str, timeout: float = 5.0) -> bool:
+        """
+        同步发送数据（线程安全）。
+        """
+        if not self.running:
+            raise RuntimeError("客户端未启动")
+        future = asyncio.run_coroutine_threadsafe(
+            self.send_data(data),
+            self.loop
+        )
+        try:
+            return future.result(timeout)
+        except TimeoutError:
+            _LOG.error("发送超时")
+            return False
+
     async def recv(
         self,
         *,
@@ -319,3 +337,10 @@ class WebSocketClient:
         except Exception as e:
             _LOG.error(f"接收消息出错: {e}")
             return None
+
+    def _cleanup(self):
+        """
+        资源清理。
+        """
+        if self._executor:
+            self._executor.shutdown(wait=False)

@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 18:46:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-23 21:49:28
+# @LastEditTime : 2025-04-04 15:53:35
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -47,9 +47,9 @@ class ExamplePlugin(BasePlugin):
         with self.work_space:
             print(f"\n🔧 工作空间已切换到: {os.getcwd()}")
         
-        print("\n📝 可用方法列表:")
-        methods = [m for m in dir(self) if not m.startswith('__')]
-        print('\n'.join(visualize_tree(methods)))
+        # print("\n📝 可用方法列表:")
+        # methods = [m for m in dir(self) if not m.startswith('__')]
+        # print('\n'.join(visualize_tree(methods)))
         
         self.register_handlers()
         print('\n✅ 插件初始化完成\n' + '=' * 50)
@@ -57,7 +57,7 @@ class ExamplePlugin(BasePlugin):
     def _close_(self):
         """插件卸载时调用"""
         print('=' * 50)
-        print('【插件终止】正在卸载...')
+        print(f'[{self.name}]正在卸载...')
         print(f"├─ 最终数据状态: {self.data}")
         print(f"└─ 插件 {self.name} 已安全卸载")
         print('=' * 50)
