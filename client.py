@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-04-04 15:49:41
+# @LastEditTime : 2025-04-06 13:59:20
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -99,12 +99,13 @@ class BotClient:
             message_handler = self.on_message,
         )
 
+    def exit(self):
+        self.close()
+
     def close(self):
         LOG.info('用户主动触发关闭事件...')
         LOG.info('准备关闭所有插件...')
         self.plugin_sys.unload_all()
-        LOG.info('准备关闭ws连接...')
-        
         LOG.info('Fcatbot 关闭完成')
 
     def link(self):

@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:15
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-04-04 15:48:11
+# @LastEditTime : 2025-04-06 14:03:02
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -24,31 +24,41 @@ _LOG = get_log('WebSocketClient')
 MessageHandler = Callable[[str], bool]
 
 class WebSocketClient:
-    """
-    一个简单的Ws客户端。
+    """一个简单的Ws客户端。
+
+    Attributes:
+        uri (str): WebSocket 服务器地址
+        websocket: WebSocket 连接对象
+        headers (dict): 请求头
+        running (bool): 客户端是否处于运行状态
+        reconnect_attempt (int): 当前重连尝试次数
+        initial_reconnect_interval (int): 初始重连间隔
+        max_reconnect_interval (int): 最大重连间隔
+        max_reconnect_attempts (int): 最大重连尝试次数
+        message_handler (Callable): 自定义消息处理器
     """
     def __init__(
         self,
         uri: str,
         headers: dict[str, str] = {},
-        initial_reconnect_interval: int = 5,  # 初始重连间隔（秒）
-        max_reconnect_interval: int = 60,     # 最大重连间隔（秒）
-        max_reconnect_attempts: int = 5,      # 最大重连尝试次数
-        message_handler: Optional[Callable[[str], None]] = None,  # 自定义消息处理器
+        initial_reconnect_interval: int = 5,  
+        max_reconnect_interval: int = 60,     
+        max_reconnect_attempts: int = 5,      
+        message_handler: Optional[Callable[[str], None]] = None,  
         close_handler: Optional[Callable[[], None]] = None,
         loop: Optional[asyncio.AbstractEventLoop] = None,
     ):
-        """
-        WebSocket 客户端初始化方法。
-        
-        :param uri: WebSocket 服务器地址
-        :param headers: 请求头
-        :param initial_reconnect_interval: 初始重连间隔时间,默认为 5 秒
-        :param max_reconnect_interval: 最大重连间隔时间,默认为 60 秒
-        :param max_reconnect_attempts: 最大重连尝试次数,默认为 5 次
-        :param message_handler: 消息处理器,可选
-        :param close_handler: 额外关闭函数,可选
-        :param loop: 自定义事件循环,可选
+        """初始化 WebSocket 客户端。
+
+        Args:
+            uri: WebSocket 服务器地址
+            headers: 请求头
+            initial_reconnect_interval: 初始重连间隔时间，默认为 5 秒
+            max_reconnect_interval: 最大重连间隔时间，默认为 60 秒
+            max_reconnect_attempts: 最大重连尝试次数，默认为 5 次
+            message_handler: 消息处理器，可选
+            close_handler: 额外关闭函数，可选
+            loop: 自定义事件循环，可选
         """
         self.uri = uri  # WebSocket 服务器地址
         self.websocket = None  # WebSocket 连接对象
@@ -69,8 +79,10 @@ class WebSocketClient:
         self._executor = ThreadPoolExecutor(max_workers=1)
 
     async def connect(self):
-        """
-        建立 WebSocket 连接。
+        """建立 WebSocket 连接。
+
+        Returns:
+            WebSocket: 连接成功返回 websocket 对象，失败返回 None
         """
         try:
             _LOG.info("尝试连接 WebSocket 服务器...")
@@ -92,9 +104,7 @@ class WebSocketClient:
             return None
 
     async def _start_reconnect(self):
-        """
-        启动自动重连逻辑。
-        """
+        """启动自动重连逻辑。"""
         while self.running and not self._closed:
             await self._backoff_reconnect()
             await self.connect()
@@ -110,10 +120,10 @@ class WebSocketClient:
                 asyncio.create_task(self._invoke_handler(msg))
 
     async def _invoke_handler(self, data: str):
-        """
-        调用用户提供的自定义消息处理器。
+        """调用用户提供的自定义消息处理器。
 
-        :param data: 接收到的消息内容
+        Args:
+            data: 接收到的消息内容
         """
         try:
             # 调用自定义处理器,处理接收到的消息
@@ -129,18 +139,19 @@ class WebSocketClient:
             _LOG.error(f"自定义处理器抛出异常: {e}")
 
     def _default_message_handler(self, data: str):
-        """
-        默认的消息处理器。如果用户没有提供自定义处理器,将使用此默认处理器。
+        """默认的消息处理器。
 
-        :param data: 接收到的消息内容
+        当用户没有提供自定义处理器时，将使用此默认处理器。
+
+        Args:
+            data: 接收到的消息内容
         """
         _LOG.info(data)  # 打印消息内容
 
     async def _backoff_reconnect(self):
-        """
-        指数退避重连策略。
+        """指数退避重连策略。
 
-        根据当前重连尝试次数,计算重连间隔时间,并在达到最大尝试次数时停止重连。
+        根据当前重连尝试次数，计算重连间隔时间，并在达到最大尝试次数时停止重连。
         """
         self.reconnect_attempt += 1  # 增加重连尝试次数
         if self.reconnect_attempt > self.max_reconnect_attempts:
@@ -162,8 +173,10 @@ class WebSocketClient:
         await asyncio.sleep(backoff)  # 等待一段时间后重连
 
     async def disconnect(self, timeout = 2):
-        """
-        断开与 WebSocket 服务器的连接。
+        """断开与 WebSocket 服务器的连接。
+
+        Args:
+            timeout: 关闭连接的超时时间，默认 2 秒
         """
         self.running = False  # 设置运行状态为 False
         if self.websocket:
@@ -186,9 +199,7 @@ class WebSocketClient:
             self._thread.join(timeout=timeout)
 
     def start(self):
-        """
-        启动客户端，运行在后台线程中。
-        """
+        """启动客户端，运行在后台线程中。"""
         if self._thread and self._thread.is_alive():
             _LOG.warning("客户端已在运行中")
             return
@@ -202,9 +213,7 @@ class WebSocketClient:
         self._thread.start()
 
     def _run_event_loop(self):
-        """
-        在独立线程中运行事件循环。
-        """
+        """在独立线程中运行事件循环。"""
         asyncio.set_event_loop(self.loop)
         try:
             self.loop.run_until_complete(self._start_client())
@@ -231,9 +240,7 @@ class WebSocketClient:
         await self.disconnect()
 
     def __del__(self):
-        """
-        析构方法,在对象销毁时关闭 WebSocket 连接。
-        """
+        """析构方法,在对象销毁时关闭 WebSocket 连接。"""
         # 避免使用 asyncio.run,直接调用同步关闭方法
         if self.websocket and not self.websocket.closed:
             # 使用低级别的低层次方法关闭连接
@@ -253,13 +260,14 @@ class WebSocketClient:
         data: str, 
         wait: bool = True, 
     ) -> Optional[str]:
-        """
-        发送数据并可选等待响应。
+        """发送数据并可选等待响应。
 
-        :param data: 要发送的数据。
-        :param wait: 是否等待响应，默认是。
-        :param response_prefer: 响应获取方式，默认'oldest'。
-        :return: 响应内容或发送状态。
+        Args:
+            data: 要发送的数据
+            wait: 是否等待响应，默认是
+
+        Returns:
+            str | bool: 若等待响应则返回响应内容，否则返回发送状态
         """
         if not self.websocket:
             _LOG.error("未连接，发送失败！")
@@ -282,8 +290,17 @@ class WebSocketClient:
             return False
 
     def send_sync(self, data: str, timeout: float = 5.0) -> bool:
-        """
-        同步发送数据（线程安全）。
+        """同步发送数据（线程安全）。
+
+        Args:
+            data: 要发送的数据
+            timeout: 超时时间，默认 5 秒
+
+        Returns:
+            bool: 发送是否成功
+
+        Raises:
+            RuntimeError: 客户端未启动时抛出
         """
         if not self.running:
             raise RuntimeError("客户端未启动")
@@ -303,12 +320,14 @@ class WebSocketClient:
         prefer: str = 'latest',
         wait: bool = False
     ) -> Optional[str]:
-        """
-        接收 WebSocket 消息。可选最新/最旧，支持等待新消息。
+        """接收 WebSocket 消息。
 
-        :param prefer: 'latest'（默认）取最新，'oldest'取最旧。
-        :param wait: 无消息时是否阻塞等待，默认否。
-        :return: 消息内容，无消息且不等待时返回None。
+        Args:
+            prefer: 消息获取方式，'latest'（默认）取最新，'oldest'取最旧
+            wait: 无消息时是否阻塞等待，默认否
+
+        Returns:
+            str | None: 消息内容，无消息且不等待时返回None
         """
         try:
             if not wait and self._message_deque:
@@ -339,8 +358,6 @@ class WebSocketClient:
             return None
 
     def _cleanup(self):
-        """
-        资源清理。
-        """
+        """资源清理。"""
         if self._executor:
             self._executor.shutdown(wait=False)
