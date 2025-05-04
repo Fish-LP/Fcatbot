@@ -1,363 +1,366 @@
-# -------------------------
-# @Author       : Fish-LP fish.zh@outlook.com
-# @Date         : 2025-02-12 13:59:15
-# @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-04-06 14:03:02
-# @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
-# @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
-# -------------------------
-from typing import Optional, Callable
+from typing import Optional, Callable, Any
 import asyncio
 import websockets
-import collections  # 用于双端队列
+import collections
 import threading
-from concurrent.futures import ThreadPoolExecutor
-
-import websockets.client
-
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from ..utils import get_log
 
-# 日志工具
 _LOG = get_log('WebSocketClient')
 
-# 自定义处理器类型: 接受一个字符串参数、返回 None
-MessageHandler = Callable[[str], bool]
+MessageHandler = Callable[[str], None]
 
 class WebSocketClient:
-    """一个简单的Ws客户端。
+    """
+    功能丰富的 WebSocket 客户端，支持自动重连、消息队列和线程安全操作。
+
+    该客户端旨在为 WebSocket 通信提供一个健壮、灵活且易于使用的接口。它通过异步事件循环和线程池实现高性能和线程安全的消息处理，同时具备自动重连机制以增强连接的可靠性。
 
     Attributes:
-        uri (str): WebSocket 服务器地址
-        websocket: WebSocket 连接对象
-        headers (dict): 请求头
-        running (bool): 客户端是否处于运行状态
-        reconnect_attempt (int): 当前重连尝试次数
-        initial_reconnect_interval (int): 初始重连间隔
-        max_reconnect_interval (int): 最大重连间隔
-        max_reconnect_attempts (int): 最大重连尝试次数
-        message_handler (Callable): 自定义消息处理器
+        uri (str): WebSocket 服务器的 URI。
+        headers (dict[str, str]): 发送连接请求时附加的 HTTP 头。
+        initial_reconnect_interval (int): 初始重连间隔时间（秒）。
+        max_reconnect_interval (int): 最大重连间隔时间（秒）。
+        max_reconnect_attempts (int): 最大重连尝试次数。
+        message_handler (Optional[MessageHandler]): 用户定义的消息处理器回调函数。
+        close_handler (Optional[Callable[[], None]]): 用户定义的连接关闭回调函数。
+        loop (Optional[asyncio.AbstractEventLoop]): 事件循环实例。
+        websocket (Optional[websockets.WebSocketClientProtocol]): WebSocket 连接协议对象。
+        running (bool): 客户端是否处于运行状态。
+        _closed (bool): 客户端是否已关闭。
+        reconnect_attempt (int): 当前重连尝试次数。
+        _connect_task (Optional[asyncio.Task]): 连接任务。
+        _message_deque (collections.deque): 消息队列。
+        _message_available (threading.Event): 消息可用事件。
+        _deque_lock (threading.Lock): 消息队列锁。
+        _thread (Optional[threading.Thread]): 事件循环线程。
+        _executor (ThreadPoolExecutor): 线程池执行器。
+        _receive_task (Optional[asyncio.Task]): 消息接收任务。
+
+    Methods:
+        start(): 启动客户端后台线程。
+        send_sync(data, timeout): 同步发送数据。
+        send_async(data, wait): 异步发送数据。
+        recv(prefer, wait): 接收消息。
+        disconnect(timeout): 同步断开连接。
+        disconnect_async(timeout): 异步断开连接。
+
+    Example:
+        >>> client = WebSocketClient("ws://example.com/socket")
+        >>> client.start()
+        >>> client.send_sync("Hello, server!")
+        >>> message = client.recv()
+        >>> print(message)
+        >>> client.disconnect()
+
+    Note:
+        该客户端假设 WebSocket 服务器支持标准的 WebSocket 协议。自动重连机制会在达到最大重连尝试次数后停止尝试连接。
+
+    See Also:
+        websockets: WebSocket 客户端和服务器库。
     """
+
     def __init__(
-        self,
-        uri: str,
-        headers: dict[str, str] = {},
-        initial_reconnect_interval: int = 5,  
-        max_reconnect_interval: int = 60,     
-        max_reconnect_attempts: int = 5,      
-        message_handler: Optional[Callable[[str], None]] = None,  
-        close_handler: Optional[Callable[[], None]] = None,
-        loop: Optional[asyncio.AbstractEventLoop] = None,
-    ):
-        """初始化 WebSocket 客户端。
+            self,
+            uri: str,
+            headers: dict[str, str] = {},
+            initial_reconnect_interval: int = 5,
+            max_reconnect_interval: int = 60,
+            max_reconnect_attempts: int = 5,
+            message_handler: Optional[MessageHandler] = None,
+            close_handler: Optional[Callable[[], None]] = None,
+            loop: Optional[asyncio.AbstractEventLoop] = None,
+        ):
+        """
+        初始化 WebSocket 客户端。
 
         Args:
-            uri: WebSocket 服务器地址
-            headers: 请求头
-            initial_reconnect_interval: 初始重连间隔时间，默认为 5 秒
-            max_reconnect_interval: 最大重连间隔时间，默认为 60 秒
-            max_reconnect_attempts: 最大重连尝试次数，默认为 5 次
-            message_handler: 消息处理器，可选
-            close_handler: 额外关闭函数，可选
-            loop: 自定义事件循环，可选
+                uri (str): WebSocket 服务器的 URI。
+                headers (dict[str, str]): 发送连接请求时附加的 HTTP 头。
+                initial_reconnect_interval (int): 初始重连间隔时间（秒）。默认为 5 秒。
+                max_reconnect_interval (int): 最大重连间隔时间（秒）。默认为 60 秒。
+                max_reconnect_attempts (int): 最大重连尝试次数。默认为 5 次。
+                message_handler (Optional[MessageHandler]): 用户定义的消息处理器回调函数。
+                close_handler (Optional[Callable[[], None]]): 用户定义的连接关闭回调函数。
+                loop (Optional[asyncio.AbstractEventLoop]): 事件循环实例。
         """
-        self.uri = uri  # WebSocket 服务器地址
-        self.websocket = None  # WebSocket 连接对象
-        self._connect_task = None  # 用于存储连接任务
-        self.headers = headers  # 请求头
-        self.running = False  # 客户端是否处于运行状态
-        self.reconnect_attempt = 0  # 当前重连尝试次数
-        self.initial_reconnect_interval = initial_reconnect_interval  # 初始重连间隔
-        self.max_reconnect_interval = max_reconnect_interval  # 最大重连间隔
-        self.max_reconnect_attempts = max_reconnect_attempts  # 最大重连尝试次数
-        self.message_handler = message_handler  # 自定义消息处理器
-        self._closed = False  # 连接是否已主动关闭
-        # 使用双端队列存储消息,支持获取最新或最旧消息
-        self._message_deque = collections.deque()
-        self._message_available = None
+        self.uri = uri
+        self.headers = headers
+        self.initial_reconnect_interval = initial_reconnect_interval
+        self.max_reconnect_interval = max_reconnect_interval
+        self.max_reconnect_attempts = max_reconnect_attempts
+        self.message_handler = message_handler or None
+        self.close_handler = close_handler
         self.loop = loop or asyncio.new_event_loop()
+        self.websocket: Optional[websockets.WebSocketClientProtocol] = None
+        self.running = False
+        self._closed = False
+        self.reconnect_attempt = 0
+        self._connect_task: Optional[asyncio.Task] = None
+        self._message_deque = collections.deque(maxlen=64)
+        self._message_available = threading.Event()
+        self._deque_lock = threading.Lock()
         self._thread: Optional[threading.Thread] = None
         self._executor = ThreadPoolExecutor(max_workers=1)
+        self._receive_task: Optional[asyncio.Task] = None
 
-    async def connect(self):
-        """建立 WebSocket 连接。
-
-        Returns:
-            WebSocket: 连接成功返回 websocket 对象，失败返回 None
+    def _default_message_handler(self, message: str) -> None:
         """
-        try:
-            _LOG.info("尝试连接 WebSocket 服务器...")
-            self.websocket = await websockets.client.connect(
-                self.uri,
-                logger=_LOG,
-                extra_headers=self.headers
+        默认消息处理器，打印日志。
+
+        Args:
+                message (str): 接收到的消息内容。
+        """
+        _LOG.debug(f"接收消息: {message}")
+
+    def start(self) -> None:
+        """
+        启动客户端后台线程。
+
+        该方法会创建一个新的线程来运行事件循环，并在事件循环中初始化 WebSocket 连接。
+        """
+        if self._thread is None or not self._thread.is_alive():
+            self._thread = threading.Thread(
+                target=self._run_event_loop, 
+                daemon=True,
+                name="WebSocketClientThread"
             )
-            _LOG.info("连接成功！")
-            self._closed = False
-            if self._message_available is None:
-                # 用于通知 recv 方法有新消息到来
-                self._message_available = asyncio.Event()
-            return self.websocket
+            self._thread.start()
+            # 在事件循环中初始化连接
+            asyncio.run_coroutine_threadsafe(self.connect_async(), self.loop)
+
+    def _run_event_loop(self) -> None:
+        """
+        运行事件循环的线程目标函数。
+
+        该方法设置当前线程的事件循环，并运行事件循环直到停止。
+        """
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_forever()
+
+    async def connect_async(self) -> None:
+        """
+        异步建立 WebSocket 连接并启动消息接收循环。
+
+        该方法尝试连接到 WebSocket 服务器，并在成功连接后启动消息接收任务。
+        如果连接失败，会触发自动重连机制。
+        """
+        if self._closed or self.running:
+            return
+        try:
+            self.websocket = await websockets.connect(
+                self.uri,
+                extra_headers=self.headers,
+                ping_interval=None  # 禁用自动 ping/pong
+            )
+            self.running = True
+            self.reconnect_attempt = 0
+            _LOG.info(f"正在连接到: {self.uri}")
+            # 启动消息接收任务
+            self._receive_task = asyncio.create_task(self._receive_messages())
         except Exception as e:
             _LOG.error(f"连接失败: {e}")
-            if not self._closed:
-                await self._start_reconnect()
-            return None
+            await self._handle_disconnect()
 
-    async def _start_reconnect(self):
-        """启动自动重连逻辑。"""
-        while self.running and not self._closed:
-            await self._backoff_reconnect()
-            await self.connect()
-
-    async def _handle_websocket(self):
-        """处理接收消息，自动存入队列并触发事件。"""
-        async for msg in self.websocket:
-            _LOG.debug(f"收到消息: {msg}")
-            self._message_deque.append(msg)
-            self._message_available.set()  # 触发有新消息
-            # 若有自定义处理器，异步调用
-            if self.message_handler:
-                asyncio.create_task(self._invoke_handler(msg))
-
-    async def _invoke_handler(self, data: str):
-        """调用用户提供的自定义消息处理器。
-
-        Args:
-            data: 接收到的消息内容
+    async def _receive_messages(self) -> None:
         """
-        try:
-            # 调用自定义处理器,处理接收到的消息
-            if asyncio.iscoroutinefunction(self.message_handler):
-                await self.message_handler(data)
-            else:
-                await self.loop.run_in_executor(
-                    self._executor,
-                    self.message_handler,
-                    data
-                )
-        except Exception as e:
-            _LOG.error(f"自定义处理器抛出异常: {e}")
+        持续接收消息并存储到队列。
 
-    def _default_message_handler(self, data: str):
-        """默认的消息处理器。
-
-        当用户没有提供自定义处理器时，将使用此默认处理器。
-
-        Args:
-            data: 接收到的消息内容
+        该方法从 WebSocket 连接中接收消息，并将其存储到消息队列中。
+        同时，会调用用户定义的消息处理器回调函数处理接收到的消息。
+        如果连接关闭或发生错误，会停止接收消息并触发自动重连机制。
         """
-        _LOG.info(data)  # 打印消息内容
-
-    async def _backoff_reconnect(self):
-        """指数退避重连策略。
-
-        根据当前重连尝试次数，计算重连间隔时间，并在达到最大尝试次数时停止重连。
-        """
-        self.reconnect_attempt += 1  # 增加重连尝试次数
-        if self.reconnect_attempt > self.max_reconnect_attempts:
-            _LOG.error(f"达到最大重连次数 {self.reconnect_attempt},停止重连！")
-            self.running = False  # 停止运行
-            return
-
-        # 计算当前重连间隔时间,使用指数退避算法
-        backoff = min(
-            self.initial_reconnect_interval * (2 ** self.reconnect_attempt),
-            self.max_reconnect_interval
-        )
-        backoff = max(backoff, self.initial_reconnect_interval)
-
-        _LOG.info(
-            f"重连尝试 {self.reconnect_attempt}/{self.max_reconnect_attempts},"
-            f"等待 {backoff} 秒后重连..."
-        )
-        await asyncio.sleep(backoff)  # 等待一段时间后重连
-
-    async def disconnect(self, timeout = 2):
-        """断开与 WebSocket 服务器的连接。
-
-        Args:
-            timeout: 关闭连接的超时时间，默认 2 秒
-        """
-        self.running = False  # 设置运行状态为 False
-        if self.websocket:
-            # 创建关闭连接的任务
-            close_task = asyncio.create_task(self.websocket.close(code=1001))
+        while self.running and self.websocket is not None:
             try:
-                # 等待最多 2 秒
-                await asyncio.wait_for(close_task, timeout=timeout)
-                _LOG.info("WebSocket 连接已关闭")
-            except asyncio.TimeoutError:
-                _LOG.warning("关闭 WebSocket 连接超时！")
+                message = await self.websocket.recv()
+                self._add_message(message)
+            except websockets.exceptions.ConnectionClosed as e:
+                _LOG.error(f"连接关闭: {e}")
+                await self._handle_disconnect()
+                break
             except Exception as e:
-                _LOG.error(f"关闭 WebSocket 连接时发生异常: {e}")
-            finally:
-                # 确保连接对象被清理
-                self.websocket = None
+                _LOG.error(f"接收时出现错误: {e}")
+                await self._handle_disconnect()
+                break
+            if self.message_handler:
+                try:
+                    # 调用用户定义的消息处理器
+                    if asyncio.iscoroutinefunction(self.message_handler):
+                        # 如果 message_handler 是异步函数
+                        await self.message_handler(message)
+                    else:
+                        # 如果 message_handler 是同步函数
+                        self.message_handler(message)
+                except Exception as e:
+                    _LOG.error(f"自定义处理器错误: {e}")
+                    continue
+
+    def _add_message(self, message: str) -> None:
+        """
+        线程安全地将消息添加到队列并触发事件。
+
+        Args:
+                message (str): 要添加的消息内容。
+        """
+        with self._deque_lock:
+            self._message_deque.append(message)
+        self._message_available.set()
+
+    async def _handle_disconnect(self) -> None:
+        """
+        处理连接断开并触发自动重连。
+
+        该方法关闭现有连接，，并根据重连策略尝试重新连接。
+        如果达到最大重连尝试次数，会停止重连执行用户定义的关闭回调函数并关闭客户端。
+        """
+
+        if self._closed:
+            return
+        self.running = False
+        # 关闭现有连接
+        if self.websocket is not None:
+            await self.websocket.close()
+            self.websocket = None
+        # 自动重连逻辑
+        if self.reconnect_attempt < self.max_reconnect_attempts:
+            self.reconnect_attempt += 1
+            delay = min(
+                self.initial_reconnect_interval * (2 ** (self.reconnect_attempt - 1)),
+                self.max_reconnect_interval
+            )
+            _LOG.info(f"在{delay}s内重新连接({self.reconnect_attempt}/{self.max_reconnect_attempts})")
+            await asyncio.sleep(delay)
+            await self.connect_async()
+        else:
+            _LOG.error("已达到最大重新连接尝试次数")
+            # 执行用户定义的关闭回调
+            if self.close_handler:
+                self.close_handler()
+            self._closed = True
+
+    async def send_async(self, data: Any, wait: bool = False) -> None:
+        """
+        异步发送数据。
+
+        Args:
+                data (Any): 要发送的数据内容。
+                wait (bool): 是否等待发送完成。默认为 False。
+
+        Raises:
+                ConnectionError: 如果客户端未连接到 WebSocket 服务器。
+      """
+        if not self.running or self.websocket is None:
+            raise ConnectionError("Not connected to WebSocket server")
+        await self.websocket.send(data)
+        if wait:
+            return await self.websocket.recv()
+
+    def send_sync(self, data: Any, timeout: Optional[float] = None) -> None:
+        """
+        同步发送数据（线程安全）。
+
+        Args:
+                data (Any): 要发送的数据内容。
+                timeout (Optional[float]): 发送操作的超时时间（秒）。默认为 None。
+
+        Raises:
+                TimeoutError: 如果发送操作超时。
+        """
+        future = asyncio.run_coroutine_threadsafe(self.send_async(data, wait=True), self.loop)
+        try:
+            result = future.result(timeout=timeout)
+            return result
+        except FutureTimeoutError as e:
+            raise TimeoutError("Send operation timed out") from e
+
+    def recv(self, prefer: str = 'oldest', wait: bool = True) -> Optional[str]:
+        """
+        接收消息。
+
+        Args:
+                prefer (str): 消息选择策略，'oldest' 返回最早的消息，'newest' 返回最新消息。默认为 'oldest'。
+                wait (bool): 如果队列为空，是否阻塞等待。默认为 True。
+
+        Returns:
+                Optional[str]: 接收到的消息内容，如果非阻塞且队列为空则返回 None。
+        """
+        while True:
+            with self._deque_lock:
+                if prefer == 'oldest' and self._message_deque:
+                    return self._message_deque.popleft()
+                elif prefer == 'newest' and self._message_deque:
+                    return self._message_deque.pop()
+            if not wait:
+                return None
+            # 等待消息到达事件
+            self._message_available.wait()
+            self._message_available.clear()
+
+    async def disconnect_async(self, timeout: Optional[float] = None) -> None:
+        """
+        异步断开连接。
+
+        Args:
+                timeout (Optional[float]): 断开连接的超时时间（秒）。默认为 None。
+        """
+        self._closed = True
+        self.running = False
+        if self.websocket is not None:
+            await self.websocket.close(timeout=timeout)
+            self.websocket = None
+        # 取消接收任务
+        if self._receive_task and not self._receive_task.done():
+            self._receive_task.cancel()
+            try:
+                await self._receive_task
+            except asyncio.CancelledError:
+                pass
+
+    def disconnect(self, timeout: Optional[float] = None) -> None:
+        """
+        同步断开连接。
+
+        Args:
+                timeout (Optional[float]): 断开连接的超时时间（秒）。默认为 None。
+        """
+        future = asyncio.run_coroutine_threadsafe(
+            self.disconnect_async(timeout), 
+            self.loop
+        )
+        future.result()
+
+    def _cleanup(self) -> None:
+        """
+        清理资源。
+
+        该方法断开连接，停止事件循环，关闭线程池执行器，并等待事件循环线程退出。
+        """
+        self.disconnect()
         if self.loop.is_running():
             self.loop.call_soon_threadsafe(self.loop.stop)
+        self._executor.shutdown(wait=False)
         if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=timeout)
+            self._thread.join(timeout=1)
 
-    def start(self):
-        """启动客户端，运行在后台线程中。"""
-        if self._thread and self._thread.is_alive():
-            _LOG.warning("客户端已在运行中")
-            return
-
-        self.running = True
-        self._thread = threading.Thread(
-            target=self._run_event_loop,
-            daemon=True,
-            name="WebSocketClientThread"
-        )
-        self._thread.start()
-
-    def _run_event_loop(self):
-        """在独立线程中运行事件循环。"""
-        asyncio.set_event_loop(self.loop)
-        try:
-            self.loop.run_until_complete(self._start_client())
-        except Exception as e:
-            _LOG.error(f"事件循环异常终止: {e}")
-        finally:
-            self._cleanup()
-
-    async def _start_client(self):
-        self.running = True
-        # 建立连接
-        while self.running:
-            connection = await self.connect()
-            if connection is not None:
-                # 连接成功后,处理消息
-                await self._handle_websocket()
+    def __del__(self):
+        """
+        析构函数，清理资源。
+        """
+        self._cleanup()
 
     async def __aenter__(self):
-        if await self.connect():
-            asyncio.create_task(self._start_client())
+        """
+        异步上下文管理器的进入方法。
+
+        该方法建立 WebSocket 连接并返回客户端实例。
+        """
+        await self.connect_async()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.disconnect()
-
-    def __del__(self):
-        """析构方法,在对象销毁时关闭 WebSocket 连接。"""
-        # 避免使用 asyncio.run,直接调用同步关闭方法
-        if self.websocket and not self.websocket.closed:
-            # 使用低级别的低层次方法关闭连接
-            # 注意: 这可能无法保证完全关闭
-            self.websocket._closing_handshake = True
-            self.websocket._close_code = 1001  # 表示客户端主动关闭
-
-            # 或者直接调用 close 方法而不关心结果
-            # 注: 这可能引发警告,但可以避免异步调用问题
-            try:
-                self.websocket.transport._sock.close()
-            except:
-                pass
-
-    async def send_data(
-        self, 
-        data: str, 
-        wait: bool = True, 
-    ) -> Optional[str]:
-        """发送数据并可选等待响应。
-
-        Args:
-            data: 要发送的数据
-            wait: 是否等待响应，默认是
-
-        Returns:
-            str | bool: 若等待响应则返回响应内容，否则返回发送状态
         """
-        if not self.websocket:
-            _LOG.error("未连接，发送失败！")
-            return False
+        异步上下文管理器的退出方法。
 
-        try:
-            await self.websocket.send(data)
-            _LOG.debug(f"发送成功: {data}")
-            
-            if wait:
-                response = await self.recv(wait=True)
-                _LOG.debug(f"收到响应: {response}")
-                return response
-            return True
-        except websockets.ConnectionClosed:
-            _LOG.error("连接已关闭，发送失败！")
-            return False
-        except Exception as e:
-            _LOG.error(f"发送异常: {e}")
-            return False
-
-    def send_sync(self, data: str, timeout: float = 5.0) -> bool:
-        """同步发送数据（线程安全）。
-
-        Args:
-            data: 要发送的数据
-            timeout: 超时时间，默认 5 秒
-
-        Returns:
-            bool: 发送是否成功
-
-        Raises:
-            RuntimeError: 客户端未启动时抛出
+        该方法断开 WebSocket 连接。
         """
-        if not self.running:
-            raise RuntimeError("客户端未启动")
-        future = asyncio.run_coroutine_threadsafe(
-            self.send_data(data),
-            self.loop
-        )
-        try:
-            return future.result(timeout)
-        except TimeoutError:
-            _LOG.error("发送超时")
-            return False
-
-    async def recv(
-        self,
-        *,
-        prefer: str = 'latest',
-        wait: bool = False
-    ) -> Optional[str]:
-        """接收 WebSocket 消息。
-
-        Args:
-            prefer: 消息获取方式，'latest'（默认）取最新，'oldest'取最旧
-            wait: 无消息时是否阻塞等待，默认否
-
-        Returns:
-            str | None: 消息内容，无消息且不等待时返回None
-        """
-        try:
-            if not wait and self._message_deque:
-                if len(self._message_deque) > 64:
-                    self._message_deque.popleft()
-                # 更新事件状态
-                self._message_available.clear()
-                message = None
-                # 根据prefer选择消息
-                if prefer in ['latest', 'new']:
-                    message = self._message_deque.pop()
-                elif prefer in ['oldest', 'old']:
-                    message = self._message_deque.popleft()
-                else:
-                    _LOG.warning(f"无效prefer参数'{prefer}'，使用默认'latest'")
-                    message = self._message_deque.pop()
-
-                return message
-            else:
-                if not wait:
-                    return None
-                # 等待新消息
-                self._message_available.clear()
-                await self._message_available.wait()
-                return self._message_deque.pop()
-        except Exception as e:
-            _LOG.error(f"接收消息出错: {e}")
-            return None
-
-    def _cleanup(self):
-        """资源清理。"""
-        if self._executor:
-            self._executor.shutdown(wait=False)
+        await self.disconnect_async()

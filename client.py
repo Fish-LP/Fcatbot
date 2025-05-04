@@ -2,8 +2,8 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-04-06 13:59:20
-# @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
+# @LastEditTime : 2025-05-04 22:12:49
+# @Description  : 喵喵喵, 超多导入(超导)
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 import os
@@ -22,20 +22,14 @@ except Exception:
     readline = None
 import asyncio
 import json
-import inspect
-import ast
+import time
 
 from typing import Any, List
 
 from .ws import WebSocketHandler
 
 from .utils import get_log
-from .utils import Color
 from .debugger import start_debug_mode
-
-from Fcatbot.data_models.message.base_message import Sender
-from Fcatbot.data_models.message.message_chain import MessageChain
-from Fcatbot.utils import visualize_tree
 
 from .data_models import GroupMessage
 from .data_models import PrivateMessage
@@ -135,7 +129,7 @@ class BotClient:
             try:
                 self.ws.start()  # 启动 WebSocket 连接
                 while True:
-                    pass
+                    time.sleep(0)
             except KeyboardInterrupt:
                 print()
                 self.close()
@@ -292,3 +286,5 @@ class BotClient:
                 await self.event_bus.publish_async(Event(OFFICIAL_HEARTBEAT_EVENT, message))
         else:
             _LOG.error("这是一个错误,请反馈给开发者\n" + str(msg))
+            return False
+        return True # 成功处理

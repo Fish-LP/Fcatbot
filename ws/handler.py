@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:27
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-22 21:20:25
+# @LastEditTime : 2025-05-04 21:27:25
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -91,7 +91,7 @@ class WebSocketHandler(WebSocketClient, Apis):
         if self.request_interceptor is not None:
             return await self.request_interceptor(action, param or params)
 
-        re = await self.send_data(json.dumps(data), wait=wait)
+        re = await self.send_async(json.dumps(data), wait=wait)
         if not wait:
             return None
 

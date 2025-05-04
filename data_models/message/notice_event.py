@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
+import time
 from typing import Literal, Dict
+from .base_message import BaseMessage
 
 @dataclass(frozen=True)
 class NoticeEvent:
@@ -91,13 +93,17 @@ class GroupRecall(NoticeEvent):
     notice_type: Literal['group_recall'] = field(default='group_recall')
     '''通知类型'''
     group_id: int = field(default=None)
-    '''群号'''
+    '''收到消息的群聊ID'''
     user_id: int = field(default=None)
     '''消息发送者QQ号'''
     operator_id: int = field(default=None)
     '''操作者QQ号'''
     message_id: int = field(default=None)
     '''被撤回的消息ID'''
+    time: int = field(default=None)
+    '''当前时间'''
+    self_id: int = field(default=None)
+    '''接收者ID'''
 
 @dataclass(frozen=True)
 class FriendRecall(NoticeEvent):
