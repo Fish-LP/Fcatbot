@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-04-04 16:06:25
+# @LastEditTime : 2025-05-05 15:24:47
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -121,9 +121,9 @@ class Image(DafaultElement):
     path: str = field(default=None)
     file_size: int = field(default=None)
     # file_unique: Any = None
-    key: str = field(default=None, init=False)
-    emoji_id: UUID = field(default=None, init=False)
-    emoji_package_id: int = field(default=None, init=False)
+    key: str = field(default=None, init=True)
+    emoji_id: UUID = field(default=None, init=True)
+    emoji_package_id: int = field(default=None, init=True)
     
     type: str = field(default='image', init=False)
     def __post_init__(self):
