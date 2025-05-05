@@ -1,3 +1,11 @@
+# -------------------------
+# @Author       : Fish-LP fish.zh@outlook.com
+# @Date         : 2025-05-05 14:34:56
+# @LastEditors  : Fish-LP fish.zh@outlook.com
+# @LastEditTime : 2025-05-05 15:34:04
+# @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
+# @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
+# -------------------------
 import re
 from abc import ABC
 from typing import List, Tuple, Union, Optional

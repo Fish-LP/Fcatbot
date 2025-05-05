@@ -1,3 +1,11 @@
+# -------------------------
+# @Author       : Fish-LP fish.zh@outlook.com
+# @Date         : 2025-03-21 18:06:59
+# @LastEditors  : Fish-LP fish.zh@outlook.com
+# @LastEditTime : 2025-05-05 15:33:46
+# @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
+# @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
+# -------------------------
 from collections import defaultdict
 from permission_tree import PermissionTree
 
