@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 18:38:11
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-30 12:22:20
+# @LastEditTime : 2025-05-05 15:13:59
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -20,7 +20,7 @@ from ..config import (
     OFFICIAL_PRIVATE_COMMAND_EVENT,
 )
 from ..data_models.message import BaseMessage
-from ..rbac_manager.RBAC_manager import RBACManager
+# from ..rbac_manager.RBAC_manager import PermissionManager
 
 class CompatibleEnrollment:
     # 事件类型与处理函数的映射
@@ -164,55 +164,3 @@ class CompatibleEnrollment:
     friend_request = _EventDecorator(OFFICIAL_FRIEND_REQUEST_EVENT)      # 好友请求事件装饰器
     group_request = _EventDecorator(OFFICIAL_GROUP_REQUEST_EVENT)        # 群请求事件装饰器
     trigger = _TriggerDecorator                                          # 触发器装饰器
-
-class PermissionTool:
-    # RBAC管理器实例
-    _rbac_manager = None
-
-    def __init__(self):
-        raise ValueError("不需要实例化该类")
-
-    @classmethod
-    def init_rbac(cls, case_sensitive: bool = True, default_role: str = None):
-        """初始化RBAC管理器"""
-        if cls._rbac_manager is None:
-            cls._rbac_manager = RBACManager(case_sensitive, default_role)
-
-    @classmethod
-    def get_rbac(cls) -> RBACManager:
-        """获取RBAC管理器实例"""
-        if cls._rbac_manager is None:
-            cls.init_rbac()
-        return cls._rbac_manager
-
-    @classmethod
-    def permission(cls, permission_path: str):
-        """
-        权限检查装饰器，使用RBAC系统
-        
-        Args:
-            permission_path: RBAC权限路径
-        """
-        def decorator(func):
-            @wraps(func)
-            def wrapper(*args, **kwargs):
-                # 获取事件对象
-                event: Union[Event,None] = args[-1] if isinstance(args[-1], Event) else None
-                if not event:
-                    return func(*args, **kwargs)
-                
-                # 获取发送者ID
-                sender_id = str(event.data.sender.id) if hasattr(event.data, 'sender') else None
-                if sender_id is None:
-                    return func(*args, **kwargs)
-
-                # RBAC权限检查
-                if not cls._rbac_manager.check_permission(sender_id, permission_path):
-                    return "权限不足"
-                
-                return func(*args, **kwargs)
-            
-            # 为函数添加权限路径属性
-            wrapper.__permission_path__ = permission_path
-            return wrapper
-        return decorator
