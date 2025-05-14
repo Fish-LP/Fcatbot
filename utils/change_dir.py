@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-18 21:06:40
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-17 19:20:06
+# @LastEditTime : 2025-05-14 18:01:01
 # @Description  : 上下文管理器,用于暂时切换工作路径。
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -23,6 +23,7 @@ class ChangeDir(ContextDecorator):
     上下文管理器,用于暂时切换工作路径。
     支持自动恢复原始路径和目录创建/清理。
     """
+
     _DIRS_REGISTRY: dict[UUID, str] = {}  # 保存所有可用目录的 UUID 和路径
 
     def __init__(
@@ -53,7 +54,7 @@ class ChangeDir(ContextDecorator):
             self.init_path()
 
     def init_path(self):
-        '''初始化目标路径'''
+        """初始化目标路径"""
         if self.init:
             return
         if isinstance(self.path, str):
@@ -122,8 +123,8 @@ class ChangeDir(ContextDecorator):
             os.chdir(self.origin_path)
             LOG.debug(f"恢复目录: {self.origin_path}")
         except Exception as e:
-            LOG.error(f"恢复原始目录失败: {e}")
-            return False  # 允许异常传播
+            LOG.critical(f"恢复原始目录失败: {e}")
+            raise RuntimeError(f"恢复原始目录失败: {self.origin_path}", self.origin_path)
 
         # 清理临时目录 如果需要
         if self.temp_dir and not self.keep_temp:
@@ -136,7 +137,7 @@ class ChangeDir(ContextDecorator):
             except Exception as e:
                 LOG.error(f"删除临时目录失败: {e}")
 
-        return True  # 阻止异常传播
+        return False  # 不处理异常，让异常继续传播
 
     def __del__(self) -> None:
         """
@@ -151,4 +152,4 @@ class ChangeDir(ContextDecorator):
                 if self.dir_id in self._DIRS_REGISTRY:
                     del self._DIRS_REGISTRY[self.dir_id]
             except Exception as e:
-                LOG.warning(f"清理临时目录失败: {e}")
+                LOG.error(f"清理临时目录失败: {e}")
