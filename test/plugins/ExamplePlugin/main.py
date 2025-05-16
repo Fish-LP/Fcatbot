@@ -39,7 +39,7 @@ class ExamplePlugin(BasePlugin):
         print(f"└─ 当前工作区: {os.getcwd()}")
         
         print("\n💾 数据状态:")
-        print(f"├─ 插件元数据: {self.meta_data}")
+        print(f"├─ 插件元数据: {self._meta_data}")
         self.data['a'] = self.data.get('a', 0) + 1
         print(f"├─ 计数器值: {self.data['a']}")
         print(f"└─ 完整数据: {self.data}")

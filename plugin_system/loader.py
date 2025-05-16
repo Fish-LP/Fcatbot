@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:26:43
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-23 21:02:34
+# @LastEditTime : 2025-05-16 22:20:48
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -17,24 +17,23 @@ from typing import Dict, List, Set, Type
 from packaging.specifiers import SpecifierSet
 from packaging.version import parse as parse_version
 
-from .custom_err import (
+from .pluginsys_err import (
     PluginCircularDependencyError,
     PluginDependencyError,
     PluginVersionError,
 )
 from .base_plugin import BasePlugin
 from .event import EventBus
-from .compatible import CompatibleEnrollment
-from ..config import PLUGINS_DIR, META_CONFIG_PATH
+from .loader_mixin import PluginInfoMixin
+from ..config import PLUGINS_DIR
 from ..utils import get_log
-from ..utils import UniversalLoader
 from ..utils import PipTool
-from ..utils import TimeTaskScheduler
 
 PM = PipTool()
 LOG = get_log('PluginLoader')
 
-class PluginLoader:
+
+class PluginLoader(PluginInfoMixin):
     """插件加载器,用于加载、卸载和管理插件。
     
     该类负责处理插件的完整生命周期管理，包括:
@@ -47,8 +46,6 @@ class PluginLoader:
     Attributes:
         plugins (Dict[str, BasePlugin]): 存储已加载的插件实例
         event_bus (EventBus): 用于处理插件间事件通信的事件总线
-        time_task_scheduler (TimeTaskScheduler): 管理定时任务的调度器
-        meta_data (dict): 插件元数据配置信息
     """
 
     def __init__(self, event_bus: EventBus):
@@ -58,15 +55,10 @@ class PluginLoader:
             event_bus (EventBus): 事件总线实例，用于处理插件间的事件通信
         """
         self.plugins: Dict[str, BasePlugin] = {}  # 存储已加载的插件
-        self.event_bus = event_bus  # 事件总线
+        self.event_bus = event_bus or EventBus()  # 事件总线
         self._dependency_graph: Dict[str, Set[str]] = {}  # 插件依赖关系图
         self._version_constraints: Dict[str, Dict[str, str]] = {}  # 插件版本约束
         self._debug = False  # 调试模式标记
-        self.time_task_scheduler:TimeTaskScheduler = TimeTaskScheduler()
-        if META_CONFIG_PATH:
-            self.meta_data = UniversalLoader(META_CONFIG_PATH).load().data
-        else:
-            self.meta_data = {}
 
     def set_debug(self, debug: bool = False):
         """设置插件系统的调试模式。
@@ -181,9 +173,7 @@ class PluginLoader:
             plugin_cls = next(p for p in valid_plugins if p.name == name)
             temp_plugins[name] = plugin_cls(
                 event_bus = self.event_bus,
-                time_task_scheduler = self.time_task_scheduler,
                 debug = self._debug,  # 传递调试模式标记 
-                meta_data=self.meta_data.copy(),
                 **kwargs
             )
 
@@ -222,19 +212,30 @@ class PluginLoader:
         """加载并注册兼容性事件处理函数。
 
         Note:
-            处理使用装饰器注册的兼容性事件，并将其绑定到对应的插件实例。
+            通过反射自动识别插件类中的兼容性事件处理函数并注册到事件总线。
         """
-        compatible = CompatibleEnrollment.events
-        for event_type, packs in compatible.items():
-            for func, priority, in_class in packs:
-                if in_class:
-                    for plugin_name, plugin in self.plugins.items():
-                        if plugin.__class__.__qualname__ == func.__qualname__.split('.')[0]:
-                            func = MethodType(func, plugin)
-                            self.event_bus.subscribe(event_type, func, priority)
-                            break
-                else:
-                    self.event_bus.subscribe(event_type, func, priority)
+        for plugin_name, plugin in self.plugins.items():
+            for attr_name in dir(plugin):
+                func = getattr(plugin, attr_name)
+                # 跳过非函数 
+                if not callable(func):
+                    continue
+                # 检查是否为兼容性事件处理函数
+                event_info = getattr(func, "_compatible_event", None)
+                if event_info:
+                    # 绑定方法（如果是类方法）
+                    if event_info["in_class"]:
+                        bound_func = func.__get__(plugin, plugin.__class__)
+                    else:
+                        bound_func = func
+                    # 注册处理函数
+                    handler_id = self.event_bus.subscribe(
+                        event_info["event_type"],
+                        bound_func,
+                        event_info.get("priority", 0)
+                    )
+                    print(event_info["event_type"])
+                    plugin._event_handlers.append(handler_id)
 
     async def unload_plugin(self, plugin_name: str, *arg, **kwd):
         """卸载指定的插件。
@@ -245,57 +246,79 @@ class PluginLoader:
             **kwd: 传递给插件卸载方法的关键字参数
         """
         if plugin_name not in self.plugins:
-            return
-
-        await self.plugins[plugin_name].__unload__(*arg, **kwd)
-        del self.plugins[plugin_name]
+            LOG.warning(f"插件 '{plugin_name}' 未加载，无法卸载")
+            return False
+        
+        try:
+            await self.plugins[plugin_name].__unload__(*arg, **kwd)
+            del self.plugins[plugin_name]
+            return True
+        except Exception as e:
+            LOG.error(f"卸载插件 '{plugin_name}' 时发生错误: {e}")
+            return False
 
     async def reload_plugin(self, plugin_name: str):
         """重新加载指定的插件。
 
         Args:
             plugin_name (str): 要重新加载的插件名称
-
-        Raises:
-            ValueError: 当插件未加载或无法找到插件类时抛出
+            
+        Returns:
+            bool: 重载是否成功
         """
-        if plugin_name not in self.plugins:
-            raise ValueError(f"插件 '{plugin_name}' 未加载")
+        try:
+            # 如果插件已加载，先卸载
+            if plugin_name in self.plugins:
+                old_plugin = self.plugins[plugin_name]
+                if not await self.unload_plugin(plugin_name):
+                    return False
+                module_path = old_plugin.__class__.__module__
+            else:
+                # 搜索插件目录查找插件
+                for dir_name in os.listdir(PLUGINS_DIR):
+                    if os.path.isdir(os.path.join(PLUGINS_DIR, dir_name)):
+                        module_path = dir_name
 
-        old_plugin = self.plugins[plugin_name]
-        await self.unload_plugin(plugin_name)
+            try:
+                module = importlib.import_module(module_path)
+                importlib.reload(module)
+            except ImportError as e:
+                LOG.error(f"加载插件模块 '{module_path}' 失败: {e}")
+                return False
 
-        # 获取插件模块路径
-        module_path = old_plugin.__class__.__module__
-        module = importlib.import_module(module_path)
-        
-        # 强制重新加载
-        importlib.reload(module)
+            # 获取插件类
+            plugin_class = None
+            for item_name in dir(module):
+                item = getattr(module, item_name)
+                if (isinstance(item, type)  
+                    and issubclass(item, BasePlugin)  
+                    and hasattr(item, 'name')  
+                    and item.name == plugin_name):
+                    plugin_class = item
+                    break
 
-        # 获取插件类
-        plugin_class = None
-        for item_name in dir(module):
-            item = getattr(module, item_name)
-            if (isinstance(item, type)  
-                and issubclass(item, BasePlugin)  
-                and hasattr(item, 'name')  
-                and item.name == plugin_name):
-                plugin_class = item
-                break
+            if not plugin_class:
+                LOG.error(f"在模块中未找到插件 '{plugin_name}'")
+                return False
 
-        if not plugin_class:
-            raise ValueError(f"无法在模块中找到插件类 '{plugin_name}'")
+            # 创建新的插件实例
+            try:
+                new_plugin = plugin_class(
+                    self.event_bus,
+                    debug=self._debug,
+                    api=self.plugins[plugin_name].api if plugin_name in self.plugins else None
+                )
+                await new_plugin.__onload__()
+                self.plugins[plugin_name] = new_plugin
+                LOG.info(f"插件 '{plugin_name}' {'重载' if plugin_name in self.plugins else '加载'}成功")
+                return True
+            except Exception as e:
+                LOG.error(f"初始化插件 '{plugin_name}' 失败: {e}")
+                return False
 
-        # 创建新的插件实例
-        new_plugin = plugin_class(
-            self.event_bus,
-            debug=self._debug,
-            time_task_scheduler = self.time_task_scheduler,
-            meta_data=self.meta_data.copy(), 
-            api=old_plugin.api
-        )
-        await new_plugin.__onload__()
-        self.plugins[plugin_name] = new_plugin
+        except Exception as e:
+            LOG.error(f"{'重载' if plugin_name in self.plugins else '加载'}插件 '{plugin_name}' 时发生未知错误: {e}")
+            return False
 
     def _load_modules_from_directory(
         self, directory_path: str
@@ -309,36 +332,81 @@ class PluginLoader:
             Dict[str, ModuleType]: 模块名称到模块对象的映射字典
 
         Note:
-            会自动处理模块的依赖安装
+            支持插件为包目录或单文件，自动处理依赖安装和导入路径
         """
+
         modules = {}
         original_sys_path = sys.path.copy()
-        all_install = {pack['name'].strip().lower() for pack in PM.list_installed() if 'name' in pack}
+        installed_packages = {pack['name'].strip().lower(): pack['version'] for pack in PM.list_installed() if 'name' in pack}
         download_new = False
 
         try:
             directory_path = os.path.abspath(directory_path)
-            sys.path.append(directory_path)
+            sys.path.insert(0, directory_path)  # 插件目录优先
 
-            for filename in os.listdir(directory_path):
-                if not os.path.isdir(os.path.join(directory_path, filename)):
+            for entry in os.listdir(directory_path):
+                entry_path = os.path.join(directory_path, entry)
+                # 只处理包目录或.py文件
+                if os.path.isdir(entry_path) and os.path.isfile(os.path.join(entry_path, "__init__.py")):
+                    plugin_name = entry
+                    plugin_path = entry_path
+                elif entry.endswith(".py") and os.path.isfile(entry_path):
+                    plugin_name = entry[:-3]
+                    plugin_path = entry_path
+                else:
                     continue
-                if os.path.isfile(os.path.join(directory_path, filename, "requirements.txt")):
-                    requirements = set([pack.strip().lower() for pack in open(os.path.join(directory_path, filename, "requirements.txt")).readlines()])
-                    download = requirements - all_install
-                    if download:
-                        download_new = True
-                        LOG.warning(f'即将安装 {filename} 中要求的库: {" ".join(download)}')
-                        if input('是否安装(Y/n):').lower() in ('y', ''):
-                            for pack in download:
-                                LOG.info(f'开始安装库: {pack}')
-                                PM.install(pack)
 
+                # 处理 requirements.txt
+                req_file = os.path.join(plugin_path, "requirements.txt") if os.path.isdir(plugin_path) else plugin_path.replace(".py", ".requirements.txt")
+                if os.path.isfile(req_file):
+                    with open(req_file) as f:
+                        requirements = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+                    for req in requirements:
+                        if req.startswith('-'):
+                            continue
+                        # 处理git/url安装
+                        if any(req.startswith(prefix) for prefix in ['git+', 'http:', 'https:']):
+                            if input(f'发现特殊安装要求 {req}, 是否安装(Y/n):').lower() in ('y', ''):
+                                LOG.info(f'开始安装: {req}')
+                                PM.install(req)
+                            continue
+                        # 解析包名和版本约束
+                        if '==' in req:
+                            pkg_name, version_constraint = req.split('==', 1)
+                        elif '>=' in req:
+                            pkg_name, version_constraint = req.split('>=', 1)
+                        else:
+                            pkg_name, version_constraint = req, None
+                        pkg_name = pkg_name.lower()
+                        if pkg_name in installed_packages:
+                            if version_constraint:
+                                current_ver = parse_version(installed_packages[pkg_name])
+                                required_ver = parse_version(version_constraint)
+                                if current_ver < required_ver:
+                                    if input(f'包 {pkg_name} 当前版本 {current_ver} 低于要求的 {required_ver}, 是否更新(Y/n):').lower() in ('y', ''):
+                                        LOG.info(f'更新包: {req}')
+                                        PM.install(req)
+                                        download_new = True
+                        else:
+                            download_new = True
+                            if input(f'发现未安装的依赖 {req}, 是否安装(Y/n):').lower() in ('y', ''):
+                                LOG.info(f'开始安装: {req}')
+                                PM.install(req)
+
+                # 动态导入模块
                 try:
-                    module = importlib.import_module(filename)
-                    modules[filename] = module
-                except ImportError as e:
-                    LOG.error(f"导入模块 {filename} 时出错: {e}")
+                    if os.path.isdir(plugin_path):
+                        module = importlib.import_module(plugin_name)
+                    else:
+                        # 单文件插件
+                        spec = importlib.util.spec_from_file_location(plugin_name, plugin_path)
+                        module = importlib.util.module_from_spec(spec)
+                        sys.modules[plugin_name] = module
+                        spec.loader.exec_module(module)
+                    modules[plugin_name] = module
+                    LOG.info(f"成功导入插件模块: {plugin_name}")
+                except Exception as e:
+                    LOG.error(f"导入模块 {plugin_name} 时出错: {e}")
                     continue
 
             if download_new:

@@ -40,3 +40,19 @@ class InvalidPluginStateError(PluginSystemError):
 class EventHandlerError(PluginSystemError):
     def __init__(self, error_info, handler):
         super().__init__(f"事件处理器错误[{handler.__module__}]: {error_info}")
+
+class PluginInitError(PluginSystemError):
+    def __init__(self, plugin_name, reason):
+        super().__init__(f"插件 '{plugin_name}' 初始化失败: {reason}")
+
+class PluginDataError(PluginSystemError):
+    def __init__(self, plugin_name, operation, reason):
+        super().__init__(f"插件 '{plugin_name}' {operation}数据时出错: {reason}")
+        
+class PluginValidationError(PluginSystemError):
+    def __init__(self, plugin_name, missing_attrs):
+        super().__init__(f"插件 '{plugin_name}' 验证失败: 缺少必需属性 {', '.join(missing_attrs)}")
+
+class PluginWorkspaceError(PluginSystemError):
+    def __init__(self, plugin_name, path, reason):
+        super().__init__(f"插件 '{plugin_name}' 工作目录 '{path}' 错误: {reason}")

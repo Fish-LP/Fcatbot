@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-04-04 14:48:49
+# @LastEditTime : 2025-05-16 20:11:40
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -10,12 +10,17 @@ import asyncio
 import inspect
 
 from pathlib import Path
-from typing import final
+from typing import List, final
 from uuid import UUID
 
-from .custom_err import PluginLoadError
+from .pluginsys_err import (
+    PluginInitError,
+    PluginDataError,
+    PluginValidationError,
+    PluginWorkspaceError,
+    PluginUnloadError
+)
 from .event import EventBus, Event
-from ..utils import TimeTaskScheduler
 from ..utils import ChangeDir
 from ..utils import Color
 from ..utils import UniversalLoader
@@ -23,13 +28,17 @@ from ..utils import get_log
 from ..utils import visualize_tree
 from ..utils.universal_data_IO import FileTypeUnknownError, SaveError, LoadError
 from ..config import PERSISTENT_DIR, PLUGINS_DIR
-from ..ws import WebSocketHandler
 
 LOG = get_log('BasePlugin')
 
-from .plugin_mixins import EventHandlerMixin, SchedulerMixin
+from .plugin_funcs import IPluginApi ,EventHandlerMixin, TimeTaskMixin, PluginFunctionMixin
 
-class BasePlugin(EventHandlerMixin, SchedulerMixin):
+class BasePlugin(
+        IPluginApi, # 插件功能定义
+        EventHandlerMixin, # 事件处理器接口(基础功能)
+        PluginFunctionMixin, # 快速添加功能(事件处理器接口扩展功能)
+        TimeTaskMixin, # 定时任务接口(额外功能)
+    ):
     """插件基类
     
     # 概述
@@ -39,40 +48,11 @@ class BasePlugin(EventHandlerMixin, SchedulerMixin):
     - `name`: 插件名称
     - `version`: 插件版本号
     
-    # 可选属性
-    - `author`: 作者名称 (默认 'Unknown')
-    - `info`: 插件描述 (默认为空)
-    - `dependencies`: 依赖项配置 (默认 `{}`)
-    - `save_type`: 数据保存类型 (默认 'json')
-    
-    # 功能特性
-    
-    ## 生命周期钩子
-    - `_init_()`: 同步初始化
-    - `on_load()`: 异步初始化
-    - `_close_()`: 同步清理
-    - `on_close()`: 异步清理
-    
-    ## 数据持久化
-    - `data`: `UniversalLoader` 实例，管理插件数据
-    - `work_space`: 工作目录上下文管理器 
-    - `self_space`: 源码目录上下文管理器
-    
-    ## 事件处理
-    - `register_handler()`: 注册事件处理器
-    - `unregister_handlers()`: 注销所有事件处理器
-    
-    ## 定时任务
-    - `add_scheduled_task()`: 添加定时任务
-    - `remove_scheduled_task()`: 移除定时任务
-    
-    # 属性说明
-    
     ## 插件标识
     - `name (str)`: 插件名称，必须定义
     - `version (str)`: 插件版本号，必须定义
     - `author (str)`: 作者名称，默认 'Unknown'
-    - `info (str)`: 插件描述信息，默认为空
+    - `info (str)`: 插件描述信息，默认为'这个作者很懒且神秘,没有写一点点描述,真是一个神秘的插件'
     - `dependencies (dict)`: 插件依赖项配置，默认 `{}`
     
     ## 路径与数据
@@ -80,7 +60,7 @@ class BasePlugin(EventHandlerMixin, SchedulerMixin):
     - `this_file_path (Path)`: 插件主文件路径
     - `meta_data (dict)`: 插件元数据字典
     - `data (UniversalLoader)`: 插件数据管理器实例
-    - `api (WebSocketHandler)`: API调用接口实例
+    - `save_type`: `data` 数据保存类型 (默认 'json')
     
     ## 目录管理
     - `work_space (ChangeDir)`: 工作目录上下文管理器
@@ -90,17 +70,14 @@ class BasePlugin(EventHandlerMixin, SchedulerMixin):
     - `first_load (bool)`: 是否为首次加载
     - `debug (bool)`: 是否处于调试模式
     
-    # 属性方法
-    - `@property debug (bool)`: 获取调试模式状态
-    
     # 核心方法
-    - `__init__()`: 初始化插件实例
+    - `__init__()`: 初始化插件实例，不可重写
     - `__onload__()`: 加载插件，执行初始化
     - `__unload__()`: 卸载插件，执行清理
-    - `on_load()`: 异步初始化钩子，可重写
-    - `on_close()`: 异步清理钩子，可重写
     - `_init_()`: 同步初始化钩子，可重写
     - `_close_()`: 同步清理钩子，可重写
+    - `on_load()`: 异步初始化钩子，可重写
+    - `on_close()`: 异步清理钩子，可重写
     """
 
     name: str
@@ -113,15 +90,13 @@ class BasePlugin(EventHandlerMixin, SchedulerMixin):
     data: UniversalLoader
     self_path: Path
     this_file_path: Path
-    meta_data: dict
-    api: WebSocketHandler
-    first_load: bool = 'True'
+    _meta_data: dict = {}
+    first_load: bool = True
     debug: bool = False  # 调试模式标记
 
     @final
     def __init__(self,
                 event_bus: EventBus,
-                time_task_scheduler: TimeTaskScheduler,
                 debug: bool = False,
                 **kwd):
         """初始化插件实例
@@ -133,42 +108,45 @@ class BasePlugin(EventHandlerMixin, SchedulerMixin):
             **kwd: 额外的关键字参数,将被设置为插件属性
             
         Raises:
-            ValueError: 当缺少插件名称或版本号时抛出
-            PluginLoadError: 当工作目录无效时抛出
+            PluginValidationError: 当缺少插件名称或版本号时抛出
+            PluginWorkspaceError: 当工作目录无效时抛出
         """
         # 插件信息检查
+        missing_attrs = []
         if not getattr(self,'name',None):
-            raise ValueError('缺失插件名称')
+            missing_attrs.append('name')
         if not getattr(self,'version',None):
-            raise ValueError('缺失插件版本号')
+            missing_attrs.append('version')
+        if missing_attrs:
+            raise PluginValidationError(self.__class__.__name__, missing_attrs)
+
         if not getattr(self,'dependencies',None):
-            self.dependencies = {}
+            self.dependencies: dict = {}
         # 添加额外属性
         if kwd:
             for k, v in kwd.items():
                 setattr(self, k, v)
-                
 
         # 固定属性
         plugin_file = Path(inspect.getmodule(self.__class__).__file__).resolve()
-        # plugins_dir = Path(PLUGINS_DIR).resolve()
         self.this_file_path = plugin_file
         # 使用插件文件所在目录作为self_path
         self.self_path = plugin_file.parent
+        if not self.self_path.exists():
+            raise PluginWorkspaceError(self.name, self.self_path, "插件目录不存在")
         self.lock = asyncio.Lock()  # 创建一个异步锁对象
 
         # 隐藏属性
-        self._debug = debug
-        self._event_handlers = []
-        self._event_bus = event_bus
-        self._time_task_scheduler = time_task_scheduler
+        self._debug: bool = debug
+        self._event_handlers: List[UUID] = []
+        self._event_bus: EventBus = event_bus
         # 使用插件目录名作为工作目录名
         plugin_dir_name = self.self_path.name
         self._work_path = Path(PERSISTENT_DIR).resolve() / plugin_dir_name
         self._data_path = self._work_path / f"{plugin_dir_name}.{self.save_type}"
 
         # 检查是否为第一次启动
-        self.first_load = False
+        self.first_load: bool = False
         if not self._work_path.exists():
             self._work_path.mkdir(parents=True)
             self.first_load = True
@@ -176,16 +154,26 @@ class BasePlugin(EventHandlerMixin, SchedulerMixin):
             self.first_load = True
 
         if not self._work_path.is_dir():
-            raise PluginLoadError(self.name, f"{self._work_path} 不是目录文件夹")
+            raise PluginWorkspaceError(self.name, self._work_path, "不是有效的工作目录")
 
         self.data = UniversalLoader(self._data_path, self.save_type)
         self.work_space = ChangeDir(self._work_path)
         self.self_space = ChangeDir(self.self_path)
+        self._meta_data: dict = {
+            'name': self.name,
+            'version': self.version,
+            'dependencies': self.dependencies,
+        }
 
     @property
     def debug(self) -> bool:
         """是否处于调试模式"""
         return self._debug
+
+    @property
+    def meta_data(self) -> dict:
+        """插件元数据"""
+        return self._meta_data.copy()
 
     @final
     async def __unload__(self, *arg, **kwd):
@@ -194,19 +182,24 @@ class BasePlugin(EventHandlerMixin, SchedulerMixin):
         执行插件卸载前的清理工作,保存数据并注销事件处理器
         
         Raises:
-            RuntimeError: 保存持久化数据失败时抛出
+            PluginDataError: 保存持久化数据失败时抛出
+            PluginUnloadError: 卸载插件时发生未知错误时抛出
         """
-        self.unregister_handlers()
-        await asyncio.to_thread(self._close_, *arg, **kwd)
-        await self.on_close(*arg, **kwd)
         try:
+            self.unregister_handlers()
+            await asyncio.to_thread(self._close_, *arg, **kwd)
+            await self.on_close(*arg, **kwd)
+            
             if self.debug:
                 LOG.warning(f"{Color.YELLOW}debug模式{Color.RED}取消{Color.RESET}退出时的保存行为")
                 print(f'{Color.GRAY}{self.name}\n', '\n'.join(visualize_tree(self.data.data)), sep='')
             else:
                 await self.data.asave()
+                
         except (FileTypeUnknownError, SaveError, FileNotFoundError) as e:
-            raise RuntimeError(self.name, f"保存持久化数据时出错: {e}")
+            raise PluginDataError(self.name, "保存", str(e))
+        except Exception as e:
+            raise PluginUnloadError(self.name, str(e))
 
     @final
     async def __onload__(self):
@@ -215,20 +208,25 @@ class BasePlugin(EventHandlerMixin, SchedulerMixin):
         执行插件加载时的初始化工作,加载数据
         
         Raises:
-            RuntimeError: 读取持久化数据失败时抛出
+            PluginDataError: 读取持久化数据失败时抛出
+            PluginInitError: 插件初始化时发生未知错误时抛出
         """
-        # load时传入的参数作为属性被保存在self中
-        if isinstance(self.data, dict):
-            self.data = UniversalLoader(self._data_path, self.save_type)
         try:
+            if isinstance(self.data, dict):
+                self.data = UniversalLoader(self._data_path, self.save_type)
             await self.data.aload()
+            
         except (FileTypeUnknownError, LoadError, FileNotFoundError) as e:
-            if self.debug:
-                pass
-            else:
+            if not self.debug:
                 open(self._data_path,'w').write('')
-        await asyncio.to_thread(self._init_)
-        await self.on_load()
+            else:
+                raise PluginDataError(self.name, "加载", str(e))
+                
+        try:
+            await asyncio.to_thread(self._init_)
+            await self.on_load()
+        except Exception as e:
+            raise PluginInitError(self.name, str(e))
 
     async def on_load(self):
         """插件初始化时的子函数,可被子类重写"""

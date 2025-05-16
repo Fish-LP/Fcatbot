@@ -2,81 +2,16 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:31:16
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-30 11:30:20
+# @LastEditTime : 2025-05-16 20:29:20
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
-from typing import List, Any, Callable, Tuple
-from copy import copy
-from .custom_err import EventHandlerError
+from typing import List, Any, Callable, Dict
+from ..pluginsys_err import EventHandlerError
+from .event import Event
 import re
 import asyncio
 import uuid
-
-class Event:
-    """事件类
-
-    用于封装事件信息,包含事件类型、数据及处理结果。
-
-    Attributes:
-        type (str): 事件类型标识符
-        data (Any): 事件携带的数据
-        _results (List[Any]): 事件处理的结果集合
-        _propagation_stopped (bool): 事件传播是否已停止的标志
-    """
-
-    def __init__(self, type: str, data: Any):
-        """初始化事件实例
-
-        Args:
-            type: 事件类型标识符
-            data: 事件携带的数据
-        """
-        self._type = type
-        self._data = data
-        self._results: List[Any] = []
-        self._propagation_stopped = False
-
-    @property
-    def data(self):
-        return copy(self._data)
-
-    @property
-    def type(self):
-        return copy(self._type)
-
-    @property
-    def results(self):
-        return copy(self._results)
-
-    def __eq__(self, value: str):
-        return self.type == value
-
-    def __add__(self, other):
-        self.add_result(other)
-        return self
-
-    def __iadd__(self, other):
-        self.add_result(other)
-        return self
-
-    def stop_propagation(self):
-        """停止事件的继续传播
-        
-        调用此方法后,后续的事件处理器将不会被执行。
-        """
-        self._propagation_stopped = True
-
-    def add_result(self, result: Any):
-        """添加事件处理结果
-        
-        Args:
-            result: 处理器返回的结果
-        """
-        self._results.append(result)
-    
-    def __repr__(self):
-        return f'Event(type="{self.type}",data={self.data},results={self.results})'
 
 class EventBus:
     """
@@ -88,6 +23,18 @@ class EventBus:
         """
         self._exact_handlers = {}
         self._regex_handlers = []
+        # 钩子存储-按事件类型
+        self._type_hooks: Dict[str, Dict[str, List[Callable]]] = {}
+        # 钩子存储-按处理器UUID
+        self._uuid_hooks: Dict[uuid.UUID, Dict[str, List[Callable]]] = {}
+        # 钩子类型列表
+        self._hook_types = [
+            'before_publish',  # 发布事件前
+            'after_publish',   # 发布事件后 
+            'before_handler',  # 处理器执行前
+            'after_handler',   # 处理器执行后
+            'on_error'        # 发生错误时
+        ]
 
     def subscribe(self, event_type: str, handler: Callable[[Event], Any], priority: int = 0) -> uuid.UUID:
         """
@@ -136,7 +83,59 @@ class EventBus:
         self._regex_handlers = [
             (patt, pr, h, hid) for (patt, pr, h, hid) in self._regex_handlers if hid != handler_id
         ]
+        # 移除UUID关联的钩子
+        if handler_id in self._uuid_hooks:
+            del self._uuid_hooks[handler_id]
+        
         return True
+
+    def add_hook(self, hook_type: str, func: Callable, event_type: str = None, handler_id: uuid.UUID = None) -> None:
+        """添加钩子函数
+        
+        Args:
+            hook_type: 钩子类型
+            func: 钩子函数
+            event_type: 事件类型,用于关联特定事件类型
+            handler_id: 处理器ID,用于关联特定处理器
+        """
+        if hook_type not in self._hook_types:
+            raise ValueError(f"无效的钩子类型: {hook_type}")
+            
+        if handler_id:
+            # UUID关联
+            if handler_id not in self._uuid_hooks:
+                self._uuid_hooks[handler_id] = {t:[] for t in self._hook_types}
+            self._uuid_hooks[handler_id][hook_type].append(func)
+        elif event_type:
+            # 事件类型关联
+            if event_type not in self._type_hooks:
+                self._type_hooks[event_type] = {t:[] for t in self._hook_types}
+            self._type_hooks[event_type][hook_type].append(func)
+        else:
+            raise ValueError("必须指定event_type或handler_id之一")
+
+    async def _run_hooks(self, hook_type: str, event: Event, handler=None, *args, **kwargs) -> None:
+        """运行指定类型的钩子函数"""
+        hooks_to_run = []
+        
+        # 获取事件类型关联的钩子
+        if event.type in self._type_hooks:
+            hooks_to_run.extend(self._type_hooks[event.type][hook_type])
+            
+        # 获取处理器UUID关联的钩子
+        if handler and hasattr(handler, 'id'):
+            handler_id = handler.id
+            if handler_id in self._uuid_hooks:
+                hooks_to_run.extend(self._uuid_hooks[handler_id][hook_type])
+
+        # 执行钩子
+        for hook in hooks_to_run:
+            if asyncio.iscoroutinefunction(hook):
+                await hook(event, *args, **kwargs)
+            else:
+                await asyncio.get_running_loop().run_in_executor(
+                    None, hook, event, *args, **kwargs
+                )
 
     async def publish_async(self, event: Event) -> List[Any]:
         """
@@ -148,6 +147,13 @@ class EventBus:
         return:
             List[Any] - 所有处理器返回的结果的列表
         """
+        # 发布前钩子
+        await self._run_hooks('before_publish', event)
+        
+        if event.intercepted:
+            await self._run_hooks('after_publish', event)
+            return event.results
+
         handlers = []
         if event.type in self._exact_handlers:
             # 处理精确匹配处理器
@@ -168,17 +174,26 @@ class EventBus:
             if event._propagation_stopped:
                 break
 
+            # 处理器执行前钩子
+            await self._run_hooks('before_handler', event, handler)
+            
             try:
                 if asyncio.iscoroutinefunction(handler):
                     await handler(event)
                 else:
                     # 将同步函数包装为异步任务
                     await asyncio.get_running_loop().run_in_executor(None, handler, event)
+                # 处理器执行后钩子
+                await self._run_hooks('after_handler', event, handler)
             except Exception as e:
+                # 错误钩子
+                await self._run_hooks('on_error', event, handler, e)
                 raise EventHandlerError(e,handler)
             # 收集结果
             results.extend(event._results)
         
+        # 发布后钩子
+        await self._run_hooks('after_publish', event)
         return results
 
     def publish_sync(self, event: Event) -> List[Any]:
