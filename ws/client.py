@@ -248,7 +248,7 @@ class WebSocketClient:
 
         Raises:
                 ConnectionError: 如果客户端未连接到 WebSocket 服务器。
-      """
+        """
         if not self.running or self.websocket is None:
             raise ConnectionError("Not connected to WebSocket server")
         await self.websocket.send(data)
@@ -329,7 +329,7 @@ class WebSocketClient:
         )
         future.result()
 
-    def _cleanup(self) -> None:
+    def cleanup(self) -> None:
         """
         清理资源。
 
@@ -346,7 +346,7 @@ class WebSocketClient:
         """
         析构函数，清理资源。
         """
-        self._cleanup()
+        self.cleanup()
 
     async def __aenter__(self):
         """
