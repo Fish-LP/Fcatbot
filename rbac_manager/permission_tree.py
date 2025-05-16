@@ -2,14 +2,14 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-05-05 14:35:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-05-05 15:33:54
+# @LastEditTime : 2025-05-16 19:13:42
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
 import re
 from typing import Dict, Any, List
 
-from permission_parser import Parser, Literal, Segment, Wildcard, ChoiceGroup, RegexSegment, FormatSegment
+from .permission_parser import Parser, Literal, Segment, Wildcard, ChoiceGroup, RegexSegment, FormatSegment
 
 
 class Tree:
@@ -20,43 +20,68 @@ class Tree:
     """
 
     def __init__(self) -> None:
-        self.root: Dict[str, Any] = {}
+        self.allow_root: Dict[str, Any] = {}
+        self.deny_root: Dict[str, Any] = {}
 
-    def insert(self, pattern_str: str) -> None:
+    def insert_segments(self, segments: List[Segment], effect: str = 'allow'):
         """
         将解析后的权限路径片段插入到字典树中。
-        只支持纯字面量路径的插入，通配符、选项组、正则表达式和格式化占位符段的路径无法插入。
-
+        
         Args:
             pattern_str: 权限路径字符串。
+            effect: 权限规则效果，默认为 'allow'。
 
         Raises:
             ValueError: 如果路径包含非 Literal 段。
         """
-        segments = self._parse_segments(pattern_str)
-        current: Dict[str, Any] = self.root
-        for segment in segments:
-            if not isinstance(segment, Literal):
-                raise ValueError("只能添加纯字面量路径到权限树")
-            key: str = segment.value
-            if key not in current:
-                current[key] = {}
-            current = current[key]
-        # 将 None 作为路径结束的标志
+        root = self.allow_root if effect == 'allow' else self.deny_root
+        current = root
+        for seg in segments:
+            # 使用 Segment 对象本身作为键（需确保 __hash__ 正确）
+            if seg not in current:
+                current[seg] = {}
+            current = current[seg]
+        current[None] = None  # 标记路径终点
+
+    def insert_segments(self, segments: List[Segment], effect: str = 'allow') -> None:
+        """
+        将解析后的权限路径片段插入到字典树中，支持任意类型的 Segment。
+        """
+        root = self.allow_root if effect == 'allow' else self.deny_root
+        current = root
+        for seg in segments:
+            if seg not in current:
+                current[seg] = {}
+            current = current[seg]
         current[None] = None
 
-    def match(self, pattern_str: str) -> bool:
+    def match(self, pattern_str: str, effect: str = None) -> bool:
         """
         在字典树中查找匹配的权限路径。
 
         Args:
             pattern_str: 权限路径字符串。
+            effect: 权限规则效果，默认为 None。
 
         Returns:
             bool: 如果路径完全匹配，则返回 True；否则返回 False。
         """
         segments = self._parse_segments(pattern_str)
-        return self._recursive_match(self.root, segments)
+        if effect == 'allow':
+            return self._recursive_match(self.allow_root, segments)
+        elif effect == 'deny':
+            return self._recursive_match(self.deny_root, segments)
+        else:
+            # 如果未指定效果，则同时检查允许和拒绝规则
+            return (self._recursive_match(self.allow_root, segments) or 
+                    self._recursive_match(self.deny_root, segments))
+
+    def match_segments(self, segments: List[Segment], effect: str = None) -> bool:
+        """
+        在字典树中查找匹配的权限路径（支持任意类型的 Segment）。
+        """
+        root = self.allow_root if effect == 'allow' else self.deny_root
+        return self._recursive_match_segments(root, segments)
 
     def _parse_segments(self, pattern_str: str) -> List[Segment]:
         """
@@ -71,80 +96,41 @@ class Tree:
         parser = Parser()
         return parser.parse(pattern_str).patterns
 
-    def _recursive_match(self, current_node: Dict[str, Any], segments: List[Segment]) -> bool:
-        """
-        递归地在字典树中查找匹配的路径。
-
-        Args:
-            current_node: 当前处理的字典树节点。
-            segments: 剩余需要匹配的路径片段列表。
-
-        Returns:
-            bool: 如果路径完全匹配，则返回 True；否则返回 False。
-        """
+    @classmethod
+    def _recursive_match_segments(cls, node: dict, segments: List[Segment]) -> bool:
         if not segments:
-            # 检查是否到达路径的尽头
-            return None in current_node
+            return None in node
+        seg = segments[0]
+        for key in node:
+            if key is not None and key == seg:
+                if cls._recursive_match_segments(node[key], segments[1:]):
+                    return True
+        return False
 
-        current_segment: Segment = segments[0]
+    @classmethod
+    def _recursive_match(cls, node: dict, target_segments: List[Segment]) -> bool:
+        if not target_segments:
+            return None in node  # 路径终点匹配
 
-        if isinstance(current_segment, Literal):
-            # 处理字面量段
-            key: str = current_segment.value
-            if key in current_node:
-                return self._recursive_match(current_node[key], segments[1:])
-            return False
+        current_seg = target_segments[0]
+        remaining_segs = target_segments[1:]
 
-        elif isinstance(current_segment, Wildcard):
-            # 处理通配符段
-            if current_segment.scope == '*':
-                # 单层通配符匹配当前层的所有可能
-                for key in current_node.keys():
-                    if key is not None:  # 跳过路径结束标志
-                        if segments[1:]:
-                            return self._recursive_match({key: current_node[key]}, segments[1:])
-                        else:
+        for pattern_seg in node:
+            if pattern_seg is None:
+                continue  # 跳过终点标记
+
+            # 直接调用 Segment 的 match 方法
+            if pattern_seg.match(current_seg):
+                # 处理通配符递归（如 ** 的多层匹配）
+                if isinstance(pattern_seg, Wildcard) and pattern_seg.scope == '**':
+                    # 尝试匹配 0 到多个剩余段
+                    for i in range(len(target_segments) + 1):
+                        if cls._recursive_match(node[pattern_seg], target_segments[i:]):
                             return True
-                return False
-            else:
-                # 多层通配符匹配所有可能的后续路径
-                for key in current_node:
-                    if key is not None:  # 跳过路径结束标志
-                        if segments[1:]:
-                            return self._recursive_match({key: current_node[key]}, segments[1:])
-                        else:
-                            return True
-                return False
-
-        elif isinstance(current_segment, ChoiceGroup):
-            # 处理选项组段
-            for option in current_segment.options:
-                if option in current_node:
-                    return self._recursive_match(current_node[option], segments[1:])
                 else:
-                    return False
-            return False
-
-        elif isinstance(current_segment, RegexSegment):
-            # 处理正则表达式段
-            for key in current_node:
-                if key is not None and re.match(current_segment.pattern, key):
-                    if self._recursive_match(current_node[key], segments[1:]):
+                    if cls._recursive_match(node[pattern_seg], remaining_segs):
                         return True
-            return False
-
-        elif isinstance(current_segment, FormatSegment):
-            raise ValueError(f'意外的格式化字符串节点')
-            for key in current_node:
-                if key is not None:
-                    if self._recursive_match(current_node[key], segments[1:]):
-                        return True
-            return False
-
-        else:
-            # 未知的段类型
-            raise ValueError(f'未知节点: {type(current_segment)}', seq = current_segment)
-            return False
+        return False
 
 
 class PermissionTree:
@@ -156,30 +142,38 @@ class PermissionTree:
     def __init__(self) -> None:
         self.tree: Tree = Tree()
 
-    def add(self, pattern_str: str) -> None:
+    def add(self, pattern_str: str, effect: str = 'allow') -> None:
         """
         将权限路径添加到权限树中。
         只支持纯字面量路径的添加。
 
         Args:
             pattern_str: 权限路径字符串。
+            effect: 权限规则效果，默认为 'allow'。
 
         Raises:
             ValueError: 如果路径包含非字面量段。
         """
-        self.tree.insert(pattern_str)
+        self.tree.insert(pattern_str, effect)
 
-    def check(self, pattern_str: str) -> bool:
+    def add_segments(self, segments: List[Segment], effect: str = 'allow') -> None:
+        self.tree.insert_segments(segments, effect)
+
+    def check(self, pattern_str: str, effect: str = None) -> bool:
         """
         检查给定的权限路径是否匹配权限树中的任何路径。
 
         Args:
             pattern_str: 要检查的权限路径字符串。
+            effect: 权限规则效果，默认为 None。
 
         Returns:
             bool: 如果匹配，则返回 True；否则返回 False。
         """
-        return self.tree.match(pattern_str)
+        return self.tree.match(pattern_str, effect)
+
+    def check_segments(self, segments: List[Segment], effect: str = None) -> bool:
+        return self.tree.match_segments(segments, effect)
 
     @classmethod
     def match(cls, pattern: str, pattern_str: str) -> bool:

@@ -2,13 +2,13 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-05-05 14:34:56
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-05-05 15:34:04
+# @LastEditTime : 2025-05-16 19:36:24
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
 import re
 from abc import ABC
-from typing import List, Tuple, Union, Optional
+from typing import List, Tuple, Union
 
 
 class Segment(ABC):
@@ -30,6 +30,16 @@ class Segment(ABC):
             is_reversed (bool): 是否反转该路径段的匹配逻辑。默认为 False。
         """
         self.is_reversed = is_reversed
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self._hash_content() == other._hash_content()
+
+    def __hash__(self):
+        return hash((self.__class__.__name__, self._hash_content()))
+
+    def _hash_content(self):
+        """返回用于hash和eq的内容，子类实现"""
+        raise NotImplementedError
 
 
 class Literal(Segment):
@@ -53,6 +63,12 @@ class Literal(Segment):
         """
         super().__init__(is_reversed)
         self.value = value
+
+    def _hash_content(self):
+        return (self.value, self.is_reversed)
+
+    def match(self, value: str) -> bool:
+        return self.value == value
 
 
 class Wildcard(Segment):
@@ -83,6 +99,14 @@ class Wildcard(Segment):
             raise ValueError("通配符范围必须是'single'(*)或'recursive'(**)")
         self.scope = '*' if scope in {'single', '*'} else '**'
 
+    def _hash_content(self):
+        return (self.scope, self.is_reversed)
+
+    def match(self, value: str) -> bool:
+        if self.scope == '*':
+            return True  # 单层通配符匹配任意值
+        else:
+            return True  # 多层通配符逻辑由树结构递归处理
 
 class ChoiceGroup(Segment):
     """
@@ -106,6 +130,11 @@ class ChoiceGroup(Segment):
         super().__init__(is_reversed)
         self.options = tuple(options)
 
+    def _hash_content(self):
+        return (self.options, self.is_reversed)
+
+    def match(self, value: str) -> bool:
+        return value in self.options
 
 class RegexSegment(Segment):
     """
@@ -130,6 +159,9 @@ class RegexSegment(Segment):
         self.pattern = pattern
         self._regex = re.compile(pattern)
 
+    def _hash_content(self):
+        return (self.pattern, self.is_reversed)
+
 
 class FormatSegment(Segment):
     """
@@ -152,6 +184,9 @@ class FormatSegment(Segment):
         """
         super().__init__(is_reversed)
         self.expression = expression
+
+    def _hash_content(self):
+        return (self.expression, self.is_reversed)
 
 
 class PermissionPath:
