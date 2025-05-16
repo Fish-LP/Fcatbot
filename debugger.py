@@ -1,10 +1,11 @@
-import os
 import ast
 import asyncio
 import inspect
 from random import randint
+import sys
 from time import time
 try:
+    # 尝试导入readline或pyreadline3
     try:
         import readline
     except ImportError:
@@ -16,6 +17,16 @@ try:
 except Exception:
     readline_support = False
     readline = None
+
+def pre_input_hook():
+    """自定义回调函数，用于覆盖当前输入"""
+    if readline.get_current_history_length() > 0:
+        readline.redisplay()  # 重新显示当前行
+        readline.insert_text(readline.get_history_item(readline.get_current_history_length()))  # 插入历史命令
+        readline.redisplay()  # 再次重新显示当前行
+
+# 设置回调函数
+readline.set_pre_input_hook(pre_input_hook)
 
 from .utils import Color
 from .utils import get_log
@@ -79,11 +90,15 @@ def cmd_help(*_):
 {Color.GREEN}.p set <name> <k> <v>{Color.RESET}   - 设置插件数据
 {Color.GREEN}.p call <name> <func>{Color.RESET}   - 调用插件方法
 {Color.GREEN}.reload [plugin]{Color.RESET}        - 重载插件(无参数时重载所有)
-{Color.GREEN}.exit{Color.RESET}                   - 退出调试模式
 所有非.开头的输入都会被作为消息发送""")
 
+@command('say')
+def send_msg(client, msg, *arg):
+    print(f"{Color.MAGENTA}>{Color.RESET} {msg}")
+    send_simulated_message(client, msg)
+
 @command('env')
-def cmd_env(*args):
+def cmd_env(client, *args):
     """环境变量管理命令。
     
     用法:
@@ -111,7 +126,7 @@ def cmd_env(*args):
             print(f"{Color.GREEN}已设置 {key} = {value}{Color.RESET}")
 
 @command('g')
-def cmd_group(group_id=None, *_):
+def cmd_group(client, group_id=None, *_):
     """切换到指定的群聊环境。
     
     用法: .g <群号>
@@ -267,7 +282,7 @@ def cmd_private(client, *args):
         print("可用子命令: list, info, data, set, call")
 
 @command('u')
-def cmd_user(user_id=None, *name):
+def cmd_user(client, user_id=None, *name):
     """设置当前用户ID和昵称。
     
     用法: .u <用户ID> [昵称]
@@ -289,7 +304,7 @@ def cmd_user(user_id=None, *name):
         print(f"{Color.YELLOW}请指定用户ID{Color.RESET}")
 
 @command('r')
-def cmd_role(role=None, *_):
+def cmd_role(client, role=None, *_):
     """设置当前用户的群角色。
     
     用法: .r <角色>
@@ -336,13 +351,53 @@ async def cmd_reload(client, name=None, *_):
     except Exception as e:
         print(f"{Color.RED}重载失败: {e}{Color.RESET}")
 
-@command('exit')
-def cmd_exit(*_):
-    """退出调试模式。
+def send_simulated_message(client, text: str) -> None:
+    """模拟发送消息并处理响应"""
+    msg_id = randint(0,9999999999)
+    base_msg_data = {
+        'id': msg_id,
+        'self_id': int(debug_state['bot_id']),
+        'real_seq': msg_id,
+        'reply_to': None,
+        'time': int(time() * 1000),
+        'post_type': 'message',
+        'sender': Sender(
+            user_id=int(debug_state['user_id']),
+            nickname=debug_state['user_name'],
+            role=debug_state['user_role']
+        ),
+        'message': MessageChain().add_text(text),
+        'raw_message': text,
+        'message_id': msg_id,
+        'user_id': int(debug_state['user_id'])
+    }
     
-    用法: .exit
-    """
-    raise KeyboardInterrupt
+    if debug_state['group_id']:
+        # 群聊消息
+        msg = GroupMessage(
+            **base_msg_data,
+            message_type='group',
+            group_id=int(debug_state['group_id']),
+            sub_type='normal'
+        )
+        if msg.raw_message.startswith(client.command_prefix):
+            out = client.publish_sync(Event(OFFICIAL_GROUP_COMMAND_EVENT, msg))
+        else:
+            out = client.publish_sync(Event(OFFICIAL_GROUP_MESSAGE_EVENT, msg))
+    else:
+        # 私聊消息
+        msg = PrivateMessage(
+            **base_msg_data,
+            message_type='private',
+            sub_type='friend'
+        )
+        if msg.raw_message.startswith(client.command_prefix):
+            out = client.publish_sync(Event(OFFICIAL_PRIVATE_COMMAND_EVENT, msg))
+        else:
+            out = client.publish_sync(Event(OFFICIAL_PRIVATE_MESSAGE_EVENT, msg))
+            
+    if out:
+        print(f'{Color.CYAN}收集到的返回:{Color.RESET} {out}')
 
 def start_debug_mode(client):
     """启动调试模式"""
@@ -392,59 +447,19 @@ def start_debug_mode(client):
                 continue
             
             # 处理消息发送
-            msg_id = randint(0,9999999999)
-            base_msg_data = {
-                'id': msg_id,
-                'self_id': int(debug_state['bot_id']),
-                'real_seq': msg_id,
-                'reply_to': None,
-                'time': int(time() * 1000),
-                'post_type': 'message',
-                'sender': Sender(
-                    user_id=int(debug_state['user_id']),
-                    nickname=debug_state['user_name'],
-                    role=debug_state['user_role']
-                ),
-                'message': MessageChain().add_text(text),
-                'raw_message': text,
-                'message_id': msg_id,
-                'user_id': int(debug_state['user_id'])
-            }
-            
-            if debug_state['group_id']:
-                # 群聊消息
-                msg = GroupMessage(
-                    **base_msg_data,
-                    message_type='group',
-                    group_id=int(debug_state['group_id']),
-                    sub_type='normal'
-                )
-                if msg.raw_message.startswith(client.command_prefix):
-                    out = client.publish_sync(Event(OFFICIAL_GROUP_COMMAND_EVENT, msg))
-                else:
-                    out = client.publish_sync(Event(OFFICIAL_GROUP_MESSAGE_EVENT, msg))
-            else:
-                # 私聊消息
-                msg = PrivateMessage(
-                    **base_msg_data,
-                    message_type='private',
-                    sub_type='friend'
-                )
-                if msg.raw_message.startswith(client.command_prefix):
-                    out = client.publish_sync(Event(OFFICIAL_PRIVATE_COMMAND_EVENT, msg))
-                else:
-                    out = client.publish_sync(Event(OFFICIAL_PRIVATE_MESSAGE_EVENT, msg))
-            if out:
-                print(f'{Color.CYAN}收集到的返回:{Color.RESET} {out}')
+            send_simulated_message(client, text)
                 
         except KeyboardInterrupt:
             print()
             LOG.info("退出调试模式")
+            LOG.info("可能需要第二次 Ctrl+C 退出")
+            del client
             if readline_support:
                 try:
                     readline.write_history_file('.history.txt')
                 except Exception:
-                    pass
-            exit(0)
+                    print('保存命令记录错误')
+            break
         except Exception as e:
             LOG.error(f"{Color.RED}调试模式错误: {e}{Color.RESET}")
+            break

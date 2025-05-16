@@ -2,24 +2,11 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-05-04 22:12:49
+# @LastEditTime : 2025-05-16 20:16:59
 # @Description  : 喵喵喵, 超多导入(超导)
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 import os
-try:
-    # 尝试导入readline或pyreadline3
-    try:
-        import readline
-    except ImportError:
-        try:
-            import pyreadline3 as readline # type: ignore
-        except ImportError:
-            readline = None
-    readline_support = True if readline else False
-except Exception:
-    readline_support = False
-    readline = None
 import asyncio
 import json
 import time
@@ -157,7 +144,7 @@ class BotClient:
         Returns:
             List[Any]: 所有处理器返回的结果列表
         """
-        self.event_bus.publish_sync(event)
+        return self.event_bus.publish_sync(event)
 
     async def publish_async(self, event: Event) -> List[Any]:
         """异步发布事件.
@@ -168,7 +155,7 @@ class BotClient:
         Returns:
             List[Any]: 所有处理器返回的结果列表
         """
-        await self.event_bus.publish_async(event)
+        return await self.event_bus.publish_async(event)
     
     async def on_message(self, data: str):
         """处理接收到的WebSocket消息.
