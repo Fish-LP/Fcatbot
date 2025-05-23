@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-05-16 20:11:40
+# @LastEditTime : 2025-05-23 20:10:50
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -12,6 +12,8 @@ import inspect
 from pathlib import Path
 from typing import List, final
 from uuid import UUID
+
+from .api import PluginSysApi
 
 from .pluginsys_err import (
     PluginInitError,
@@ -97,6 +99,7 @@ class BasePlugin(
     @final
     def __init__(self,
                 event_bus: EventBus,
+                sys_api: PluginSysApi,
                 debug: bool = False,
                 **kwd):
         """初始化插件实例
@@ -156,9 +159,11 @@ class BasePlugin(
         if not self._work_path.is_dir():
             raise PluginWorkspaceError(self.name, self._work_path, "不是有效的工作目录")
 
+        # 接口
         self.data = UniversalLoader(self._data_path, self.save_type)
         self.work_space = ChangeDir(self._work_path)
         self.self_space = ChangeDir(self.self_path)
+        self.sys: PluginSysApi = sys_api
         self._meta_data: dict = {
             'name': self.name,
             'version': self.version,

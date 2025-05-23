@@ -1,6 +1,10 @@
+from typing import Callable, Any, List, Optional, TypeVar
 import inspect
 from functools import wraps
-from typing import TypeVar, Callable, Optional, Any
+
+from .api import CompatibleHandler, COMPATIBLE_HANDLERS
+from .base_plugin import BasePlugin
+from .event.event_bus import EventBus
 from .event import Event
 from ..config import (
     OFFICIAL_PRIVATE_MESSAGE_EVENT,
@@ -108,28 +112,38 @@ class CompatibleEnrollment:
                 return wrapper  # type: ignore
             return decorator
 
+    # 显式声明类属性类型以提供IDE提示
     def group_event(self, row_event: bool = False) -> F:
-        ''''''
+        """群消息事件装饰器"""
+        return self._EventDecorator(OFFICIAL_GROUP_MESSAGE_EVENT)(row_event)
+
     def private_event(self, row_event: bool = False) -> F:
-        ''''''
-    def group_event(self, row_event: bool = False) -> F:
-        ''''''
+        """私聊消息事件装饰器"""
+        return self._EventDecorator(OFFICIAL_PRIVATE_MESSAGE_EVENT)(row_event)
+
     def notice_event(self, row_event: bool = False) -> F:
-        ''''''
+        """通知事件装饰器"""
+        return self._EventDecorator(OFFICIAL_NOTICE_EVENT)(row_event)
+
     def group_command(self, row_event: bool = False) -> F:
-        ''''''
+        """群命令事件装饰器"""
+        return self._EventDecorator(OFFICIAL_GROUP_COMMAND_EVENT)(row_event)
+
     def private_command(self, row_event: bool = False) -> F:
-        ''''''
+        """私聊命令事件装饰器"""
+        return self._EventDecorator(OFFICIAL_PRIVATE_COMMAND_EVENT)(row_event)
+
     def friend_request(self, row_event: bool = False) -> F:
-        ''''''
-    def friend_request(self, row_event: bool = False) -> F:
-        ''''''
+        """好友请求事件装饰器"""
+        return self._EventDecorator(OFFICIAL_FRIEND_REQUEST_EVENT)(row_event)
+
     def group_request(self, row_event: bool = False) -> F:
-        ''''''
+        """群请求事件装饰器"""
+        return self._EventDecorator(OFFICIAL_GROUP_REQUEST_EVENT)(row_event)
+
     def trigger(self, row_event: bool = False) -> F:
         ''''''
 
-    # 显式声明类属性类型以提供IDE提示
     group_event = _EventDecorator(OFFICIAL_GROUP_MESSAGE_EVENT)
     private_event = _EventDecorator(OFFICIAL_PRIVATE_MESSAGE_EVENT)
     notice_event = _EventDecorator(OFFICIAL_NOTICE_EVENT)
@@ -138,3 +152,28 @@ class CompatibleEnrollment:
     friend_request = _EventDecorator(OFFICIAL_FRIEND_REQUEST_EVENT)
     group_request = _EventDecorator(OFFICIAL_GROUP_REQUEST_EVENT)
     trigger = _TriggerDecorator()
+
+class EventCompatibleHandler(CompatibleHandler):
+    """事件兼容性处理器"""
+    def check(self, obj: Any) -> bool:
+        return hasattr(obj, "_compatible_event")
+        
+    def handle(self, plugin: BasePlugin, func: Callable, event_bus: EventBus) -> None:
+        event_info = getattr(func, "_compatible_event")
+        if event_info:
+            if event_info["in_class"]:
+                bound_func = func.__get__(plugin, plugin.__class__)
+            else:
+                bound_func = func
+                
+            handler_id = event_bus.subscribe(
+                event_info["event_type"],
+                bound_func,
+                event_info.get("priority", 0)
+            )
+            plugin._event_handlers.append(handler_id)
+
+# 注册所有兼容性处理器
+COMPATIBLE_HANDLERS.extend([
+    EventCompatibleHandler("_compatible_event"),
+])

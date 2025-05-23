@@ -1,36 +1,41 @@
 # -------------------------
 # @Author       : Fish-LP fish.zh@outlook.com
-# @Date         : 2025-02-11 17:26:43
+# @Date         : 2025-03-21 18:06:59
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-05-16 22:20:48
+# @LastEditTime : 2025-05-23 20:12:17
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
-# @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
+# @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
 import asyncio
 import importlib
 import os
 import sys
-from collections import defaultdict, deque
-from types import ModuleType, MethodType
-from typing import Dict, List, Set, Type
 
+from collections import defaultdict, deque
+from types import ModuleType
+from typing import Dict, List, Set, Type
 from packaging.specifiers import SpecifierSet
 from packaging.version import parse as parse_version
+from logging import getLogger
+
+from .base_plugin import BasePlugin
+from .event import EventBus
+from .pip_tool import PipTool
 
 from .pluginsys_err import (
     PluginCircularDependencyError,
     PluginDependencyError,
     PluginVersionError,
 )
-from .base_plugin import BasePlugin
-from .event import EventBus
-from .loader_mixin import PluginInfoMixin
-from ..config import PLUGINS_DIR
-from ..utils import get_log
-from ..utils import PipTool
+from .api import (
+    PluginInfoMixin,
+    COMPATIBLE_HANDLERS,
+    PLUGINS_DIR,
+    PluginSysApi
+)
 
-PM = PipTool()
-LOG = get_log('PluginLoader')
+EPM = PipTool()
+LOG = getLogger('PluginLoader')
 
 
 class PluginLoader(PluginInfoMixin):
@@ -56,6 +61,7 @@ class PluginLoader(PluginInfoMixin):
         """
         self.plugins: Dict[str, BasePlugin] = {}  # 存储已加载的插件
         self.event_bus = event_bus or EventBus()  # 事件总线
+        self.sys_api = PluginSysApi(self)   # 系统级接口
         self._dependency_graph: Dict[str, Set[str]] = {}  # 插件依赖关系图
         self._version_constraints: Dict[str, Dict[str, str]] = {}  # 插件版本约束
         self._debug = False  # 调试模式标记
@@ -174,6 +180,7 @@ class PluginLoader(PluginInfoMixin):
             temp_plugins[name] = plugin_cls(
                 event_bus = self.event_bus,
                 debug = self._debug,  # 传递调试模式标记 
+                sys_api = self.sys_api,
                 **kwargs
             )
 
@@ -209,35 +216,21 @@ class PluginLoader(PluginInfoMixin):
 
 
     def load_compatible_data(self):
-        """加载并注册兼容性事件处理函数。
-
-        Note:
-            通过反射自动识别插件类中的兼容性事件处理函数并注册到事件总线。
-        """
+        """执行兼容性的自动行为，使用外部定义的兼容性处理器"""
+        event_bus = self.event_bus
         for plugin_name, plugin in self.plugins.items():
             for attr_name in dir(plugin):
                 func = getattr(plugin, attr_name)
-                # 跳过非函数 
                 if not callable(func):
                     continue
-                # 检查是否为兼容性事件处理函数
-                event_info = getattr(func, "_compatible_event", None)
-                if event_info:
-                    # 绑定方法（如果是类方法）
-                    if event_info["in_class"]:
-                        bound_func = func.__get__(plugin, plugin.__class__)
-                    else:
-                        bound_func = func
-                    # 注册处理函数
-                    handler_id = self.event_bus.subscribe(
-                        event_info["event_type"],
-                        bound_func,
-                        event_info.get("priority", 0)
-                    )
-                    print(event_info["event_type"])
-                    plugin._event_handlers.append(handler_id)
+                    
+                # 遍历所有兼容性处理器
+                for handler in COMPATIBLE_HANDLERS:
+                    if handler.check(func):
+                        handler.handle(plugin, func, event_bus)
 
-    async def unload_plugin(self, plugin_name: str, *arg, **kwd):
+
+    async def unload_plugin(self, plugin_name: str, **kwargs):
         """卸载指定的插件。
 
         Args:
@@ -250,14 +243,14 @@ class PluginLoader(PluginInfoMixin):
             return False
         
         try:
-            await self.plugins[plugin_name].__unload__(*arg, **kwd)
+            await self.plugins[plugin_name].__unload__(**kwargs)
             del self.plugins[plugin_name]
             return True
         except Exception as e:
             LOG.error(f"卸载插件 '{plugin_name}' 时发生错误: {e}")
             return False
 
-    async def reload_plugin(self, plugin_name: str):
+    async def reload_plugin(self, plugin_name: str, **kwargs):
         """重新加载指定的插件。
 
         Args:
@@ -265,6 +258,9 @@ class PluginLoader(PluginInfoMixin):
             
         Returns:
             bool: 重载是否成功
+        
+        Note:
+            如果重载失败不会恢复插件
         """
         try:
             # 如果插件已加载，先卸载
@@ -304,9 +300,10 @@ class PluginLoader(PluginInfoMixin):
             # 创建新的插件实例
             try:
                 new_plugin = plugin_class(
-                    self.event_bus,
-                    debug=self._debug,
-                    api=self.plugins[plugin_name].api if plugin_name in self.plugins else None
+                    event_bus = self.event_bus,
+                    debug = self._debug,  # 传递调试模式标记 
+                    sys_api = self.sys_api,
+                    **kwargs
                 )
                 await new_plugin.__onload__()
                 self.plugins[plugin_name] = new_plugin
@@ -337,7 +334,7 @@ class PluginLoader(PluginInfoMixin):
 
         modules = {}
         original_sys_path = sys.path.copy()
-        installed_packages = {pack['name'].strip().lower(): pack['version'] for pack in PM.list_installed() if 'name' in pack}
+        installed_packages = {pack['name'].strip().lower(): pack['version'] for pack in EPM.list_installed() if 'name' in pack}
         download_new = False
 
         try:
@@ -368,7 +365,7 @@ class PluginLoader(PluginInfoMixin):
                         if any(req.startswith(prefix) for prefix in ['git+', 'http:', 'https:']):
                             if input(f'发现特殊安装要求 {req}, 是否安装(Y/n):').lower() in ('y', ''):
                                 LOG.info(f'开始安装: {req}')
-                                PM.install(req)
+                                EPM.install(req)
                             continue
                         # 解析包名和版本约束
                         if '==' in req:
@@ -385,13 +382,13 @@ class PluginLoader(PluginInfoMixin):
                                 if current_ver < required_ver:
                                     if input(f'包 {pkg_name} 当前版本 {current_ver} 低于要求的 {required_ver}, 是否更新(Y/n):').lower() in ('y', ''):
                                         LOG.info(f'更新包: {req}')
-                                        PM.install(req)
+                                        EPM.install(req)
                                         download_new = True
                         else:
                             download_new = True
                             if input(f'发现未安装的依赖 {req}, 是否安装(Y/n):').lower() in ('y', ''):
                                 LOG.info(f'开始安装: {req}')
-                                PM.install(req)
+                                EPM.install(req)
 
                 # 动态导入模块
                 try:
