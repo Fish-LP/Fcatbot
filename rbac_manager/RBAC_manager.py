@@ -2,12 +2,12 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-03-21 18:06:59
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-05-24 14:09:15
+# @LastEditTime : 2025-05-24 16:09:44
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
 from typing import Dict, List
-from .permission_tree import RuleTree
+from .permission_tree import RuleTree, LiteralTree
 
 class Role:
     """角色类，管理权限规则"""
@@ -52,11 +52,22 @@ class PermissionManager:
     """RBAC权限管理核心类"""
     def __init__(self):
         self.roles: Dict[str, Role] = {}
-        self.global_permissions = RuleTree()  # 全局权限树
+        self.global_permissions = LiteralTree()
 
-    def register_permission(self, permission_pattern: str) -> None:
-        """注册权限"""
-        self.global_permissions.add_permission(permission_pattern)
+    def __str__(self):
+        return "\033[1m\033[33mGlobal Permissio\033[0m\n" + str(self.global_permissions)
+
+    def register_permission(self, permission: str) -> None:
+        """注册具体权限"""
+        self.global_permissions.add_permission(permission)
+
+    def is_permission_registered(self, permission_pattern: str) -> bool:
+        """检查权限模式是否匹配任何已注册的权限"""
+        return bool(self.global_permissions.match(permission_pattern))
+
+    def get_matched_permissions(self, permission_pattern: str) -> List[str]:
+        """获取与模式匹配的所有已注册权限"""
+        return self.global_permissions.match(permission_pattern)
 
     def create_role(self, role_name: str) -> Role:
         """创建角色"""
@@ -70,15 +81,12 @@ class PermissionManager:
         if role:
             user.assign_role(role)
 
-    def add_permission(self, role_name: str, permission_pattern: str) -> None:
-        """为角色添加允许权限规则"""
+    def assign_permission(self, role_name: str, permission_pattern: str, deny: bool = False) -> None:
+        """为角色分配权限规则，只有模式匹配到已注册权限时才能分配"""
         role = self.roles.get(role_name)
-        # 只有已经注册的权限才能被分配
-        if role and self.global_permissions.match(permission_pattern):
-            role.add_permission(permission_pattern)
-            
-    def deny_permission(self, role_name: str, permission_pattern: str) -> None:
-        """为角色添加拒绝权限规则"""
-        role = self.roles.get(role_name)
-        if role and self.global_permissions.match(permission_pattern):
-            role.deny_permission(permission_pattern)
+        matched_permissions = self.get_matched_permissions(permission_pattern)
+        if role and matched_permissions:
+            if deny:
+                role.deny_permission(permission_pattern)
+            else:
+                role.add_permission(permission_pattern)

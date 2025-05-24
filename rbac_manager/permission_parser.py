@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-05-05 14:34:56
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-05-24 10:24:46
+# @LastEditTime : 2025-05-24 16:04:08
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
@@ -13,10 +13,8 @@ from typing import Iterable, List, Tuple, Union
 
 class Segment(ABC):
     """
-    路径段基类（抽象类）
-
-    该类是所有路径段类型的基类，定义了路径段的基本属性和方法
-    路径段是构成权限路径的基本单元，可以是字面量、通配符、选项组、正则表达式或格式化占位符
+    路径段基类
+    路径段是构成权限路径的基本单元
 
     Attributes:
         is_reversed (bool): 是否反转该路径段的匹配逻辑默认为 False
@@ -70,6 +68,10 @@ class Literal(Segment):
     def _hash_content(self):
         return (self.value, self.is_reversed)
 
+    def __str__(self):
+        """返回路径段的字符串表示形式"""
+        return f"{'!' if self.is_reversed else ''}{self.value}"
+
     def match(self, value: str) -> bool:
         return self.value == value
 
@@ -102,6 +104,10 @@ class Wildcard(Segment):
     def match(self, value: str) -> bool:
         return True
 
+    def __str__(self):
+        """返回路径段的字符串表示形式"""
+        return f"{'!' if self.is_reversed else ''}{self.scope}"
+
 class ChoiceGroup(Segment):
     """
     选项组段
@@ -129,6 +135,10 @@ class ChoiceGroup(Segment):
 
     def match(self, value: str) -> bool:
         return value in self.options
+
+    def __str__(self):
+        """返回路径段的字符串表示形式"""
+        return f"{'!' if self.is_reversed else ''}{self.options}"
 
 
 class RegexSegment(Segment):
@@ -175,31 +185,33 @@ class RegexSegment(Segment):
             return not match_result
         return match_result
 
+    def __str__(self):
+        """返回路径段的字符串表示形式"""
+        return f"{'!' if self.is_reversed else ''}[{self.pattern}]"
 
-class FormatSegment(Segment):
-    """
-    格式化占位段
 
-    格式化占位段表示一个可以匹配特定格式的占位符
+# class FormatSegment(Segment):
+#     """
+#     格式化占位段
 
-    Attributes:
-        expression (str): 格式化占位段的格式化表达式
-        is_reversed (bool): 是否反转该路径段的匹配逻辑默认为 False
-    """
+#     Attributes:
+#         expression (str): 格式化占位段的格式化表达式
+#         is_reversed (bool): 是否反转该路径段的匹配逻辑默认为 False
+#     """
 
-    def __init__(self, expression: str, is_reversed: bool = False):
-        """
-        初始化格式化占位段
+#     def __init__(self, expression: str, is_reversed: bool = False):
+#         """
+#         初始化格式化占位段
 
-        Args:
-            expression (str): 格式化占位段的格式化表达式
-            is_reversed (bool): 是否反转该路径段的匹配逻辑默认为 False
-        """
-        super().__init__(is_reversed)
-        self.expression = expression
+#         Args:
+#             expression (str): 格式化占位段的格式化表达式
+#             is_reversed (bool): 是否反转该路径段的匹配逻辑默认为 False
+#         """
+#         super().__init__(is_reversed)
+#         self.expression = expression
 
-    def _hash_content(self):
-        return (self.expression, self.is_reversed)
+#     def _hash_content(self):
+#         return (self.expression, self.is_reversed)
 
 
 class PermissionPath:
@@ -255,8 +267,8 @@ class PermissionPath:
         if len(self) < len(other):
             return False
         
-        return all(segment.match(other_segment) 
-                  for segment, other_segment in zip(self, other))
+        return all(segment.match(other_segment)
+                    for segment, other_segment in zip(self, other))
 
 
 class SegmentFactory:
@@ -289,8 +301,8 @@ class SegmentFactory:
             return ChoiceGroup(kwargs['options'], is_reversed)
         elif type_ == 'RegexSegment':
             return RegexSegment(kwargs['pattern'], is_reversed)
-        elif type_ == 'FormatSegment':
-            return FormatSegment(kwargs['expression'], is_reversed)
+        # elif type_ == 'FormatSegment':
+        #     return FormatSegment(kwargs['expression'], is_reversed)
         else:
             raise ValueError(f"未知的段类型: {type_}")
 
@@ -376,7 +388,7 @@ class Parser:
             return segment_factory.create_segment('ChoiceGroup', is_reversed, options=options)
         elif content.startswith('[') and content.endswith(']'):
             return segment_factory.create_segment('RegexSegment', is_reversed, pattern=content[1:-1])
-        elif content.startswith('{') and content.endswith('}'):
-            return segment_factory.create_segment('FormatSegment', is_reversed, expression=content[1:-1])
+        # elif content.startswith('{') and content.endswith('}'):
+        #     return segment_factory.create_segment('FormatSegment', is_reversed, expression=content[1:-1])
         else:
             return segment_factory.create_segment('Literal', is_reversed, value=content)

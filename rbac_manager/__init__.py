@@ -7,5 +7,7 @@
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 
-__all__ = [
-]
+from .RBAC_manager import PermissionManager, Role, User
+from .user_manager import UserManager
+
+__all__ = ['PermissionManager', 'UserManager', 'Role', 'User']
