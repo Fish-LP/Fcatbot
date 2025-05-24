@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-05-24 18:22:55
+# @LastEditTime : 2025-05-24 19:23:58
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -223,7 +223,7 @@ class BasePlugin(
             await self.data.aload()
             
         except (FileTypeUnknownError, LoadError, FileNotFoundError) as e:
-            if not self.debug:
+            if not self.debug or self.first_load:
                 open(self._data_path,'w').write('')
             else:
                 raise PluginDataError(self.name, "加载", str(e))
