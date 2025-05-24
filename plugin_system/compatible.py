@@ -1,3 +1,11 @@
+# -------------------------
+# @Author       : Fish-LP fish.zh@outlook.com
+# @Date         : 2025-05-04 22:39:56
+# @LastEditors  : Fish-LP fish.zh@outlook.com
+# @LastEditTime : 2025-05-24 18:23:18
+# @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
+# @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
+# -------------------------
 from typing import Callable, Any, List, Optional, TypeVar
 import inspect
 from functools import wraps

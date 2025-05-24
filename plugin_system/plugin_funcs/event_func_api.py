@@ -12,7 +12,7 @@ from uuid import UUID
 
 from ...utils import get_log
 from ..event import EventBus, Event
-from .abc_api import AbstractPluginApi
+from ..abc_api import AbstractPluginApi
 
 
 LOG = get_log('BasePlugin')

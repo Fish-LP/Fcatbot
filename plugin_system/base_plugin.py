@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-05-23 20:10:50
+# @LastEditTime : 2025-05-24 18:22:55
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -12,6 +12,7 @@ import inspect
 from pathlib import Path
 from typing import List, final
 from uuid import UUID
+from logging import getLogger
 
 from .api import PluginSysApi
 
@@ -26,14 +27,14 @@ from .event import EventBus, Event
 from ..utils import ChangeDir
 from ..utils import Color
 from ..utils import UniversalLoader
-from ..utils import get_log
-from ..utils import visualize_tree
 from ..utils.universal_data_IO import FileTypeUnknownError, SaveError, LoadError
-from ..config import PERSISTENT_DIR, PLUGINS_DIR
+from ..utils import visualize_tree
+from ..config import PERSISTENT_DIR
 
-LOG = get_log('BasePlugin')
+LOG = getLogger('BasePlugin')
 
-from .plugin_funcs import IPluginApi ,EventHandlerMixin, TimeTaskMixin, PluginFunctionMixin
+from .plugin_funcs import EventHandlerMixin, TimeTaskMixin, PluginFunctionMixin
+from .abc_api import IPluginApi
 
 class BasePlugin(
         IPluginApi, # 插件功能定义
@@ -196,7 +197,7 @@ class BasePlugin(
             await self.on_close(*arg, **kwd)
             
             if self.debug:
-                LOG.warning(f"{Color.YELLOW}debug模式{Color.RED}取消{Color.RESET}退出时的保存行为")
+                LOG.warning(f"{Color.YELLOW}debug模式下将{Color.RED}取消{Color.RESET}退出时的默认保存行为")
                 print(f'{Color.GRAY}{self.name}\n', '\n'.join(visualize_tree(self.data.data)), sep='')
             else:
                 await self.data.asave()

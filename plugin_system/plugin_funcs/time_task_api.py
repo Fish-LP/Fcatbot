@@ -8,7 +8,7 @@
 # -------------------------
 from typing import Any, Dict, List, Callable, Optional, Tuple, Union, final
 from ...utils import TimeTaskScheduler
-from .abc_api import AbstractPluginApi
+from ..abc_api import AbstractPluginApi
 
 class TimeTaskMixin(AbstractPluginApi):
     """定时任务调度混入类，提供定时任务的管理功能
