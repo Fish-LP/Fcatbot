@@ -2,11 +2,12 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-05-24 19:23:58
+# @LastEditTime : 2025-05-24 19:40:53
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 import asyncio
+from copy import copy
 import inspect
 
 from pathlib import Path
@@ -196,7 +197,7 @@ class BasePlugin(
             await asyncio.to_thread(self._close_, *arg, **kwd)
             await self.on_close(*arg, **kwd)
             
-            if self.debug:
+            if self.debug or self.first_load:
                 LOG.warning(f"{Color.YELLOW}debug模式下将{Color.RED}取消{Color.RESET}退出时的默认保存行为")
                 print(f'{Color.GRAY}{self.name}\n', '\n'.join(visualize_tree(self.data.data)), sep='')
             else:
@@ -231,6 +232,8 @@ class BasePlugin(
         try:
             await asyncio.to_thread(self._init_)
             await self.on_load()
+            if self.debug and self.first_load:
+                await self.data.asave()
         except Exception as e:
             raise PluginInitError(self.name, str(e))
 
