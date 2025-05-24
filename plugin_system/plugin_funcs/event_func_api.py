@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-03-29 15:36:57
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-05-15 19:23:01
+# @LastEditTime : 2025-05-24 17:00:30
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
@@ -37,7 +37,7 @@ class PluginFunctionMixin(AbstractPluginApi):
     _event_handlers: List[UUID]
     meta_data: dict
 
-    def addfunc(
+    def register_function(
         self,
         name: str,  # 功能名称
         event_type: str,  # 监听的事件类型
@@ -48,7 +48,7 @@ class PluginFunctionMixin(AbstractPluginApi):
         permission: str = None,  # 权限要求（预留）
     ):
         """
-        添加一个新的插件功能。
+        注册一个新的插件功能。
 
         功能通过监听特定事件并触发特定逻辑来实现。该方法会将功能注册到事件总线中，并记录功能的元数据。
 
