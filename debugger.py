@@ -207,8 +207,8 @@ def cmd_private(client, *args):
         if name in client.plugin_sys.plugins:
             plugin = client.plugin_sys.plugins[name]
             print(f"{Color.CYAN}插件 {name} 的数据:{Color.RESET}")
-            if plugin.data.data:
-                print('\n'.join(visualize_tree(plugin.data.data)))
+            if plugin.data:
+                print('\n'.join(visualize_tree(plugin.data)))
             else:
                 print(f"{Color.GRAY}(空){Color.RESET}")
         else:
@@ -244,7 +244,7 @@ def cmd_private(client, *args):
             
             # 显示更新后的数据
             print(f"{Color.CYAN}当前数据:{Color.RESET}")
-            print('\n'.join(visualize_tree(plugin.data.data)))
+            print('\n'.join(visualize_tree(plugin.data)))
         except Exception as e:
             print(f"{Color.RED}操作失败: {e}{Color.RESET}")
             
@@ -425,41 +425,41 @@ def start_debug_mode(client):
     client.ws.set_request_interceptor(debug_interceptor)
     
     print(f"{Color.CYAN}输入 {Color.GREEN}.help{Color.CYAN} 查看调试命令帮助{Color.RESET}")
-    while True:
-        try:
-            text = input(f'{Color.MAGENTA}>{Color.RESET} ').strip()
-            if not text:
-                continue
-                
-            if text.startswith('.'):
-                parts = text[1:].split()
-                if not parts:
+    try:
+        while True:
+                text = input(f'{Color.MAGENTA}>{Color.RESET} ').strip()
+                if not text:
                     continue
-                cmd, *args = parts
+                    
+                if text.startswith('.'):
+                    parts = text[1:].split()
+                    if not parts:
+                        continue
+                    cmd, *args = parts
+                    
+                    if cmd in debug_commands:
+                        try:
+                            result = debug_commands[cmd](client, *args)
+                            if inspect.iscoroutinefunction(debug_commands[cmd]):
+                                asyncio.run(result)
+                        except Exception as e:
+                            print(f"{Color.RED}命令执行出错: {e}{Color.RESET}")
+                    continue
                 
-                if cmd in debug_commands:
-                    try:
-                        result = debug_commands[cmd](client, *args)
-                        if inspect.iscoroutinefunction(debug_commands[cmd]):
-                            asyncio.run(result)
-                    except Exception as e:
-                        print(f"{Color.RED}命令执行出错: {e}{Color.RESET}")
-                continue
+                # 处理消息发送
+                send_simulated_message(client, text)
             
-            # 处理消息发送
-            send_simulated_message(client, text)
-                
-        except KeyboardInterrupt:
-            print()
-            LOG.info("退出调试模式")
-            LOG.info("可能需要第二次 Ctrl+C 退出")
-            del client
-            if readline_support:
-                try:
-                    readline.write_history_file('.history.txt')
-                except Exception:
-                    print('保存命令记录错误')
-            break
-        except Exception as e:
-            LOG.error(f"{Color.RED}调试模式错误: {e}{Color.RESET}")
-            break
+    except KeyboardInterrupt:
+        print()
+        LOG.info("退出调试模式")
+        LOG.info("可能需要第二次 Ctrl+C 退出")
+        del client
+        if readline_support:
+            try:
+                readline.write_history_file('.history.txt')
+            except Exception:
+                print('保存命令记录错误')
+    except Exception as e:
+        LOG.error(f"{Color.RED}调试模式错误: {e}{Color.RESET}")
+    
+    exit(0)

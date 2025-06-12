@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-05-16 20:16:59
+# @LastEditTime : 2025-06-12 20:22:23
 # @Description  : 喵喵喵, 超多导入(超导)
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -65,11 +65,12 @@ class BotClient:
         last_heartbeat: 最后一次心跳数据
         ws: WebSocket处理器实例
     """
-    def __init__(self, uri: str, token: str = None, command_prefix: tuple[str] = ('/','#')):
+    def __init__(self, uri: str, token: str = None, command_prefix: tuple[str] = ('/','#'), debug: bool = False):
         self.event_bus = EventBus()
-        self.plugin_sys = PluginLoader(self.event_bus)
+        self.plugin_sys = PluginLoader(self.event_bus, debug)
         self.last_heartbeat:dict = {}
         self.command_prefix = command_prefix
+        self.debug = debug
         
         headers = {"Content-Type": "application/json"}
         if token:
@@ -94,21 +95,20 @@ class BotClient:
         self.ws.start()
         return self.ws
 
-    def load_plugin(self, debug = False):
+    def load_plugin(self):
         '''仅加载插件'''
         if not os.path.exists(PLUGINS_DIR):
             os.makedirs(PLUGINS_DIR, exist_ok=True)
         # 设置插件系统的调试模式
-        self.plugin_sys.set_debug(debug)
         asyncio.run(self.plugin_sys.load_plugins(api=self.ws))
 
-    def run(self, load_plugins:bool = True, debug = False):
+    def run(self, load_plugins:bool = True):
         '''连接并启用bot客户端'''
         if load_plugins:
             LOG.info('准备加载插件')
-            self.load_plugin(debug)
+            self.load_plugin()
         LOG.info('准备启动Fcatbot')
-        if debug:
+        if self.debug:
             LOG.warning('以 DEBUG 模式启动')
             LOG.warning('推荐配合 DEGUB 级别食用')
             start_debug_mode(self)
@@ -120,7 +120,7 @@ class BotClient:
             except KeyboardInterrupt:
                 print()
                 self.close()
-                exit(0)
+                # exit(0)
 
     async def api(self, action: str, **params) -> dict:
         """调用机器人API.
