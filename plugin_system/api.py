@@ -2,11 +2,12 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-05-16 21:30:50
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-05-23 20:12:31
+# @LastEditTime : 2025-06-12 19:00:29
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
+
 PluginLoader = object
 BasePlugin = object
 # from .loader import PluginLoader
@@ -31,18 +32,6 @@ class PluginInfoMixin:
         if obj:
             return list(self.plugins.values())
         return list(self.plugins.keys())
-
-class CompatibleHandler:
-    def __init__(self, attr_name: str):
-        self.attr_name = attr_name
-        
-    def check(self, obj: Any) -> bool:
-        """检查对象是否满足该处理器的处理条件"""
-        raise NotImplementedError
-        
-    def handle(self, obj: Any) -> None:
-        """处理对象的兼容性行为"""
-        raise NotImplementedError
 
 class PluginSysApi:
     """为Plugin提供管理其他插件的接口类"""
@@ -84,6 +73,3 @@ class PluginSysApi:
             Dict[str, BasePlugin]: 插件名称到插件实例的映射
         """
         return self._plugin_sys.plugins
-
-COMPATIBLE_HANDLERS: List[CompatibleHandler] = []
-PLUGINS_DIR = "./plugins"

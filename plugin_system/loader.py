@@ -2,8 +2,8 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-03-21 18:06:59
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-05-23 20:12:17
-# @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
+# @LastEditTime : 2025-06-12 20:33:54
+# @Description  : 插件加载器
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
 import asyncio
@@ -18,6 +18,8 @@ from packaging.specifiers import SpecifierSet
 from packaging.version import parse as parse_version
 from logging import getLogger
 
+from .abc_api import CompatibleHandler
+
 from .base_plugin import BasePlugin
 from .event import EventBus
 from .pip_tool import PipTool
@@ -29,12 +31,17 @@ from .pluginsys_err import (
 )
 from .api import (
     PluginInfoMixin,
-    COMPATIBLE_HANDLERS,
-    PLUGINS_DIR,
     PluginSysApi
 )
 
-EPM = PipTool()
+from .config import config
+
+plugins_dir = config.plugins_dir
+if config.auto_install_pip_pack:
+    pip_tool = PipTool()
+else:
+    pip_tool = None
+
 LOG = getLogger('PluginLoader')
 
 
@@ -53,7 +60,7 @@ class PluginLoader(PluginInfoMixin):
         event_bus (EventBus): 用于处理插件间事件通信的事件总线
     """
 
-    def __init__(self, event_bus: EventBus):
+    def __init__(self, event_bus: EventBus, debug: bool = False):
         """初始化插件加载器。
 
         Args:
@@ -64,19 +71,9 @@ class PluginLoader(PluginInfoMixin):
         self.sys_api = PluginSysApi(self)   # 系统级接口
         self._dependency_graph: Dict[str, Set[str]] = {}  # 插件依赖关系图
         self._version_constraints: Dict[str, Dict[str, str]] = {}  # 插件版本约束
-        self._debug = False  # 调试模式标记
-
-    def set_debug(self, debug: bool = False):
-        """设置插件系统的调试模式。
-
-        Args:
-            debug (bool, optional): 是否启用调试模式。默认为 False
-
-        Note:
-            启用调试模式后会输出更详细的日志信息。
-        """
         self._debug = debug
-        LOG.warning("插件系统已切换为调试模式") if debug else None
+        if debug:
+            LOG.warning("插件系统已切换为调试模式") if debug else None
 
     def _validate_plugin(self, plugin_cls: Type[BasePlugin]) -> bool:
         """验证插件类是否符合规范要求。
@@ -176,7 +173,9 @@ class PluginLoader(PluginInfoMixin):
 
         temp_plugins = {}
         for name in load_order:
+            
             plugin_cls = next(p for p in valid_plugins if p.name == name)
+            LOG.info(f"加载插件 {plugin_cls.name}")
             temp_plugins[name] = plugin_cls(
                 event_bus = self.event_bus,
                 debug = self._debug,  # 传递调试模式标记 
@@ -190,14 +189,14 @@ class PluginLoader(PluginInfoMixin):
         for name in load_order:
             await self.plugins[name].__onload__()
 
-    async def load_plugins(self, plugins_path: str = PLUGINS_DIR, **kwargs):
+    async def load_plugins(self, plugins_path: str = plugins_dir, **kwargs):
         """从指定目录加载所有插件。
 
         Args:
-            plugins_path (str, optional): 插件目录路径。默认为 PLUGINS_DIR
+            plugins_path (str, optional): 插件目录路径。默认为 plugins_dir
             **kwargs: 传递给插件实例化的额外参数
         """
-        if not plugins_path: plugins_path = PLUGINS_DIR
+        if not plugins_path: plugins_path = plugins_dir
         if os.path.exists(plugins_path):
             LOG.info(f"从 {os.path.abspath(plugins_path)} 导入插件")
             modules = self._load_modules_from_directory(plugins_path)
@@ -205,7 +204,7 @@ class PluginLoader(PluginInfoMixin):
             for plugin in modules.values():
                 for plugin_class_name in getattr(plugin, "__all__", []):
                     plugins.append(getattr(plugin, plugin_class_name))
-            LOG.info(f"准备加载插件 [{len(plugins)}]......")
+            LOG.info(f"准备加载插件 ({len(plugins)})......")
             await self.from_class_load_plugins(plugins, **kwargs)
             LOG.info(f"已加载插件数 [{len(self.plugins)}]")
             LOG.info(f"准备加载兼容内容......")
@@ -225,7 +224,7 @@ class PluginLoader(PluginInfoMixin):
                     continue
                     
                 # 遍历所有兼容性处理器
-                for handler in COMPATIBLE_HANDLERS:
+                for handler in CompatibleHandler._subclasses:
                     if handler.check(func):
                         handler.handle(plugin, func, event_bus)
 
@@ -271,8 +270,8 @@ class PluginLoader(PluginInfoMixin):
                 module_path = old_plugin.__class__.__module__
             else:
                 # 搜索插件目录查找插件
-                for dir_name in os.listdir(PLUGINS_DIR):
-                    if os.path.isdir(os.path.join(PLUGINS_DIR, dir_name)):
+                for dir_name in os.listdir(plugins_dir):
+                    if os.path.isdir(os.path.join(plugins_dir, dir_name)):
                         module_path = dir_name
 
             try:
@@ -334,7 +333,7 @@ class PluginLoader(PluginInfoMixin):
 
         modules = {}
         original_sys_path = sys.path.copy()
-        installed_packages = {pack['name'].strip().lower(): pack['version'] for pack in EPM.list_installed() if 'name' in pack}
+        installed_packages = {pack['name'].strip().lower(): pack['version'] for pack in pip_tool.list_installed() if 'name' in pack}
         download_new = False
 
         try:
@@ -353,42 +352,43 @@ class PluginLoader(PluginInfoMixin):
                 else:
                     continue
 
-                # 处理 requirements.txt
-                req_file = os.path.join(plugin_path, "requirements.txt") if os.path.isdir(plugin_path) else plugin_path.replace(".py", ".requirements.txt")
-                if os.path.isfile(req_file):
-                    with open(req_file) as f:
-                        requirements = [line.strip() for line in f if line.strip() and not line.startswith('#')]
-                    for req in requirements:
-                        if req.startswith('-'):
-                            continue
-                        # 处理git/url安装
-                        if any(req.startswith(prefix) for prefix in ['git+', 'http:', 'https:']):
-                            if input(f'发现特殊安装要求 {req}, 是否安装(Y/n):').lower() in ('y', ''):
-                                LOG.info(f'开始安装: {req}')
-                                EPM.install(req)
-                            continue
-                        # 解析包名和版本约束
-                        if '==' in req:
-                            pkg_name, version_constraint = req.split('==', 1)
-                        elif '>=' in req:
-                            pkg_name, version_constraint = req.split('>=', 1)
-                        else:
-                            pkg_name, version_constraint = req, None
-                        pkg_name = pkg_name.lower()
-                        if pkg_name in installed_packages:
-                            if version_constraint:
-                                current_ver = parse_version(installed_packages[pkg_name])
-                                required_ver = parse_version(version_constraint)
-                                if current_ver < required_ver:
-                                    if input(f'包 {pkg_name} 当前版本 {current_ver} 低于要求的 {required_ver}, 是否更新(Y/n):').lower() in ('y', ''):
-                                        LOG.info(f'更新包: {req}')
-                                        EPM.install(req)
-                                        download_new = True
-                        else:
-                            download_new = True
-                            if input(f'发现未安装的依赖 {req}, 是否安装(Y/n):').lower() in ('y', ''):
-                                LOG.info(f'开始安装: {req}')
-                                EPM.install(req)
+                if pip_tool:
+                    # 处理 requirements.txt
+                    req_file = os.path.join(plugin_path, "requirements.txt") if os.path.isdir(plugin_path) else plugin_path.replace(".py", ".requirements.txt")
+                    if os.path.isfile(req_file):
+                        with open(req_file) as f:
+                            requirements = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+                        for req in requirements:
+                            if req.startswith('-'):
+                                continue
+                            # 处理git/url安装
+                            if any(req.startswith(prefix) for prefix in ['git+', 'http:', 'https:']):
+                                if input(f'发现特殊安装要求 {req}, 是否安装(Y/n):').lower() in ('y', ''):
+                                    LOG.info(f'开始安装: {req}')
+                                    pip_tool.install(req)
+                                continue
+                            # 解析包名和版本约束
+                            if '==' in req:
+                                pkg_name, version_constraint = req.split('==', 1)
+                            elif '>=' in req:
+                                pkg_name, version_constraint = req.split('>=', 1)
+                            else:
+                                pkg_name, version_constraint = req, None
+                            pkg_name = pkg_name.lower()
+                            if pkg_name in installed_packages:
+                                if version_constraint:
+                                    current_ver = parse_version(installed_packages[pkg_name])
+                                    required_ver = parse_version(version_constraint)
+                                    if current_ver < required_ver:
+                                        if input(f'包 {pkg_name} 当前版本 {current_ver} 低于要求的 {required_ver}, 是否更新(Y/n):').lower() in ('y', ''):
+                                            LOG.info(f'更新包: {req}')
+                                            pip_tool.install(req)
+                                            download_new = True
+                            else:
+                                download_new = True
+                                if input(f'发现未安装的依赖 {req}, 是否安装(Y/n):').lower() in ('y', ''):
+                                    LOG.info(f'开始安装: {req}')
+                                    pip_tool.install(req)
 
                 # 动态导入模块
                 try:

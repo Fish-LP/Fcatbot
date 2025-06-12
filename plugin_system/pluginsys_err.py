@@ -3,7 +3,7 @@
 # @Date         : 2025-02-11 17:26:43
 # @LastEditors  : Fish-LP fish.zh@outlook.com
 # @LastEditTime : 2025-03-17 18:56:56
-# @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
+# @Description  : 插件系统自定义错误
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 class PluginSystemError(Exception):

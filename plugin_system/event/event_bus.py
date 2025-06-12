@@ -2,8 +2,8 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:31:16
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-05-16 20:29:20
-# @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
+# @LastEditTime : 2025-06-12 18:29:00
+# @Description  : 事件总线类,用于管理和分发事件
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 from typing import List, Any, Callable, Dict

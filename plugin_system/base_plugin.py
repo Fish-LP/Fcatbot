@@ -2,18 +2,18 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-05-24 19:40:53
+# @LastEditTime : 2025-06-12 21:41:07
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 import asyncio
-from copy import copy
 import inspect
 
 from pathlib import Path
 from typing import List, final
 from uuid import UUID
 from logging import getLogger
+import uuid
 
 from .api import PluginSysApi
 
@@ -24,18 +24,21 @@ from .pluginsys_err import (
     PluginWorkspaceError,
     PluginUnloadError
 )
-from .event import EventBus, Event
+from .event import EventBus
 from ..utils import ChangeDir
 from ..utils import Color
 from ..utils import UniversalLoader
 from ..utils.universal_data_IO import FileTypeUnknownError, SaveError, LoadError
 from ..utils import visualize_tree
-from ..config import PERSISTENT_DIR
+from .config import config
+from .abc_api import IPluginApi
+from .plugin_funcs import (
+    EventHandlerMixin,
+    TimeTaskMixin,
+    PluginFunctionMixin
+)
 
 LOG = getLogger('BasePlugin')
-
-from .plugin_funcs import EventHandlerMixin, TimeTaskMixin, PluginFunctionMixin
-from .abc_api import IPluginApi
 
 class BasePlugin(
         IPluginApi, # 插件功能定义
@@ -53,6 +56,7 @@ class BasePlugin(
     - `version`: 插件版本号
     
     ## 插件标识
+    - `id (UUID)`: 插件本地唯一id, 自动生成
     - `name (str)`: 插件名称，必须定义
     - `version (str)`: 插件版本号，必须定义
     - `author (str)`: 作者名称，默认 'Unknown'
@@ -76,14 +80,15 @@ class BasePlugin(
     
     # 核心方法
     - `__init__()`: 初始化插件实例，不可重写
-    - `__onload__()`: 加载插件，执行初始化
-    - `__unload__()`: 卸载插件，执行清理
+    - `__onload__()`: 加载插件，执行初始化，不可重写
+    - `__unload__()`: 卸载插件，执行清理，不可重写
     - `_init_()`: 同步初始化钩子，可重写
     - `_close_()`: 同步清理钩子，可重写
     - `on_load()`: 异步初始化钩子，可重写
     - `on_close()`: 异步清理钩子，可重写
     """
 
+    id: uuid.UUID
     name: str
     version: str
     dependencies: dict
@@ -147,7 +152,7 @@ class BasePlugin(
         self._event_bus: EventBus = event_bus
         # 使用插件目录名作为工作目录名
         plugin_dir_name = self.self_path.name
-        self._work_path = Path(PERSISTENT_DIR).resolve() / plugin_dir_name
+        self._work_path = Path(config.plugins_data_dir).resolve() / plugin_dir_name
         self._data_path = self._work_path / f"{plugin_dir_name}.{self.save_type}"
 
         # 检查是否为第一次启动
@@ -162,7 +167,8 @@ class BasePlugin(
             raise PluginWorkspaceError(self.name, self._work_path, "不是有效的工作目录")
 
         # 接口
-        self.data = UniversalLoader(self._data_path, self.save_type)
+        self._data = UniversalLoader(self._data_path, self.save_type, realtime_save=True, realtime_load=True)
+        self.data = self._data
         self.work_space = ChangeDir(self._work_path)
         self.self_space = ChangeDir(self.self_path)
         self.sys: PluginSysApi = sys_api
@@ -197,7 +203,7 @@ class BasePlugin(
             await asyncio.to_thread(self._close_, *arg, **kwd)
             await self.on_close(*arg, **kwd)
             
-            if self.debug or self.first_load:
+            if not self.first_load and self.debug:
                 LOG.warning(f"{Color.YELLOW}debug模式下将{Color.RED}取消{Color.RESET}退出时的默认保存行为")
                 print(f'{Color.GRAY}{self.name}\n', '\n'.join(visualize_tree(self.data.data)), sep='')
             else:
@@ -220,15 +226,23 @@ class BasePlugin(
         """
         try:
             if isinstance(self.data, dict):
-                self.data = UniversalLoader(self._data_path, self.save_type)
+                self.data = self._data
             await self.data.aload()
+            if 'meta_data' not in self.data:
+                self.data['meta_data'] = self._meta_data
+                await self.data.asave()
+            if 'id' not in self.data['meta_data']:
+                self.id = uuid.uuid4()
+                self.data['meta_data']['id'] = self.id
+                await self.data.asave()
+            self.id = self.data['meta_data']['id']
             
         except (FileTypeUnknownError, LoadError, FileNotFoundError) as e:
             if not self.debug or self.first_load:
                 open(self._data_path,'w').write('')
             else:
                 raise PluginDataError(self.name, "加载", str(e))
-                
+        
         try:
             await asyncio.to_thread(self._init_)
             await self.on_load()
