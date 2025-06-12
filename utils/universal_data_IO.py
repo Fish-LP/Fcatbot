@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-13 21:47:01
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-04-04 17:35:35
+# @LastEditTime : 2025-06-12 21:39:11
 # @Description  : 通用文件加载器，支持JSON/TOML/YAML/PICKLE格式的同步/异步读写
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -28,11 +28,15 @@ Raises:
 import ast
 import asyncio
 import json
+import uuid
 import os
 import warnings
+import time
 from typing import Callable, Dict, Any, Literal, Optional, Union
 from pathlib import Path
 import pickle
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 # ---------------------
 # region 模块可用性检测区块
@@ -110,26 +114,104 @@ class ModuleNotInstalledError(UniversalLoaderError):
 # region 主功能类实现
 # ---------------------
 
+class FileChangeHandler(FileSystemEventHandler):
+    def __init__(self, callback: Callable, on_modified_callbacks: list[Callable] = None):
+        self.last_modified = 0
+        self.callback = callback
+        self.on_modified_callbacks = on_modified_callbacks or []
+        super().__init__()
+
+    def on_modified(self, event):
+        if event.is_directory:
+            return
+        current_time = time.time()
+        if current_time - self.last_modified > 1:  # 防止重复触发
+            self.last_modified = current_time
+            self.callback()
+            # 执行所有注册的回调
+            for callback in self.on_modified_callbacks:
+                try:
+                    callback()
+                except Exception as e:
+                    warnings.warn(f"执行文件修改回调时出错: {e}")
+
 class UniversalLoader(dict):
-    _flag = '-'
+    """
+    通用加载器，支持多种文件类型的数据加载与保存。
+
+    该加载器可以根据文件扩展名自动识别文件类型，同时提供实时保存和实时读取的功能。
+    实时保存功能会在数据变更时自动保存到文件，而实时读取功能会在文件变更时自动重新加载数据。
+
+    Attributes:
+        realtime_save (bool): 是否启用实时保存（数据变更时自动保存）。
+        realtime_load (bool): 是否启用实时读取（文件变更时自动重新加载）。
+        file_path (str or Path): 文件路径，支持字符串或 Path 对象。
+        file_type (str): 手动指定文件类型（覆盖自动检测），支持类型：json/toml/yaml/pickle。
+
+    Methods:
+        load(): 加载文件内容到内存。
+        save(): 将内存中的数据保存到文件。
+
+    Example:
+        >>> loader = UniversalLoader("data.json")
+        >>> loader.load()
+        >>> loader.save()
+
+    Note:
+        - 如果启用实时读取功能，需要确保文件路径有效且可访问。
+        - 如果手动指定文件类型，需确保与文件实际内容匹配，否则可能导致加载失败。
+
+    See Also:
+        json: 用于处理 JSON 文件。
+        toml: 用于处理 TOML 文件。
+        yaml: 用于处理 YAML 文件。
+        pickle: 用于处理 Python 对象序列化文件。
+    """
+    _flag = '|'
     _custom_type_handlers = {}
     
-    def __init__(self, file_path: Union[str, Path], file_type: Optional[str] = None):
+    def __init__(self,
+                file_path: Union[str, Path],
+                file_type: Optional[str] = None,
+                realtime_save: bool = False,
+                realtime_load: bool = False,
+            ):
         """
-        初始化通用加载器
+        初始化通用加载器。
 
-        :param file_path: 文件路径，支持字符串或Path对象
-        :param file_type: 可选参数,手动指定文件类型（覆盖自动检测）
-                        支持类型：json/toml/yaml/pickle
-
-        示例：
-            >>> loader = UniversalLoader("data.json")
-            >>> loader.load()
+        Args:
+            file_path (str | Path): 文件路径，支持字符串或 Path 对象
+            realtime_save (bool, optional): 是否启用实时保存，数据变更时自动保存
+            realtime_load (bool, optional): 是否启用实时读取，文件变更时自动重新加载
+            file_type (str, optional): 手动指定文件类型
         """
         super().__init__()
         self.file_path: Path = Path(file_path).resolve()  # 获取绝对路径
         self.file_type = file_type.lower() if file_type else self._detect_file_type()
         self._async_lock = asyncio.Lock()  # 异步操作锁
+        self._observer = None
+        self._realtime_save = realtime_save
+        self._on_modified_callbacks = []
+        self._setup_realtime_features(realtime_save, realtime_load)
+
+    def _setup_realtime_features(self, realtime_save: bool, realtime_load: bool):
+        """设置实时功能"""
+        if realtime_save:
+            def on_dict_change(key, value):
+                self.save()
+            self.__setitem__ = lambda k, v: (super().__setitem__(k, v), on_dict_change(k, v))[0]
+
+        if realtime_load:
+            self._observer = Observer()
+            handler = FileChangeHandler(self.load, self._on_modified_callbacks)
+            self._observer.schedule(handler, str(self.file_path.parent), recursive=False)
+            self._observer.start()
+
+    def __del__(self):
+        """清理观察器"""
+        if self._observer:
+            self._observer.stop()
+            self._observer.join()
 
     def __enter__(self) -> 'UniversalLoader':
         """上下文管理器入口: with instance as data"""
@@ -442,7 +524,6 @@ class UniversalLoader(dict):
         # JSON格式保存
         if self.file_type == 'json':
             converted_data = self._type_convert(self.copy(), 'preserve', JSON_TYPE)
-            print(converted_data)
             with save_path.open('w') as f:
                 if UJSON_AVAILABLE:
                     ujson.dump(converted_data, f, ensure_ascii=False, indent=4)
@@ -495,3 +576,19 @@ class UniversalLoader(dict):
         # 其他格式回退同步保存
         return self._save_data_sync(save_path)
 # endregion
+
+# ---------------------
+# region 额外数据类型支持
+# ---------------------
+
+# UUID
+def uuid_serialize(uuid_obj):
+    return str(uuid_obj)
+
+def uuid_deserialize(uuid_str):
+    return uuid.UUID(uuid_str)
+
+UniversalLoader.register_type_handler('UUID', uuid_serialize, uuid_deserialize)
+
+# endregion
+
