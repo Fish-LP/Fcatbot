@@ -15,14 +15,15 @@ license = { file = "LICENSE" } # 许可证文件路径
 readme = "README.md" # 项目说明文件路径
 urls = { Homepage = "https://github.com/Fish-LP/FcatBot" } # 项目主页
 classifiers = [
-    "Development Status :: 3 - Alpha",        # 开发状态
-    "Intended Audience :: Developers",        # 目标受众
-    "License :: Other/Proprietary License",   # 自定义许可协议
-    "Programming Language :: Python :: 3",    # 支持的 Python 版本
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
+    "Development Status :: 3 - Alpha",      # 开发状态
+    "Intended Audience :: Developers",      # 目标受众
+    "License :: Other/Proprietary License", # 自定义许可协议
+    "Programming Language :: Python :: 3",  # 支持的 Python 版本
+    # "Programming Language :: Python :: 3.9",  # 不明确是否仍然支持
+    # "Programming Language :: Python :: 3.10", # 不明确是否仍然支持
+    # "Programming Language :: Python :: 3.11", # 不明确是否仍然支持
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
     "websockets==10.4",                                  # ws连接
