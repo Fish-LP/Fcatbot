@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-12 21:41:07
+# @LastEditTime : 2025-06-14 19:35:11
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import List, final
 from uuid import UUID
 from logging import getLogger
-import uuid
 
 from .api import PluginSysApi
 
@@ -88,13 +87,12 @@ class BasePlugin(
     - `on_close()`: 异步清理钩子，可重写
     """
 
-    id: uuid.UUID
     name: str
     version: str
     dependencies: dict
     author: str = 'Unknown'
     info: str = '这个作者很懒且神秘,没有写一点点描述,真是一个神秘的插件'
-    save_type: str = 'json'
+    save_type: str = 'yaml'
     
     data: UniversalLoader
     self_path: Path
@@ -231,11 +229,6 @@ class BasePlugin(
             if 'meta_data' not in self.data:
                 self.data['meta_data'] = self._meta_data
                 await self.data.asave()
-            if 'id' not in self.data['meta_data']:
-                self.id = uuid.uuid4()
-                self.data['meta_data']['id'] = self.id
-                await self.data.asave()
-            self.id = self.data['meta_data']['id']
             
         except (FileTypeUnknownError, LoadError, FileNotFoundError) as e:
             if not self.debug or self.first_load:

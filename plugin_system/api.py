@@ -2,16 +2,17 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-05-16 21:30:50
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-12 19:00:29
+# @LastEditTime : 2025-06-14 18:39:31
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Type, Any
 
-PluginLoader = object
-BasePlugin = object
+
 # from .loader import PluginLoader
 # from .base_plugin import BasePlugin
+BasePlugin = object
+PluginLoader = object
 
 
 

@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-03-21 18:06:59
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-12 20:33:54
+# @LastEditTime : 2025-06-14 19:55:35
 # @Description  : 插件加载器
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
@@ -28,6 +28,7 @@ from .pluginsys_err import (
     PluginCircularDependencyError,
     PluginDependencyError,
     PluginVersionError,
+    PluginNameConflictError,
 )
 from .api import (
     PluginInfoMixin,
@@ -130,7 +131,15 @@ class PluginLoader(PluginInfoMixin):
 
         Raises:
             PluginCircularDependencyError: 当发现循环依赖时抛出
+            PluginNameConflictError: 当发现重复的插件名称时抛出
         """
+        # 检查重复的插件名称
+        seen_plugins = set()
+        for plugin_name in self._dependency_graph.keys():
+            if plugin_name in seen_plugins:
+                raise PluginNameConflictError(plugin_name)
+            seen_plugins.add(plugin_name)
+
         in_degree = {k: 0 for k in self._dependency_graph}
         adj_list = defaultdict(list)
 

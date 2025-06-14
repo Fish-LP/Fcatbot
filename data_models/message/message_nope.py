@@ -2,15 +2,13 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-05-05 15:24:47
+# @LastEditTime : 2025-06-14 20:16:46
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
-import base64
 from enum import Enum
 from typing import Literal
 from dataclasses import dataclass, field
-from typing import Any
 from uuid import UUID
 
 class Behavior(Enum):
@@ -126,9 +124,12 @@ class Image(DafaultElement):
     emoji_package_id: int = field(default=None, init=True)
     
     type: str = field(default='image', init=False)
-    def __post_init__(self):
-        if self.emoji_id:
-            self.emoji_id = UUID(self.emoji_id)
+    
+    def __init__(self, *args, **kwargs):
+        if 'emoji_id' in kwargs and kwargs['emoji_id']:
+            kwargs['emoji_id'] = UUID(kwargs['emoji_id'])
+        super().__init__(*args, **kwargs)
+    
     def to_dict(self) -> dict:
         return {
             'type': 'image',
