@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-05-16 21:30:50
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-14 20:39:04
+# @LastEditTime : 2025-06-14 21:05:17
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
@@ -12,7 +12,9 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Type, Any
 if TYPE_CHECKING:
     from .loader import PluginLoader
     from .base_plugin import BasePlugin
-
+else:
+    PluginLoader = object
+    BasePlugin = object
 
 
 class PluginInfoMixin:

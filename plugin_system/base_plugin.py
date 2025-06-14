@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-14 19:35:11
+# @LastEditTime : 2025-06-14 20:46:30
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -55,7 +55,6 @@ class BasePlugin(
     - `version`: 插件版本号
     
     ## 插件标识
-    - `id (UUID)`: 插件本地唯一id, 自动生成
     - `name (str)`: 插件名称，必须定义
     - `version (str)`: 插件版本号，必须定义
     - `author (str)`: 作者名称，默认 'Unknown'
@@ -85,6 +84,9 @@ class BasePlugin(
     - `_close_()`: 同步清理钩子，可重写
     - `on_load()`: 异步初始化钩子，可重写
     - `on_close()`: 异步清理钩子，可重写
+    
+    # 系统功能
+    - `sys (PluginSysApi)`: 插件系统提供的接口
     """
 
     name: str
