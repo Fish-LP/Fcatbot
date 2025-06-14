@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-14 20:16:46
+# @LastEditTime : 2025-06-14 21:29:33
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -39,7 +39,7 @@ class Element:
         }
 
 @dataclass(frozen=True)
-class DafaultElement(Element):
+class DefaultElement(Element):
     '''强制置顶消息元素'''
     behavior: Behavior = field(init=False, default=Behavior.DAFAULT)
 
@@ -67,7 +67,7 @@ class OccupyTypeElement(Element):
 
 
 @dataclass(frozen=True)
-class Text(DafaultElement):
+class Text(DefaultElement):
     '''[文本]消息元素'''
     text: str
     '''文本'''
@@ -76,7 +76,7 @@ class Text(DafaultElement):
 
 
 @dataclass(frozen=True)
-class At(DafaultElement):
+class At(DefaultElement):
     '''[@]消息元素'''
     qq: int
     '''qq号'''
@@ -84,7 +84,7 @@ class At(DafaultElement):
     type: str = field(default='at', init=False)
 
 @dataclass(frozen=True)
-class AtAll(DafaultElement):
+class AtAll(DefaultElement):
     '''[@全体]消息元素'''
     qq: str = field(default='all', init=False)
     
@@ -92,7 +92,7 @@ class AtAll(DafaultElement):
 
 
 @dataclass(frozen=True)
-class Face(DafaultElement):
+class Face(DefaultElement):
     '''[表情]消息元素'''
     id: int
     resultId: int = field(default=None)
@@ -102,7 +102,7 @@ class Face(DafaultElement):
 
 
 @dataclass(frozen=True)
-class Image(DafaultElement):
+class Image(DefaultElement):
     '''[图片]消息元素'''
     file: str
     '''[参见napcat]推荐使用base64'''
@@ -128,7 +128,6 @@ class Image(DafaultElement):
     def __init__(self, *args, **kwargs):
         if 'emoji_id' in kwargs and kwargs['emoji_id']:
             kwargs['emoji_id'] = UUID(kwargs['emoji_id'])
-        super().__init__(*args, **kwargs)
     
     def to_dict(self) -> dict:
         return {
