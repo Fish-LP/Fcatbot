@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-14 21:29:33
+# @LastEditTime : 2025-06-14 21:41:22
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -125,7 +125,7 @@ class Image(DefaultElement):
     
     type: str = field(default='image', init=False)
     
-    def __init__(self, *args, **kwargs):
+    def __post_init__(self, *args, **kwargs):
         if 'emoji_id' in kwargs and kwargs['emoji_id']:
             kwargs['emoji_id'] = UUID(kwargs['emoji_id'])
     
