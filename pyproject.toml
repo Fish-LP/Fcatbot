@@ -30,6 +30,7 @@ dependencies = [
     "tqdm~=4.67.1",                                      # 进度条
     "aiofiles~=24.1.0",                                  # UniversalLoaderError支持异步文件读写
     "schedule~=1.2.2",                                   # 定时任务
+    "watchdog~=6.0.0",                                   # 文件监控
     "windows-curses~=2.4.1; platform_system=='Windows'", # Windows平台下的curses支持
     "pyreadline3; platform_system=='Windows'",           # Windows平台下的readline支持
 ]
