@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:41:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-16 01:41:00
+# @LastEditTime : 2025-06-20 14:06:02
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -195,32 +195,32 @@ def setup_logging():
     # 日志格式配置
     default_log_format = {
         "console": {
-            "DEBUG": f"{Color.CYAN}[%(asctime)s.%(msecs)03d]{Color.RESET} "
+            "DEBUG": f"{Color.CYAN}[%(asctime)s]{Color.RESET} "
                     f"{Color.BLUE}%(colored_levelname)-8s{Color.RESET} "
                     f"{Color.GRAY}[%(threadName)s|%(processName)s]{Color.RESET} "
                     f"{Color.MAGENTA}%(name)s{Color.RESET} "
                     f"{Color.YELLOW}%(filename)s:%(funcName)s:%(lineno)d{Color.RESET} "
                     "| %(message)s",
             
-            "INFO": f"{Color.CYAN}[%(asctime)s.%(msecs)03d]{Color.RESET} "
+            "INFO": f"{Color.CYAN}[%(asctime)s]{Color.RESET} "
                     f"{Color.GREEN}%(colored_levelname)-8s{Color.RESET} "
                     f"{Color.MAGENTA}%(name)s{Color.RESET} ➜ "
                     f"{Color.WHITE}%(message)s{Color.RESET}",
             
-            "WARNING": f"{Color.CYAN}[%(asctime)s.%(msecs)03d]{Color.RESET} "
+            "WARNING": f"{Color.CYAN}[%(asctime)s]{Color.RESET} "
                     f"{Color.YELLOW}%(colored_levelname)-8s{Color.RESET} "
                     f"{Color.MAGENTA}%(name)s{Color.RESET} "
                     f"{Color.RED}➜{Color.RESET} "
                     f"{Color.YELLOW}%(message)s{Color.RESET}",
             
-            "ERROR": f"{Color.CYAN}[%(asctime)s.%(mctime)s.%(msecs)03d]{Color.RESET} "
+            "ERROR": f"{Color.CYAN}[%(asctime)s.%(mctime)s]{Color.RESET} "
                     f"{Color.RED}%(colored_levelname)-8s{Color.RESET} "
                     f"{Color.GRAY}[%(filename)s]{Color.RESET}"
                     f"{Color.MAGENTA}%(name)s:%(lineno)d{Color.RESET} "
                     f"{Color.RED}➜{Color.RESET} "
                     f"{Color.RED}%(message)s{Color.RESET}",
             
-            "CRITICAL": f"{Color.CYAN}[%(asctime)s.%(msecs)03d]{Color.RESET} "
+            "CRITICAL": f"{Color.CYAN}[%(asctime)s]{Color.RESET} "
                         f"{Color.BG_RED}{Color.WHITE}%(colored_levelname)-8s{Color.RESET} "
                         f"{Color.GRAY}{{%(module)s}}{Color.RESET}"
                         f"{Color.MAGENTA}[%(filename)s]{Color.RESET}"
@@ -229,11 +229,11 @@ def setup_logging():
                         f"{Color.BOLD}%(message)s{Color.RESET}"
         },
         "file": {
-            "DEBUG": "[%(asctime)s.%(msecs)03d] %(levelname)-8s [%(threadName)s|%(processName)s] %(name)s (%(filename)s:%(funcName)s:%(lineno)d) | %(message)s",
-            "INFO": "[%(asctime)s.%(msecs)03d] %(levelname)-8s %(name)s ➜ %(message)s",
-            "WARNING": "[%(asctime)s.%(msecs)03d] %(levelname)-8s %(name)s ➜ %(message)s",
-            "ERROR": "[%(asctime)s.%(msecs)03d] %(levelname)-8s [%(filename)s]%(name)s:%(lineno)d ➜ %(message)s",
-            "CRITICAL": "[%(asctime)s.%(msecs)03d] %(levelname)-8s {%(module)s}[%(filename)s]%(name)s:%(lineno)d ➜ %(message)s",
+            "DEBUG": "[%(asctime)s] %(levelname)-8s [%(threadName)s|%(processName)s] %(name)s (%(filename)s:%(funcName)s:%(lineno)d) | %(message)s",
+            "INFO": "[%(asctime)s] %(levelname)-8s %(name)s ➜ %(message)s",
+            "WARNING": "[%(asctime)s] %(levelname)-8s %(name)s ➜ %(message)s",
+            "ERROR": "[%(asctime)s] %(levelname)-8s [%(filename)s]%(name)s:%(lineno)d ➜ %(message)s",
+            "CRITICAL": "[%(asctime)s] %(levelname)-8s {%(module)s}[%(filename)s]%(name)s:%(lineno)d ➜ %(message)s",
         }
     }
 
