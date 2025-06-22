@@ -2,14 +2,17 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-14 21:41:22
+# @LastEditTime : 2025-06-22 19:50:01
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 from enum import Enum
-from typing import Literal
+from typing import Literal, TYPE_CHECKING
 from dataclasses import dataclass, field
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from .message_chain import MessageChain
 
 class Behavior(Enum):
     DAFAULT: int = 0
@@ -258,8 +261,7 @@ class Nope(OccupyTypeElement):
 class NopeData:
     user_id: int
     nickname: str
-    content: any # MessageChain
-    '''MessageChain'''
+    content: MessageChain
 
 # TODO: Markdown
 @dataclass(frozen=True)
