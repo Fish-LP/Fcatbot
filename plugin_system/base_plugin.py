@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-14 20:46:30
+# @LastEditTime : 2025-06-22 20:56:19
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -138,6 +138,7 @@ class BasePlugin(
                 setattr(self, k, v)
 
         # 固定属性
+        TimeTaskMixin.init_api()
         plugin_file = Path(inspect.getmodule(self.__class__).__file__).resolve()
         self.this_file_path = plugin_file
         # 使用插件文件所在目录作为self_path

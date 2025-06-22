@@ -2,86 +2,19 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:41:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-20 14:06:02
+# @LastEditTime : 2025-06-22 21:51:42
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 import logging
 import os
-import sys
+import json
 import warnings
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
-
 from tqdm import tqdm as tqdm_original
 from .color import Color
 
-import ctypes
-from ctypes import wintypes
-
-def is_ansi_supported():
-    """
-    检查系统是否支持 ANSI 转义序列。
-
-    return:
-        bool: 如果系统支持 ANSI 转义序列返回 True,否则返回 False。
-    """
-    if not sys.platform.startswith("win"):
-        # 非 Windows 系统通常支持 ANSI 转义序列
-        return True
-
-    # 检查 Windows 版本
-    is_windows_10_or_higher = False
-    try:
-        # 获取 Windows 版本信息
-        version_info = sys.getwindowsversion()
-        major_version = version_info[0]
-        build_number = version_info[3]
-
-        # Windows 10 (major version 10) 或更高版本
-        if major_version >= 10:
-            is_windows_10_or_higher = True
-    except AttributeError:
-        # 如果无法获取版本信息,假设不支持
-        return False
-
-    # 检查控制台是否支持虚拟终端处理
-    kernel32 = ctypes.windll.kernel32
-    stdout_handle = kernel32.GetStdHandle(-11)
-    if stdout_handle == wintypes.HANDLE(-1).value:
-        return False
-
-    # 获取当前控制台模式
-    console_mode = wintypes.DWORD()
-    if not kernel32.GetConsoleMode(stdout_handle, ctypes.byref(console_mode)):
-        return False
-
-    # 检查是否支持虚拟终端处理
-    return (console_mode.value & 0x0004) != 0 or is_windows_10_or_higher
-
-def set_console_mode(mode=7):
-    """
-    设置控制台输出模式。
-
-    Args
-        mode (int): 控制台模式标志,默认为7（ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING）。
-
-    return:
-        bool: 如果操作成功返回True,否则返回False。
-    """
-    try:
-        kernel32 = ctypes.windll.kernel32
-        # 获取标准输出句柄
-        stdout_handle = kernel32.GetStdHandle(-11)
-        if stdout_handle == wintypes.HANDLE(-1).value:
-            return False
-        
-        # 设置控制台模式
-        if not kernel32.SetConsoleMode(stdout_handle, mode):
-            return False
-    except Exception:
-        return False
-    return True
 
 # 定义自定义的 tqdm 类,继承自原生的 tqdm 类
 class tqdm(tqdm_original):
@@ -100,7 +33,7 @@ class tqdm(tqdm_original):
         - leave (bool): 进度条完成后是否保留显示。
     """
     _STYLE_MAP = {
-        "BLACK,": Color.BLACK,
+        "BLACK": Color.BLACK,
         "RED": Color.RED,
         "GREEN": Color.GREEN,
         "YELLOW": Color.YELLOW,
@@ -110,18 +43,25 @@ class tqdm(tqdm_original):
         "WHITE": Color.WHITE,
     }
     
-
     def __init__(self, *args, **kwargs):
+        # 保存颜色参数以便后续处理
+        self._custom_colour = kwargs.get("colour", "GREEN")
+        
+        # 设置默认进度条格式
         kwargs.setdefault("bar_format", 
             f"{Color.CYAN}{{desc}}{Color.RESET} "
-            f"{Color.WHITE}{{percentage:3.0f}}%{Color.RESET}"
+            f"{Color.WHITE}{{percentage:3.0f}}%{Color.RESET} "
             f"{Color.GRAY}[{{n_fmt}}]{Color.RESET}"
             f"{Color.WHITE}|{{bar:20}}|{Color.RESET}"
             f"{Color.BLUE}[{{elapsed}}]{Color.RESET}"
         )
         kwargs.setdefault("ncols", 80)
-        kwargs.setdefault("colour", "green")
+        kwargs.setdefault("colour", None)  # 避免基类处理颜色
+        
         super().__init__(*args, **kwargs)
+        
+        # 在初始化完成后应用颜色
+        self.colour = self._custom_colour
         
     @property
     def colour(self):
@@ -130,9 +70,18 @@ class tqdm(tqdm_original):
     @colour.setter 
     def colour(self, color):
         # 确保颜色值有效
-        valid_color = self._STYLE_MAP.get(color, "GREEN")  # 如果无效,回退到 GREEN
-        self._colour = valid_color
-        self.desc = f"{getattr(Color, valid_color)}{self.desc}{Color.RESET}"
+        if not color:
+            color = "GREEN"
+            
+        color_upper = color.upper()
+        valid_color = self._STYLE_MAP.get(color_upper, "GREEN")
+        
+        # 保存颜色值
+        self._colour = color_upper
+        
+        # 更新描述信息颜色
+        if hasattr(self, 'GREEN') and self.desc:
+            self.desc = f"{getattr(Color, valid_color)}{self.desc}{Color.RESET}"
 
 
 # 日志级别颜色映射
@@ -181,72 +130,27 @@ def _get_valid_log_level(level_name: str, default: str):
 
 
 def setup_logging():
-    """设置日志"""
+    """设置日志系统，支持根据记录器名称重定向到不同文件"""
     # 环境变量读取
     console_level = os.getenv("LOG_LEVEL", "INFO").upper()
     file_level = os.getenv("FILE_LOG_LEVEL", "DEBUG").upper()
-    # 为了保证有效日志信息仅支持控制台
-    console_log_format = os.getenv("LOG_FORMAT", None)
     
     # 验证并转换日志级别
     console_log_level = _get_valid_log_level(console_level, "INFO")
     file_log_level = _get_valid_log_level(file_level, "DEBUG")
-
+    
     # 日志格式配置
-    default_log_format = {
-        "console": {
-            "DEBUG": f"{Color.CYAN}[%(asctime)s]{Color.RESET} "
-                    f"{Color.BLUE}%(colored_levelname)-8s{Color.RESET} "
-                    f"{Color.GRAY}[%(threadName)s|%(processName)s]{Color.RESET} "
-                    f"{Color.MAGENTA}%(name)s{Color.RESET} "
-                    f"{Color.YELLOW}%(filename)s:%(funcName)s:%(lineno)d{Color.RESET} "
-                    "| %(message)s",
-            
-            "INFO": f"{Color.CYAN}[%(asctime)s]{Color.RESET} "
-                    f"{Color.GREEN}%(colored_levelname)-8s{Color.RESET} "
-                    f"{Color.MAGENTA}%(name)s{Color.RESET} ➜ "
-                    f"{Color.WHITE}%(message)s{Color.RESET}",
-            
-            "WARNING": f"{Color.CYAN}[%(asctime)s]{Color.RESET} "
-                    f"{Color.YELLOW}%(colored_levelname)-8s{Color.RESET} "
-                    f"{Color.MAGENTA}%(name)s{Color.RESET} "
-                    f"{Color.RED}➜{Color.RESET} "
-                    f"{Color.YELLOW}%(message)s{Color.RESET}",
-            
-            "ERROR": f"{Color.CYAN}[%(asctime)s.%(mctime)s]{Color.RESET} "
-                    f"{Color.RED}%(colored_levelname)-8s{Color.RESET} "
-                    f"{Color.GRAY}[%(filename)s]{Color.RESET}"
-                    f"{Color.MAGENTA}%(name)s:%(lineno)d{Color.RESET} "
-                    f"{Color.RED}➜{Color.RESET} "
-                    f"{Color.RED}%(message)s{Color.RESET}",
-            
-            "CRITICAL": f"{Color.CYAN}[%(asctime)s]{Color.RESET} "
-                        f"{Color.BG_RED}{Color.WHITE}%(colored_levelname)-8s{Color.RESET} "
-                        f"{Color.GRAY}{{%(module)s}}{Color.RESET}"
-                        f"{Color.MAGENTA}[%(filename)s]{Color.RESET}"
-                        f"{Color.MAGENTA}%(name)s:%(lineno)d{Color.RESET} "
-                        f"{Color.BG_RED}➜{Color.RESET} "
-                        f"{Color.BOLD}%(message)s{Color.RESET}"
-        },
-        "file": {
-            "DEBUG": "[%(asctime)s] %(levelname)-8s [%(threadName)s|%(processName)s] %(name)s (%(filename)s:%(funcName)s:%(lineno)d) | %(message)s",
-            "INFO": "[%(asctime)s] %(levelname)-8s %(name)s ➜ %(message)s",
-            "WARNING": "[%(asctime)s] %(levelname)-8s %(name)s ➜ %(message)s",
-            "ERROR": "[%(asctime)s] %(levelname)-8s [%(filename)s]%(name)s:%(lineno)d ➜ %(message)s",
-            "CRITICAL": "[%(asctime)s] %(levelname)-8s {%(module)s}[%(filename)s]%(name)s:%(lineno)d ➜ %(message)s",
-        }
-    }
-
-    # 日志格式配置
-    log_format = os.getenv(
-        "LOG_FORMAT",
-        console_log_format or default_log_format['console'][console_level]
+    console_log_format = os.getenv("LOG_FORMAT", 
+        f"{Color.CYAN}[%(asctime)s]{Color.RESET} "
+        f"%(colored_levelname)s "
+        f"{Color.MAGENTA}%(name)s{Color.RESET} ➜ "
+        f"{Color.WHITE}%(message)s{Color.RESET}"
     )
-    file_format = os.getenv(
-        "LOG_FILE_FORMAT",
-        default_log_format['file'][file_level]
+    
+    file_log_format = os.getenv("LOG_FILE_FORMAT",
+        "[%(asctime)s] %(levelname)-8s %(name)s ➜ %(message)s"
     )
-
+    
     # 文件路径配置
     log_dir = os.getenv("LOG_FILE_PATH", "./logs")
     file_name = os.getenv("LOG_FILE_NAME", "bot_%Y_%m_%d.log")
@@ -257,70 +161,111 @@ def setup_logging():
     except ValueError:
         backup_count = 7
         warnings.warn("BACKUP_COUNT 为无效值,使用默认值 7")
-        os.environ["BACKUP_COUNT"] = 7
+        os.environ["BACKUP_COUNT"] = "7"
 
     # 创建日志目录
     os.makedirs(log_dir, exist_ok=True)
-    file_path = os.path.join(log_dir, datetime.now().strftime(file_name))
+    root_file_path = os.path.join(log_dir, datetime.now().strftime(file_name))
 
-    # 配置根日志器
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)  # 全局最低级别设为DEBUG
-
-    # 控制台处理器
+    # ===== 1. 配置根记录器 =====
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)  # 全局最低级别设为DEBUG
+    
+    # 控制台处理器 - 只添加到根记录器
     console_handler = logging.StreamHandler()
     console_handler.setLevel(console_log_level)
-    console_handler.setFormatter(ColoredFormatter(log_format, datefmt='%H:%M:%S'))
-
-    # 文件处理器
-    file_handler = TimedRotatingFileHandler(
-        filename=file_path,
+    console_handler.setFormatter(ColoredFormatter(console_log_format, datefmt='%H:%M:%S'))
+    
+    # 根记录器的文件处理器
+    root_file_handler = TimedRotatingFileHandler(
+        filename=root_file_path,
         when="midnight",
         interval=1,
         backupCount=backup_count,
         encoding="utf-8"
     )
-    file_handler.setLevel(file_log_level)
-    file_handler.setFormatter(logging.Formatter(file_format))
-
-    # 初始化并添加处理器
-    logger.handlers = []
-    logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
+    root_file_handler.setLevel(file_log_level)
+    root_file_handler.setFormatter(logging.Formatter(file_log_format))
+    
+    # 添加处理器到根记录器
+    root_logger.handlers = [console_handler, root_file_handler]
+    
+    # ===== 2. 配置重定向记录器 =====
+    # 从环境变量读取重定向配置
+    redirect_rules_json = os.getenv("LOG_REDIRECT_RULES", "{}")
+    try:
+        redirect_rules = json.loads(redirect_rules_json)
+    except json.JSONDecodeError:
+        redirect_rules = {}
+        warnings.warn("Invalid LOG_REDIRECT_RULES format. Using default rules.")
+    
+    # 默认重定向规则
+    if not redirect_rules:
+        redirect_rules = {
+            # "database": "database.log",
+            # "network": "network.log",
+            # "security": "security.log"
+        }
+    
+    # 为每个重定向规则创建记录器和处理器
+    for logger_name, filename in redirect_rules.items():
+        # 创建完整的文件路径
+        redirect_file_path = os.path.join(log_dir, filename)
+        
+        # 创建文件处理器
+        file_handler = TimedRotatingFileHandler(
+            filename=redirect_file_path,
+            when="midnight",
+            interval=1,
+            backupCount=backup_count,
+            encoding="utf-8"
+        )
+        file_handler.setLevel(file_log_level)
+        file_handler.setFormatter(logging.Formatter(file_log_format))
+        
+        # 创建记录器并添加处理器
+        logger = logging.getLogger(logger_name)
+        logger.setLevel(file_log_level)
+        logger.addHandler(file_handler)
+        
+        # 关键：禁止传播到根记录器，避免重复记录
+        logger.propagate = False
 
 
 # 初始化日志配置
 setup_logging()
 
 
-def get_log(name='Loger'):
+def get_log(name='Logger'):
     """获取日志记录器"""
     return logging.getLogger(name)
-
 
 
 # 示例用法
 if __name__ == "__main__":
     from time import sleep
-
     from tqdm.contrib.logging import logging_redirect_tqdm
 
-    logger = get_log(__name__)
-    logger.debug("这是一个调试信息")
-    logger.info("这是一个普通信息")
-    logger.warning("这是一个警告信息")
-    logger.error("这是一个错误信息")
-    logger.critical("这是一个严重错误信息")
-    # 常见参数
-    # total: 总进度数。
-    # desc: 进度条描述。
-    # ncols: 进度条宽度。
-    # unit: 进度单位。
-    # leave: 是否在完成后保留进度条。
+    # 获取不同记录器的日志
+    root_logger = get_log()
+    db_logger = get_log("database")
+    net_logger = get_log("network")
+    sec_logger = get_log("security")
+    
+    # 测试日志输出
+    root_logger.debug("根记录器调试信息")
+    root_logger.info("根记录器普通信息")
+    db_logger.warning("数据库警告: 连接池接近满负荷")
+    net_logger.error("网络错误: 连接超时")
+    sec_logger.critical("安全警报: 检测到异常登录尝试")
 
+    # 测试进度条日志集成
     with logging_redirect_tqdm():
-        with tqdm(range(0, 100)) as pbar:
+        with tqdm(range(0, 100), desc="处理进度") as pbar:
             for i in pbar:
                 if i % 10 == 0:
-                    logger.info(f"now: {i}")
+                    root_logger.info(f"当前进度: {i}%")
+                    db_logger.debug(f"数据库查询 {i} 次")
                 sleep(0.1)
+    
+    root_logger.info("所有任务已完成!")

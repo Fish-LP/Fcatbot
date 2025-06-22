@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-13 21:47:01
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-22 18:54:31
+# @LastEditTime : 2025-06-22 20:57:45
 # @Description  : 通用文件加载器，支持JSON/TOML/YAML/PICKLE格式的同步/异步读写
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -58,8 +58,8 @@ FILE_DEBOUNCE_TIME = reading_time * 20
 
 # watchdog检测
 try:
-    from watchdog.observers import Observer
-    from watchdog.events import FileSystemEventHandler
+    from watchdog.observers import Observer # type: ignore
+    from watchdog.events import FileSystemEventHandler # type: ignore
     WATCHDOG_AVAILABLE = True
 except ImportError:
     WATCHDOG_AVAILABLE = False
