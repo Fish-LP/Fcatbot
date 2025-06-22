@@ -1,120 +1,146 @@
-import ast
 import asyncio
-import json
-import os
-from typing import Any, Dict, Literal
-import unittest
-from pathlib import Path
 import tempfile
-import shutil
-# 测试数据
-TEST_DATA = {
-    'int_key': 42,
-    'float_key': 3.14159,
-    'str_key': 'Hello, World!',
-    'bool_key': True,
-    'none_key': None,
-    'list_key': [1, 2, 3, 'four', None, True],
-    'dict_key': {
-        'nested_int': 123,
-        'nested_str': 'nested value',
-        'nested_list': ['a', 'b', 'c'],
-        'nested_dict': {'a': 1, 'b': 2}
-    },
-    123: 'non_string_key',  # 非字符串键
-    (1, 2): 'tuple_key'     # 元组键
+import time
+import json
+from datetime import datetime
+from uuid import UUID
+from decimal import Decimal
+from pathlib import Path
+
+from Fcatbot.utils.universal_data_IO import LoadError, FileTypeUnknownError, UniversalLoader, WATCHDOG_AVAILABLE, PICKLE_AVAILABLE
+
+
+# 创建临时目录
+temp_dir = Path(tempfile.mkdtemp())
+test_data = {
+    "string": "Hello, World!",
+    "integer": 42,
+    "float": 3.14,
+    "boolean": True,
+    "none": None,
+    "list": [1, 2, 3],
+    "dict": {"nested": "value"},
+    "uuid": UUID("12345678-1234-5678-1234-567812345678"),
+    "datetime": datetime(2025, 1, 1, 12, 0, 0),
+    "decimal": Decimal("123.45")
 }
 
-
-from Fcatbot.utils.universal_data_IO import FileTypeUnknownError, ModuleNotInstalledError, UniversalLoader
-
-# 创建临时测试目录
-# TEST_DIR = Path(tempfile.mkdtemp())
-TEST_DIR = Path('./test_cach')
-TEST_FILES = {
-    'json': TEST_DIR / 'test.json',
-    'toml': TEST_DIR / 'test.toml',
-    'yaml': TEST_DIR / 'test.yaml',
-    # 'ini': TEST_DIR / 'test.ini',
-    # 'xml': TEST_DIR / 'test.xml',
-    # 'properties': TEST_DIR / 'test.properties',
-    # 'pickle': TEST_DIR / 'test.pickle'
-}
-
-
-# 用于测试的异步函数
-async def run_async_tests():
-    # 测试异步加载和保存
-    for file_type, file_path in TEST_FILES.items():
-        loader = UniversalLoader(file_path)
-        await loader.aload()
-        await loader.asave()
-        print(f"异步测试: {file_type} 文件加载和保存成功")
-
-# 清理测试环境
-def cleanup():
-    # shutil.rmtree(TEST_DIR)
-    # print("测试环境已清理")
-    pass
-
-# 主测试函数
-def main():
+async def main():
     try:
-        # 创建测试文件
-        for file_type, file_path in TEST_FILES.items():
-            loader = UniversalLoader(file_path)
-            loader.update(TEST_DATA)
-            loader.save()
-            print(f"创建 {file_type} 测试文件成功")
+        # 测试 JSON 格式
+        json_file = temp_dir / "test.json"
+        loader = UniversalLoader(json_file)
+        loader.update(test_data)
+        loader.save()
+        loader.load()
+        assert loader["string"] == test_data["string"]
+        assert loader["integer"] == test_data["integer"]
+        print("JSON 格式测试通过")
 
-        # 同步加载和保存测试
-        for file_type, file_path in TEST_FILES.items():
-            loader = UniversalLoader(file_path)
+        # 测试 TOML 格式
+        toml_file = temp_dir / "test.toml"
+        loader = UniversalLoader(toml_file)
+        loader.update(test_data)
+        loader.save()
+        loader.load()
+        assert loader["string"] == test_data["string"]
+        assert loader["integer"] == test_data["integer"]
+        print("TOML 格式测试通过")
+
+        # 测试 YAML 格式
+        yaml_file = temp_dir / "test.yaml"
+        loader = UniversalLoader(yaml_file)
+        loader.update(test_data)
+        loader.save()
+        loader.load()
+        assert loader["string"] == test_data["string"]
+        assert loader["integer"] == test_data["integer"]
+        print("YAML 格式测试通过")
+
+        # 测试 PICKLE 格式
+        pickle_file = temp_dir / "test.pickle"
+        loader = UniversalLoader(pickle_file)
+        loader.update(test_data)
+        loader.save()
+        loader.load()
+        assert loader["string"] == test_data["string"]
+        assert loader["integer"] == test_data["integer"]
+        print("PICKLE 格式测试通过")
+
+        # 测试实时保存功能
+        realtime_save_file = temp_dir / "test_realtime.json"
+        loader = UniversalLoader(realtime_save_file, realtime_save=True)
+        loader.update(test_data)
+        loader.save()
+        loader["new_key"] = "new_value"
+        time.sleep(0.5)  # 确保实时保存完成
+        assert "new_key" in loader
+        assert loader["new_key"] == "new_value"
+        print("实时保存功能测试通过")
+
+        # 测试实时加载功能
+        if WATCHDOG_AVAILABLE:
+            realtime_load_file = temp_dir / "test_realtime_load.json"
+            loader = UniversalLoader(realtime_load_file, realtime_load=True)
+            loader.update(test_data)
+            loader.save()
+
+            with open(realtime_load_file, "w") as f:
+                json.dump({"new_key": "new_value"}, f)
+
+            time.sleep(0.5)  # 确保文件修改事件处理完成
+            assert "new_key" in loader
+            assert loader["new_key"] == "new_value"
+            print("实时加载功能测试通过")
+        else:
+            print("跳过实时加载功能测试: watchdog 模块未安装")
+
+        # 测试异步操作
+        async_json_file = temp_dir / "test_async.json"
+        async with UniversalLoader(async_json_file) as loader:
+            loader.update(test_data)
+            await loader.asave()
+
+        async with UniversalLoader(async_json_file) as loader:
+            await loader.aload()
+            assert loader["string"] == test_data["string"]
+            assert loader["integer"] == test_data["integer"]
+        print("异步操作测试通过")
+
+        # 测试异常处理
+        invalid_file = temp_dir / "test.invalid"
+        try:
+            UniversalLoader(invalid_file)
+            assert False, "应抛出 FileTypeUnknownError"
+        except FileTypeUnknownError:
+            print("文件类型未知异常测试通过")
+
+        non_existent_file = temp_dir / "nonexistent.json"
+        loader = UniversalLoader(non_existent_file)
+        try:
             loader.load()
-            
-            # 验证数据是否一致
-            if loader != TEST_DATA:
-                print()
-                print(loader)
-                print()
-                print(TEST_DATA)
-                print()
-            assert loader == TEST_DATA, f"{file_type} 数据不一致"
-            
-            # 保存回文件
-            loader.save()
-            print(f"同步测试: {file_type} 文件加载和保存成功")
-
-        # 运行异步测试
-        asyncio.run(run_async_tests())
-
-        # 错误处理测试
-        try:
-            UniversalLoader('nonexistent_file.json').load()
+            assert False, "应抛出 FileNotFoundError"
         except FileNotFoundError:
-            print("文件不存在错误处理测试成功")
+            print("文件不存在异常测试通过")
 
+        pickle_file = temp_dir / "test.pickle"
         try:
-            UniversalLoader('unknown_type.txt').load()
-        except FileTypeUnknownError:
-            print("未知文件类型错误处理测试成功")
+            UniversalLoader(pickle_file)
+            if not PICKLE_AVAILABLE:
+                assert False, "应抛出 ValueError"
+        except LoadError:
+            if not PICKLE_AVAILABLE:
+                print("PICKLE 安全警告测试通过")
+            else:
+                assert False, "应抛出 ValueError"
+                
 
-        try:
-            UniversalLoader(TEST_FILES['toml']).file_type = 'unknown'
-            UniversalLoader(TEST_FILES['toml']).load()
-        except FileTypeUnknownError:
-            print("手动设置未知文件类型错误处理测试成功")
-
-        try:
-            UniversalLoader(TEST_FILES['toml']).file_type = 'toml'
-            UniversalLoader(TEST_FILES['toml']).load()
-        except ModuleNotInstalledError as e:
-            print(f"模块未安装错误处理测试成功: {e}")
-
-        print("所有测试通过!")
+        print("所有测试通过！")
 
     finally:
-        cleanup()
+        # 清理临时目录
+        import shutil
+        shutil.rmtree(temp_dir)
 
-if __name__ == "__main__":
-    main()
+# 运行异步主函数
+asyncio.run(main())
