@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:27
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-05-04 21:27:25
+# @LastEditTime : 2025-06-23 22:23:08
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -62,7 +62,6 @@ class WebSocketHandler(WebSocketClient, Apis):
                 param: Optional[Any] = None, 
                 echo = uuid.uuid4().hex,
                 wait: bool = True,
-                **params
                 ) -> Optional[dict]:
         """调用API接口
 
@@ -70,8 +69,6 @@ class WebSocketHandler(WebSocketClient, Apis):
             action: API动作名称
             param: API调用参数
             echo: 请求标识符
-            wait: 是否等待响应
-            **params: 额外的API参数
 
         Returns:
             API调用结果字典,失败时返回None
@@ -81,42 +78,35 @@ class WebSocketHandler(WebSocketClient, Apis):
             TypeError: 响应数据类型错误
         """
         if not echo: echo = uuid.uuid4().hex
-        data = {
+        send_data = {
             "action": action,
-            "params": param or params,
+            "params": param,
             "echo": echo,
         }
 
         # 如果在debug模式下且设置了拦截器,则使用拦截器处理请求
         if self.request_interceptor is not None:
-            return await self.request_interceptor(action, param or params)
+            return await self.request_interceptor(action, param)
 
-        re = await self.send_async(json.dumps(data), wait=wait)
-        if not wait:
-            return None
-
-        try:
-            re = json.loads(str(re))
-        except json.JSONDecodeError as e:
-            _LOG.error(f"API响应数据解析失败: {e}")
-            return None
-        except TypeError as e:
-            _LOG.error(f"API响应数据类型错误: {e}")
-            return None
-
-        if re.get('wording', None):
-            _LOG.error(f"API异常 {re['wording']}")
-        if isinstance(re.get('status', ''), dict):
-            return re
-        elif re.get('status', '').lower() in ('ok', '200') or 'self_id' in re:
-            if re.get('echo', None) == echo:
-                return re['data']
+        data: str = await self.request(
+            send_data,
+            self._api_hardler
+        )
+        data: dict = json.loads(str(data))
+        
+        if data.get('wording', None):
+            _LOG.error(f"API异常 {data['wording']}")
+        if isinstance(data.get('status', ''), dict):
+            return data
+        elif data.get('status', '').lower() in ('ok', '200') or 'self_id' in data:
+            if data.get('echo', None) == echo:
+                return data['data']
             else:
                 _LOG.error(f"API响应的 echo 标识不符")
         else:
-            _LOG.error(f"API调用异常: {re}")
+            _LOG.error(f"API调用异常: {data}")
             return None
-
+        
     async def send_group_msg(self, messagechain: MessageChain, group_id:str = None, wait: bool = True):
         """发送群消息.
 
@@ -149,3 +139,12 @@ class WebSocketHandler(WebSocketClient, Apis):
             if lifecycle.get('post_type',None) == 'meta_event':
                 _LOG.info(f"{lifecycle['self_id']} 连接成功")
         return self
+    
+    def _api_hardler(self, echo: str):
+        def func(data: Any):
+            try:
+                re: dict = json.loads(str(data))
+            except: # 不需要日志
+                return False
+            return 'echo' in re and re.get('echo', None) == echo
+        return func
