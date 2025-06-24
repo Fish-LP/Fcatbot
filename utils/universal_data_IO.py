@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-13 21:47:01
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-24 20:39:18
+# @LastEditTime : 2025-06-24 20:50:37
 # @Description  : 通用文件加载器，支持JSON/TOML/YAML/PICKLE格式的同步/异步读写
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -22,7 +22,7 @@ Raises:
     LoadError:                  当加载文件时发生错误时抛出
     SaveError:                  当保存文件时发生错误时抛出
     ModuleNotInstalledError:    当所需模块未安装时抛出
-    ValueError:                 当未手动开启pickle支持时抛出
+    ValueError:                 当未手动开启pickle支持时抛出/不支持的解析方式
 """
 
 import os

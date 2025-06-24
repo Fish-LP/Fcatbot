@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-24 19:43:15
+# @LastEditTime : 2025-06-24 20:55:06
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -229,13 +229,10 @@ class BasePlugin(
             if isinstance(self.data, dict):
                 self.data = self._data
             await self.data.aload()
-            if 'meta_data' not in self.data:
-                self.data['meta_data'] = self._meta_data
-                await self.data.asave()
             
         except (FileTypeUnknownError, LoadError, FileNotFoundError) as e:
             if not self.debug or self.first_load:
-                open(self._data_path,'w').write('')
+                open(self._data_path, 'w', encoding='utf-8').close()
             else:
                 raise PluginDataError(self.name, "加载", str(e))
         
