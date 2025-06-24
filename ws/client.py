@@ -7,7 +7,7 @@ import json
 import time
 from typing import *
 from concurrent.futures import ThreadPoolExecutor
-from websockets.legacy.client import WebSocketClientProtocol
+from websockets.legacy.client import Connect
 from websockets.exceptions import (
     ConnectionClosed,       # 连接关闭
     ConnectionClosedError,  # 连接错误(握手失败)
@@ -18,13 +18,14 @@ from logging import Logger
 class WebSocketClient:
     def __init__(
         self,
+        *,
         uri: str,
         logger: Optional[Logger] = None,
         headers: Optional[Dict[str, str]] = {},
-        ping_interval: float = 30.0,
-        ping_timeout: float = 5.0,
+        ping_interval: float = 30,
+        ping_timeout: float = 10,
         reconnect_attempts: int = 3,
-        timeout: float = 10.0,
+        timeout: float = 20,
         auth: Optional[Union[Dict[str, str], None]] = {},
         max_queue_size: int = 127,
         random_jitter: float = 0.5,
@@ -65,8 +66,6 @@ class WebSocketClient:
         '''重连随机延迟因子'''
         self.logger = logger
         '''日志记录器'''
-        self.uri = uri
-        '''连接地址'''
         self.headers = headers
         '''连接头'''
         self.ping_interval = ping_interval
@@ -134,11 +133,13 @@ class WebSocketClient:
         while not self._closing.is_set():
             try:
                 self._connected.clear()
-                async with WebSocketClientProtocol(
-                    self.uri,
+                async with Connect(
+                    uri = self.uri,
+                    logger = self.logger or None,
                     extra_headers=self.headers,
-                    ping_interval=self.ping_interval,
-                    ping_timeout=self.ping_timeout
+                    timeout=self.timeout,
+                    ping_interval = self.ping_interval,
+                    ping_timeout = self.ping_timeout,
                 ) as ws:
                     # 更新连接状态
                     self._connected.set()
@@ -185,7 +186,7 @@ class WebSocketClient:
         self._closed.set()
         if logger: logger.debug("连接管理器已停止")
 
-    async def _receive_messages(self, ws: WebSocketClientProtocol):
+    async def _receive_messages(self, ws: Connect):
         """接收消息并分发到监听器"""
         logger = self.logger
         
@@ -218,7 +219,7 @@ class WebSocketClient:
                 if logger: logger.error(f"未知接收时错误: {e}")
                 break
 
-    async def _send_messages(self, ws: WebSocketClientProtocol):
+    async def _send_messages(self, ws: Connect):
         """从队列中获取消息并发送"""
         logger = self.logger
         
@@ -251,17 +252,17 @@ class WebSocketClient:
             except Exception as e:
                 if logger: logger.error(f"未知发送错误: {e}")
 
-    async def _monitor_ping(self, ws: WebSocketClientProtocol):
+    async def _monitor_ping(self, ws: Connect):
         """监控连接状态"""
         while not self._closing.is_set():
             try:
                 # ping
                 pong_waiter = await ws.ping()
-                latency = asyncio.wait_for(
+                latency = await asyncio.wait_for(
                     pong_waiter,
                     timeout=self.ping_timeout,
                 )
-                
+                self.logger.debug(f"ping-pong 延迟: {latency}")
                 await asyncio.sleep(self.ping_interval)
                 
             except ConnectionClosed:

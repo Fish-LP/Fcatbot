@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:27
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-24 19:06:57
+# @LastEditTime : 2025-06-24 20:25:13
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -11,7 +11,7 @@ import asyncio
 from logging import Logger
 from typing import Any, Optional, Dict, Union
 import uuid
-
+from urllib.parse import urlparse
 from ..utils import get_log
 from ..data_models import MessageChain
 from .client import WebSocketClient
@@ -55,8 +55,9 @@ class WebSocketHandler(WebSocketClient, Apis):
             max_queue_size: 消息队列最大大小
             random_jitter: 重连随机延迟因子
         """
+        self.uri = uri
         super().__init__(
-            uri:= uri,
+            uri = uri,
             logger = _LOG,
             headers = headers,
             ping_interval = ping_interval,
@@ -68,7 +69,6 @@ class WebSocketHandler(WebSocketClient, Apis):
             random_jitter = random_jitter,
 
         )
-        self.ws_client = self
         self.ping:int = -1
         self.request_cache:Dict[uuid.UUID: dict] = {}
         self.request_interceptor = None
