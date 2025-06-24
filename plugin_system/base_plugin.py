@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-22 20:56:19
+# @LastEditTime : 2025-06-24 19:41:17
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -138,7 +138,7 @@ class BasePlugin(
                 setattr(self, k, v)
 
         # 固定属性
-        TimeTaskMixin.init_api()
+        TimeTaskMixin.init_api(self)
         plugin_file = Path(inspect.getmodule(self.__class__).__file__).resolve()
         self.this_file_path = plugin_file
         # 使用插件文件所在目录作为self_path
@@ -206,7 +206,7 @@ class BasePlugin(
             
             if not self.first_load and self.debug:
                 LOG.warning(f"{Color.YELLOW}debug模式下将{Color.RED}取消{Color.RESET}退出时的默认保存行为")
-                print(f'{Color.GRAY}{self.name}\n', '\n'.join(visualize_tree(self.data.data)), sep='')
+                print(f'{Color.GRAY}{self.name}\n', '\n'.join(visualize_tree(self.data)), sep='')
             else:
                 await self.data.asave()
                 

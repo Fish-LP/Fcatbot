@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-23 22:16:21
+# @LastEditTime : 2025-06-24 19:10:24
 # @Description  : 喵喵喵, 超多导入(超导)
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -71,15 +71,17 @@ class BotClient:
         self.last_heartbeat:dict = {}
         self.command_prefix = command_prefix
         self.debug = debug
-        
-        headers = {"Content-Type": "application/json"}
+        auth = None
         if token:
-            headers["Authorization"] = f"Bearer {token}"
+            auth = {
+                "Authorization": f"Bearer {token}"
+            }
         self.ws = WebSocketHandler(
             uri,
-            headers,
-            message_handler = self.on_message,
+            headers = {"Content-Type": "application/json"},
+            auth = auth,
         )
+        self.listenerid = self.ws.create_listener(64)
 
     def exit(self):
         self.close()

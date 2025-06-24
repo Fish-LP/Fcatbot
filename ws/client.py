@@ -25,7 +25,7 @@ class WebSocketClient:
         ping_timeout: float = 5.0,
         reconnect_attempts: int = 3,
         timeout: float = 10.0,
-        auth: Optional[Dict[str, str]] = {},
+        auth: Optional[Union[Dict[str, str], None]] = {},
         max_queue_size: int = 127,
         random_jitter: float = 0.5,
     ):
@@ -47,7 +47,9 @@ class WebSocketClient:
         # 设置
         self.uri = uri
         '''连接地址'''
-        self.headers = headers.update(auth)
+        if auth:
+            headers.update(auth)
+        self.headers = headers
         '''连接头 + 认证信息'''
         self.ping_interval = ping_interval
         '''心跳间隔(秒)'''

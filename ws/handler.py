@@ -2,13 +2,14 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:27
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-23 22:23:08
+# @LastEditTime : 2025-06-24 19:06:57
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 import json
 import asyncio
-from typing import Any, Optional, Dict
+from logging import Logger
+from typing import Any, Optional, Dict, Union
 import uuid
 
 from ..utils import get_log
@@ -29,20 +30,44 @@ class WebSocketHandler(WebSocketClient, Apis):
         request_cache (Dict[UUID, dict]): 请求缓存字典
     """
 
-    def __init__(self, uri, headers=None, initial_reconnect_interval=5, 
-                 max_reconnect_interval=60, max_reconnect_attempts=5,
-                 message_handler=None, close_handler=None):
+    def __init__(
+        self,
+        uri: str,
+        headers: Optional[Dict[str, str]] = {},
+        ping_interval: float = 30.0,
+        ping_timeout: float = 5.0,
+        reconnect_attempts: int = 3,
+        timeout: float = 10.0,
+        auth: Optional[Union[Dict[str, str], None]] = {},
+        max_queue_size: int = 127,
+        random_jitter: float = 0.5,
+    ):
         """初始化WebSocket处理器
 
         Args:
-            uri: WebSocket服务器地址
-            headers: 连接请求头
-            initial_reconnect_interval: 初始重连间隔(秒)
-            max_reconnect_interval: 最大重连间隔(秒)
-            max_reconnect_attempts: 最大重连尝试次数
-            message_handler: 消息处理函数
+            uri: WebSocket 服务器地址
+            headers: 连接头信息
+            ping_interval: 心跳间隔（秒）
+            ping_timeout: 心跳超时（秒）
+            reconnect_attempts: 最大重试次数
+            timeout: 连接/读写操作超时时间（秒）
+            auth: 认证信息（用于需要认证的 WebSocket 服务器）
+            max_queue_size: 消息队列最大大小
+            random_jitter: 重连随机延迟因子
         """
-        super().__init__(uri, headers, initial_reconnect_interval, max_reconnect_interval, max_reconnect_attempts, message_handler, close_handler)
+        super().__init__(
+            uri:= uri,
+            logger = _LOG,
+            headers = headers,
+            ping_interval = ping_interval,
+            ping_timeout = ping_timeout,
+            reconnect_attempts = reconnect_attempts,
+            timeout = timeout,
+            auth = auth,
+            max_queue_size = max_queue_size,
+            random_jitter = random_jitter,
+
+        )
         self.ws_client = self
         self.ping:int = -1
         self.request_cache:Dict[uuid.UUID: dict] = {}
@@ -60,8 +85,7 @@ class WebSocketHandler(WebSocketClient, Apis):
     async def api(self,
                 action: str,
                 param: Optional[Any] = None, 
-                echo = uuid.uuid4().hex,
-                wait: bool = True,
+                echo: uuid.UUID = uuid.uuid4().hex,
                 ) -> Optional[dict]:
         """调用API接口
 

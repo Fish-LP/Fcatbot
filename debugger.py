@@ -25,9 +25,9 @@ def pre_input_hook():
         readline.insert_text(readline.get_history_item(readline.get_current_history_length()))  # 插入历史命令
         readline.redisplay()  # 再次重新显示当前行
 if TYPE_CHECKING:
-    from .client import WebSocketHandler
+    from .client import BotClient
 else:
-    WebSocketHandler = object
+    BotClient = object
 # 设置回调函数
 readline.set_pre_input_hook(pre_input_hook)
 
@@ -402,7 +402,7 @@ def send_simulated_message(client, text: str) -> None:
     if out:
         print(f'{Color.CYAN}收集到的返回:{Color.RESET} {out}')
 
-def start_debug_mode(client: WebSocketHandler):
+def start_debug_mode(client: BotClient):
     """启动调试模式"""
     async def debug_interceptor(action: str, params: dict) -> dict:
         """Debug模式下的API请求拦截器"""
@@ -425,7 +425,7 @@ def start_debug_mode(client: WebSocketHandler):
         return {}
 
     # 设置debug模式的请求拦截器
-    client.set_request_interceptor(debug_interceptor)
+    client.ws.set_request_interceptor(debug_interceptor)
     
     print(f"{Color.CYAN}输入 {Color.GREEN}.help{Color.CYAN} 查看调试命令帮助{Color.RESET}")
     try:
