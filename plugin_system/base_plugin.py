@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-24 19:41:17
+# @LastEditTime : 2025-06-24 19:43:15
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -205,7 +205,7 @@ class BasePlugin(
             await self.on_close(*arg, **kwd)
             
             if not self.first_load and self.debug:
-                LOG.warning(f"{Color.YELLOW}debug模式下将{Color.RED}取消{Color.RESET}退出时的默认保存行为")
+                LOG.warning(f"{Color.YELLOW}debug模式下将{Color.RED}取消{Color.YELLOW}退出时的默认保存行为{Color.RESET}")
                 print(f'{Color.GRAY}{self.name}\n', '\n'.join(visualize_tree(self.data)), sep='')
             else:
                 await self.data.asave()
