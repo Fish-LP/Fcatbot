@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-13 21:47:01
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-22 20:57:45
+# @LastEditTime : 2025-06-24 20:39:18
 # @Description  : 通用文件加载器，支持JSON/TOML/YAML/PICKLE格式的同步/异步读写
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -30,7 +30,6 @@ import ast
 import json
 import time
 import pickle
-import shutil
 import asyncio
 import warnings
 import functools
@@ -191,21 +190,24 @@ class UniversalLoader(dict):
     def __init__(
         self,
         file_path: Union[str, Path],
-        file_type: Optional[str] = None,
+        file_encoding: str = 'utf-8',
         realtime_save: bool = False,
         realtime_load: bool = False,
+        file_type: Optional[str] = None,
     ):
         """
         初始化通用加载器。
         
         Args:
             file_path: 文件路径，支持字符串或Path对象
+            file_encoding: 文件编码
             realtime_save: 是否启用实时保存
             realtime_load: 是否启用实时读取
             file_type: 手动指定文件类型
         """
         super().__init__()
         self._file_path: Path = Path(file_path).resolve()
+        self.file_encoding: str = file_encoding
         self._file_type = file_type.lower() if file_type else self._detect_file_type()
         self._async_lock = asyncio.Lock()
         self._observer = None
@@ -497,19 +499,19 @@ class UniversalLoader(dict):
 
     def _load_data_sync(self) -> Dict[str, Any]:
         if self._file_type == 'json':
-            with self._file_path.open('r') as f:
+            with self._file_path.open('r', encoding=self.file_encoding) as f:
                 raw_data = ujson.load(f) if UJSON_AVAILABLE else json.load(f)
                 return self._type_convert(raw_data, 'restore')
         
         elif self._file_type == 'toml':
-            with self._file_path.open('r') as f:
+            with self._file_path.open('r', encoding=self.file_encoding) as f:
                 raw_data = toml.load(f)
                 return self._type_convert(raw_data, 'restore')
         
         elif self._file_type == 'yaml':
             if not YAML_AVAILABLE:
                 raise ModuleNotInstalledError("请安装 PyYAML 模块：pip install PyYAML")
-            with self._file_path.open('r') as f:
+            with self._file_path.open('r', encoding=self.file_encoding) as f:
                 raw_data = yaml.safe_load(f) or {}
                 return self._type_convert(raw_data, 'restore')
         
@@ -526,15 +528,15 @@ class UniversalLoader(dict):
     async def _load_data_async(self) -> Dict[str, Any]:
         if AIOFILES_AVAILABLE:
             if self._file_type == 'json':
-                async with aiofiles.open(self._file_path, 'r') as f:
+                async with aiofiles.open(self._file_path, 'r', encoding=self.file_encoding) as f:
                     content = await f.read()
                     return self._type_convert(ujson.loads(content) if UJSON_AVAILABLE else json.loads(content), 'restore')
             elif self._file_type == 'toml':
-                async with aiofiles.open(self._file_path, 'r') as f:
+                async with aiofiles.open(self._file_path, 'r', encoding=self.file_encoding) as f:
                     content = await f.read()
                     return self._type_convert(toml.loads(content), 'restore')
             elif self._file_type == 'yaml':
-                async with aiofiles.open(self._file_path, 'r') as f:
+                async with aiofiles.open(self._file_path, 'r', encoding=self.file_encoding) as f:
                     content = await f.read()
                     return self._type_convert(yaml.safe_load(content) or {}, 'restore')
             elif self._file_type == 'pickle':
@@ -552,7 +554,7 @@ class UniversalLoader(dict):
     def _save_data_sync(self, save_path: Path) -> None:
         if self._file_type == 'json':
             converted_data = self._type_convert(self.copy(), 'preserve', JSON_TYPE)
-            with save_path.open('w') as f:
+            with save_path.open('w', encoding=self.file_encoding) as f:
                 if UJSON_AVAILABLE:
                     ujson.dump(converted_data, f, ensure_ascii=False, indent=4)
                 else:
@@ -560,12 +562,12 @@ class UniversalLoader(dict):
         
         elif self._file_type == 'toml':
             converted_data = self._type_convert(self.copy(), 'preserve', TOML_TYPE)
-            with save_path.open('w') as f:
+            with save_path.open('w', encoding=self.file_encoding) as f:
                 toml.dump(converted_data, f)
         
         elif self._file_type == 'yaml':
             converted_data = self._type_convert(self.copy(), 'preserve', YAML_TYPE)
-            with save_path.open('w') as f:
+            with save_path.open('w', encoding=self.file_encoding) as f:
                 yaml.dump(converted_data, f, allow_unicode=True, default_flow_style=False)
         
         elif self._file_type == 'pickle':
@@ -580,16 +582,16 @@ class UniversalLoader(dict):
         if AIOFILES_AVAILABLE:
             if self._file_type == 'json':
                 converted_data = self._type_convert(self.copy(), 'preserve', JSON_TYPE)
-                async with aiofiles.open(save_path, 'w', encoding='utf-8') as f:
+                async with aiofiles.open(save_path, 'w', encoding=self.file_encoding) as f:
                     content = ujson.dumps(converted_data) if UJSON_AVAILABLE else json.dumps(converted_data)
                     await f.write(content)
             elif self._file_type == 'toml':
                 converted_data = self._type_convert(self.copy(), 'preserve', TOML_TYPE)
-                async with aiofiles.open(save_path, 'w') as f:
+                async with aiofiles.open(save_path, 'w', encoding=self.file_encoding) as f:
                     await f.write(toml.dumps(converted_data))
             elif self._file_type == 'yaml':
                 converted_data = self._type_convert(self.copy(), 'preserve', YAML_TYPE)
-                async with aiofiles.open(save_path, 'w') as f:
+                async with aiofiles.open(save_path, 'w', encoding=self.file_encoding) as f:
                     await f.write(yaml.dump(converted_data, allow_unicode=True))
             elif self._file_type == 'pickle':
                 converted_data = self._type_convert(self.copy(), 'preserve', PICKLE_TYPE)
