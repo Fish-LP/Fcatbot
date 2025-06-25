@@ -34,7 +34,8 @@ from .abc_api import IPluginApi
 from .plugin_funcs import (
     EventHandlerMixin,
     TimeTaskMixin,
-    PluginFunctionMixin
+    PluginFunctionMixin,
+    QueueManager
 )
 
 LOG = getLogger('BasePlugin')
@@ -44,6 +45,7 @@ class BasePlugin(
         EventHandlerMixin, # 事件处理器接口(基础功能)
         PluginFunctionMixin, # 快速添加功能(事件处理器接口扩展功能)
         TimeTaskMixin, # 定时任务接口(额外功能)
+        QueueManager, # 管道管理器
     ):
     """插件基类
     
