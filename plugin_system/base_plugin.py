@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-26 18:51:56
+# @LastEditTime : 2025-06-26 19:19:24
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -70,6 +70,8 @@ class BasePlugin(
     - `data (UniversalLoader)`: 插件数据管理器实例
     - `save_type`: `data` 数据保存类型 (默认 'json')
     - `file_encoding`: `data` 文件编码（默认 'utf-8'）
+    - `realtime_save`: `data` 行为，实时保存（默认 False）
+    - `realtime_load`: `data` 行为，实时读取，需要`watchdog`（默认 False）
     
     ## 目录管理
     - `work_space (ChangeDir)`: 工作目录上下文管理器
@@ -99,6 +101,8 @@ class BasePlugin(
     info: str = '这个作者很懒且神秘,没有写一点点描述,真是一个神秘的插件'
     save_type: str = 'yaml'
     file_encoding: str = 'utf-8'
+    realtime_save: bool = False
+    realtime_load: bool = False
     
     data: UniversalLoader
     self_path: Path
@@ -172,7 +176,13 @@ class BasePlugin(
             raise PluginWorkspaceError(self.name, self._work_path, "不是有效的工作目录")
 
         # 接口
-        self._data = UniversalLoader(file_path=self._data_path, file_encoding=self.file_encoding, file_type=self.save_type, realtime_save=True, realtime_load=True)
+        self._data = UniversalLoader(
+            file_path=self._data_path,
+            file_encoding=self.file_encoding,
+            file_type=self.save_type,
+            realtime_save=self.realtime_save,
+            realtime_load=self.realtime_load
+        )
         self.data = self._data
         self.work_space = ChangeDir(self._work_path)
         self.self_space = ChangeDir(self.self_path)

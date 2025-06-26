@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-13 21:47:01
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-26 19:00:31
+# @LastEditTime : 2025-06-26 19:24:36
 # @Description  : 通用文件加载器，支持JSON/TOML/YAML/PICKLE格式的同步/异步读写
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -50,19 +50,19 @@ FILE_DEBOUNCE_TIME = 0.001
 # watchdog检测
 WATCHDOG_AVAILABLE = False
 try:
-    from watchdog.observers import Observer
-    from watchdog.events import FileSystemEventHandler
+    from watchdog.observers import Observer # type: ignore
+    from watchdog.events import FileSystemEventHandler # type: ignore
     WATCHDOG_AVAILABLE = True
 except ImportError:
     warnings.warn("watchdog 模块未安装。实时读取功能将被禁用。", ImportWarning)
 
 # PICKLE
-PICKLE_AVAILABLE = True  # ! 安全警告：需手动审核来源可信的pickle文件
+PICKLE_AVAILABLE = False  # ! 安全警告：需手动审核来源可信的pickle文件
 
 # TOML 模块检测
 TOML_AVAILABLE = False
 try:
-    import toml
+    import toml # type: ignore
     TOML_AVAILABLE = True
 except ImportError:
     pass  # 非关键依赖,静默处理
@@ -70,7 +70,7 @@ except ImportError:
 # 异步文件操作模块检测
 AIOFILES_AVAILABLE = False
 try:
-    import aiofiles
+    import aiofiles # type: ignore
     AIOFILES_AVAILABLE = True
 except ImportError:
     warnings.warn("aiofiles 模块未安装。异步功能将被禁用。", ImportWarning)
@@ -78,7 +78,7 @@ except ImportError:
 # YAML 模块检测
 YAML_AVAILABLE = False
 try:
-    import yaml
+    import yaml # type: ignore
     YAML_AVAILABLE = True
 except ImportError:
     pass  # 非关键依赖,静默处理
@@ -86,7 +86,7 @@ except ImportError:
 # 高性能JSON模块检测
 UJSON_AVAILABLE = False
 try:
-    import ujson
+    import ujson # type: ignore
     UJSON_AVAILABLE = True
 except ImportError:
     pass  # 回退到标准json模块
