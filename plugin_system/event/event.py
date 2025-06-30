@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:31:16
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-12 18:28:50
+# @LastEditTime : 2025-06-29 19:32:46
 # @Description  : 事件类,封装事件信息
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -29,10 +29,11 @@ class Event:
             type: 事件类型标识符
             data: 事件携带的数据
         """
-        self._type = type
-        self._data = data
+        self._type: str = type
+        self._data: Any = data
         self._results: List[Any] = []
-        self._propagation_stopped = False
+        self._propagation_stopped: bool = False
+        self._intercepted: bool = False
 
     @property
     def data(self):
@@ -45,6 +46,11 @@ class Event:
     @property
     def results(self):
         return copy(self._results)
+
+    @property 
+    def intercepted(self) -> bool:
+        """是否被拦截"""
+        return self._intercepted
 
     def __eq__(self, value: str):
         return self.type == value
@@ -78,11 +84,6 @@ class Event:
         """
         self._propagation_stopped = True
         self._intercepted = True
-    
-    @property 
-    def intercepted(self) -> bool:
-        """是否被拦截"""
-        return getattr(self, '_intercepted', False)
     
     def __repr__(self):
         return f'Event(type="{self.type}",data={self.data},results={self.results})'
