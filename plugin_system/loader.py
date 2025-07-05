@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-03-21 18:06:59
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-14 19:55:35
+# @LastEditTime : 2025-06-29 20:08:39
 # @Description  : 插件加载器
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
@@ -13,7 +13,7 @@ import sys
 
 from collections import defaultdict, deque
 from types import ModuleType
-from typing import Dict, List, Set, Type
+from typing import Dict, List, Optional, Set, Type
 from packaging.specifiers import SpecifierSet
 from packaging.version import parse as parse_version
 from logging import getLogger
@@ -30,10 +30,7 @@ from .pluginsys_err import (
     PluginVersionError,
     PluginNameConflictError,
 )
-from .api import (
-    PluginInfoMixin,
-    PluginSysApi
-)
+from .api import PluginSysApi
 
 from .config import config
 
@@ -46,7 +43,7 @@ else:
 LOG = getLogger('PluginLoader')
 
 
-class PluginLoader(PluginInfoMixin):
+class PluginLoader:
     """插件加载器,用于加载、卸载和管理插件。
     
     该类负责处理插件的完整生命周期管理，包括:
@@ -449,3 +446,18 @@ class PluginLoader(PluginInfoMixin):
         finally:
             # 关闭事件循环
             loop.close()
+
+
+    def get_plugin(self, name: str) -> Optional[BasePlugin]:
+        """按名称获取插件实例"""
+        return self.plugins.get(name)
+
+    def get_metadata(self, name: str) -> dict:
+        """获取插件元数据"""
+        return self.plugins.get(name).meta_data
+
+    def list_plugins(self, obj: bool = False) -> List[str | BasePlugin]:
+        """获取已加载插件列表"""
+        if obj:
+            return list(self.plugins.values())
+        return list(self.plugins.keys())

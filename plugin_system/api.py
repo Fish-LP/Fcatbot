@@ -2,11 +2,11 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-05-16 21:30:50
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-14 21:05:17
+# @LastEditTime : 2025-06-29 20:08:42
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
-from typing import TYPE_CHECKING, Dict, List, Optional, Type, Any
+from typing import TYPE_CHECKING, Dict
 
 
 if TYPE_CHECKING:
@@ -15,25 +15,6 @@ if TYPE_CHECKING:
 else:
     PluginLoader = object
     BasePlugin = object
-
-
-class PluginInfoMixin:
-    """为PluginLoader提供插件信息管理能力的混入类"""
-    plugins: Dict[str, BasePlugin]  # 已加载的插件
-
-    def get_plugin(self, name: str) -> Optional[BasePlugin]:
-        """按名称获取插件实例"""
-        return self.plugins.get(name)
-
-    def get_metadata(self, name: str) -> dict:
-        """获取插件元数据"""
-        return self.plugins.get(name).meta_data
-
-    def list_plugins(self, obj: bool = False) -> List[str | BasePlugin]:
-        """获取已加载插件列表"""
-        if obj:
-            return list(self.plugins.values())
-        return list(self.plugins.keys())
 
 class PluginSysApi:
     """为Plugin提供管理其他插件的接口类"""

@@ -13,7 +13,7 @@ from .change_dir import ChangeDir
 from .test_suite import TestSuite
 from .pip_tool import PipTool
 from .visualize_data import visualize_tree
-from .time_task_scheduler import TimeTaskScheduler
+from .time_task_scheduler import AsyncTaskScheduler
 
 __all__ = [
     'UniversalLoader',
@@ -23,5 +23,5 @@ __all__ = [
     'Color',
     'PipTool',
     'visualize_tree',
-    'TimeTaskScheduler',
+    'AsyncTaskScheduler',
 ]

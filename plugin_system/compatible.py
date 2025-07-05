@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-05-04 22:39:56
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-12 19:28:45
+# @LastEditTime : 2025-06-30 21:34:51
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
@@ -23,6 +23,7 @@ from ..config import (
     OFFICIAL_GROUP_COMMAND_EVENT,
     OFFICIAL_PRIVATE_COMMAND_EVENT,
 )
+from ..utils.time_task_scheduler import AsyncTaskScheduler, AsyncTask
 
 # 定义泛型类型变量用于装饰器返回类型
 F = TypeVar("F", bound=Callable[..., Any])
@@ -38,7 +39,7 @@ class _EventDecorator:
 
             @wraps(func)
             def wrapper(*args, **kwargs) -> Optional[Any]:
-                event = args[1] if in_class else args[0]
+                event: Event = args[1] if in_class else args[0]
                 if row_event:
                     return func(*args, **kwargs)
                 else:
@@ -178,3 +179,23 @@ class EventCompatibleHandler(CompatibleHandler):
                 event_info.get("priority", 0)
             )
             plugin._event_handlers.append(handler_id)
+
+# class TaskSchedulerCompatibleHandler(CompatibleHandler):
+#     """事件兼容性处理器"""
+#     def check(self, obj: Any) -> bool:
+#         return hasattr(obj, "_task")
+        
+#     def handle(self, plugin: BasePlugin, func: Callable, event_bus: EventBus) -> None:
+#         event_info = getattr(func, "_task")
+#         if event_info:
+#             if event_info["in_class"]:
+#                 bound_func = func.__get__(plugin, plugin.__class__)
+#             else:
+#                 bound_func = func
+                
+#             handler_id = event_bus.subscribe(
+#                 event_info["event_type"],
+#                 bound_func,
+#                 event_info.get("priority", 0)
+#             )
+#             plugin._event_handlers.append(handler_id)

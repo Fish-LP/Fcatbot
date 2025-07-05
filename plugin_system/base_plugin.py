@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-26 19:19:24
+# @LastEditTime : 2025-07-05 21:38:46
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -33,19 +33,15 @@ from .config import config
 from .abc_api import IPluginApi
 from .plugin_funcs import (
     EventHandlerMixin,
-    TimeTaskMixin,
-    PluginFunctionMixin,
     QueueManager
 )
 
 LOG = getLogger('BasePlugin')
 
 class BasePlugin(
-        IPluginApi, # 插件功能定义
+        IPluginApi, # 插件额外属性定义
         EventHandlerMixin, # 事件处理器接口(基础功能)
-        PluginFunctionMixin, # 快速添加功能(事件处理器接口扩展功能)
-        TimeTaskMixin, # 定时任务接口(额外功能)
-        QueueManager, # 管道管理器
+        # QueueManager, # 管道管理器
     ):
     """插件基类
     
@@ -68,10 +64,10 @@ class BasePlugin(
     - `this_file_path (Path)`: 插件主文件路径
     - `meta_data (dict)`: 插件元数据字典
     - `data (UniversalLoader)`: 插件数据管理器实例
-    - `save_type`: `data` 数据保存类型 (默认 'json')
-    - `file_encoding`: `data` 文件编码（默认 'utf-8'）
-    - `realtime_save`: `data` 行为，实时保存（默认 False）
-    - `realtime_load`: `data` 行为，实时读取，需要`watchdog`（默认 False）
+    - `save_type`(str): `data` 数据保存类型 (默认 'json')
+    - `file_encoding`(str): `data` 文件编码（默认 'utf-8'）
+    - `realtime_save`(bool): `data` 行为，实时保存（默认 False）
+    - `realtime_load`(bool): `data` 行为，实时读取，需要`watchdog`（默认 False）
     
     ## 目录管理
     - `work_space (ChangeDir)`: 工作目录上下文管理器
@@ -146,7 +142,6 @@ class BasePlugin(
                 setattr(self, k, v)
 
         # 固定属性
-        TimeTaskMixin.init_api(self)
         plugin_file = Path(inspect.getmodule(self.__class__).__file__).resolve()
         self.this_file_path = plugin_file
         # 使用插件文件所在目录作为self_path
@@ -183,7 +178,6 @@ class BasePlugin(
             realtime_save=self.realtime_save,
             realtime_load=self.realtime_load
         )
-        self.data = self._data
         self.work_space = ChangeDir(self._work_path)
         self.self_space = ChangeDir(self.self_path)
         self.sys: PluginSysApi = sys_api
@@ -192,7 +186,17 @@ class BasePlugin(
             'version': self.version,
             'dependencies': self.dependencies,
         }
-
+    
+    @property
+    def data(self) -> UniversalLoader:
+        return self._data
+    
+    @data.setter
+    def data(self, value: UniversalLoader):
+        if not isinstance(value, UniversalLoader):
+            raise TypeError(f"data 应该是 UniversalLoader 而不是 {type(value)}")
+        self._data = value
+    
     @property
     def debug(self) -> bool:
         """是否处于调试模式"""
@@ -201,7 +205,7 @@ class BasePlugin(
     @property
     def meta_data(self) -> dict:
         """插件元数据"""
-        return self._meta_data.copy()
+        return self._meta_data
 
     @final
     async def __unload__(self, *arg, **kwd):
