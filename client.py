@@ -2,15 +2,15 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-24 19:10:24
+# @LastEditTime : 2025-07-06 16:05:09
 # @Description  : 喵喵喵, 超多导入(超导)
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 import os
 import asyncio
 import json
-import time
 
+import sys
 from typing import Any, List
 
 from .ws import WebSocketHandler
@@ -81,7 +81,6 @@ class BotClient:
             headers = {"Content-Type": "application/json"},
             auth = auth,
         )
-        self.listenerid = self.ws.create_listener(64)
 
     def exit(self):
         self.close()
@@ -90,6 +89,8 @@ class BotClient:
         LOG.info('用户主动触发关闭事件...')
         LOG.info('准备关闭所有插件...')
         self.plugin_sys.unload_all()
+        LOG.info('准备关闭连接...')
+        self.ws.close()
         LOG.info('Fcatbot 关闭完成')
 
     def link(self):
@@ -115,14 +116,29 @@ class BotClient:
             LOG.warning('推荐配合 DEGUB 级别食用')
             start_debug_mode(self)
         else:
+            self.ws.start()  # 启动 WebSocket 连接
             try:
-                self.ws.start()  # 启动 WebSocket 连接
-                while True:
-                    time.sleep(0)
+                asyncio.run(self.loop())
             except KeyboardInterrupt:
                 print()
+            finally:
                 self.close()
-                # exit(0)
+
+    async def loop(self):
+        listener = self.ws.create_listener(64)
+        while self.ws.is_connected:
+            try:
+                data = self.ws.get_message(listener)
+            except Exception:
+                await asyncio.sleep(0)
+                continue
+            if data:
+                # print(data)
+                await self.on_message(data)
+        # for data in listener.iter_messages():
+        #     print(f"接收到消息: {data}")
+        #     if data:
+        #         await self.on_message(data)
 
     async def api(self, action: str, **params) -> dict:
         """调用机器人API.
@@ -134,7 +150,7 @@ class BotClient:
         Returns:
             dict: API响应数据
         """
-        result = await self.ws.api(action, params, wait=True)
+        result = await self.ws.api(action, params)
         return result
     
     def publish_sync(self, event: Event) -> List[Any]:
@@ -171,7 +187,7 @@ class BotClient:
         Args:
             data: 接收到的消息数据(JSON格式)
         """
-        msg = json.loads(data)
+        msg = data if isinstance(data, dict) else json.loads(data)
         if 'post_type' not in msg:
             return
         _LOG = get_log(f"Bot.{msg['self_id']}")

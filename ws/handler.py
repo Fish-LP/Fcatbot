@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:27
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-24 20:25:13
+# @LastEditTime : 2025-07-06 14:01:05
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -11,7 +11,6 @@ import asyncio
 from logging import Logger
 from typing import Any, Optional, Dict, Union
 import uuid
-from urllib.parse import urlparse
 from ..utils import get_log
 from ..data_models import MessageChain
 from .client import WebSocketClient
@@ -60,14 +59,13 @@ class WebSocketHandler(WebSocketClient, Apis):
             uri = uri,
             logger = _LOG,
             headers = headers,
+            auth = auth,
             ping_interval = ping_interval,
             ping_timeout = ping_timeout,
             reconnect_attempts = reconnect_attempts,
             timeout = timeout,
-            auth = auth,
             max_queue_size = max_queue_size,
             random_jitter = random_jitter,
-
         )
         self.ping:int = -1
         self.request_cache:Dict[uuid.UUID: dict] = {}
@@ -112,11 +110,14 @@ class WebSocketHandler(WebSocketClient, Apis):
         if self.request_interceptor is not None:
             return await self.request_interceptor(action, param)
 
-        data: str = await self.request(
+        data: str = self.request(
             send_data,
-            self._api_hardler
+            self._api_hardler(echo)
         )
-        data: dict = json.loads(str(data))
+        if data is None:
+            _LOG.error(f"API请求失败: {send_data}")
+            return None
+        data: dict = json.loads(str(data)) if isinstance(data, str) else data
         
         if data.get('wording', None):
             _LOG.error(f"API异常 {data['wording']}")
@@ -166,9 +167,11 @@ class WebSocketHandler(WebSocketClient, Apis):
     
     def _api_hardler(self, echo: str):
         def func(data: Any):
-            try:
-                re: dict = json.loads(str(data))
-            except: # 不需要日志
-                return False
+            if isinstance(data, str):
+                try:
+                    re: dict = json.loads(str(data))
+                except: # 需要日志
+                    _LOG.error(f"API响应数据解析失败: {data}")
+                    return False
             return 'echo' in re and re.get('echo', None) == echo
         return func

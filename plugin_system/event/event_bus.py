@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:31:16
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-30 21:56:55
+# @LastEditTime : 2025-07-06 16:10:21
 # @Description  : 事件总线类,用于管理和分发事件
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -154,55 +154,55 @@ class EventBus:
         return:
             List[Any] - 所有处理器返回的结果的列表
         """
-        async with self._async_lock:
-            # 发布前钩子
-            await self._run_hooks('before_publish', event)
-            
-            if event.intercepted:
-                await self._run_hooks('after_publish', event)
-                return event.results
-
-            handlers = []
-            if event.type in self._exact_handlers:
-                # 处理精确匹配处理器
-                for (pattern, priority, handler, handler_id) in self._exact_handlers[event.type]:
-                    handlers.append((handler, priority, handler_id))
-            else:
-                # 处理正则匹配处理器
-                for (pattern, priority, handler, handler_id) in self._regex_handlers:
-                    if pattern and pattern.match(event.type):
-                        handlers.append((handler, priority, handler_id))
-            
-            # 按优先级排序
-            sorted_handlers = sorted(handlers, key=lambda x: (-x[1], x[0].__name__))
-            
-            results = []
-            # 按优先级顺序调用处理器
-            for handler, priority, handler_id in sorted_handlers:
-                if event._propagation_stopped:
-                    break
-
-                # 处理器执行前钩子
-                await self._run_hooks('before_handler', event, handler)
-                
-                try:
-                    if asyncio.iscoroutinefunction(handler):
-                        await handler(event)
-                    else:
-                        # 将同步函数包装为异步任务
-                        await asyncio.get_running_loop().run_in_executor(None, handler, event)
-                    # 处理器执行后钩子
-                    await self._run_hooks('after_handler', event, handler)
-                except Exception as e:
-                    # 错误钩子
-                    await self._run_hooks('on_error', event, handler, e)
-                    raise EventHandlerError(e,handler)
-                # 收集结果
-                results.extend(event._results)
-            
-            # 发布后钩子
+        # 发布前钩子
+        await self._run_hooks('before_publish', event)
+        
+        if event.intercepted:
             await self._run_hooks('after_publish', event)
-            return results
+            return event.results
+
+        handlers = []
+        if event.type in self._exact_handlers:
+            # 处理精确匹配处理器
+            for (pattern, priority, handler, handler_id) in self._exact_handlers[event.type]:
+                handlers.append((handler, priority, handler_id))
+        else:
+            # 处理正则匹配处理器
+            for (pattern, priority, handler, handler_id) in self._regex_handlers:
+                if pattern and pattern.match(event.type):
+                    handlers.append((handler, priority, handler_id))
+        
+        # 按优先级排序
+        sorted_handlers = sorted(handlers, key=lambda x: (-x[1], x[0].__name__))
+        
+        results = []
+        # 按优先级顺序调用处理器
+        for handler, priority, handler_id in sorted_handlers:
+            if event._propagation_stopped:
+                break
+
+            # 处理器执行前钩子
+            await self._run_hooks('before_handler', event, handler)
+            
+            try:
+                if asyncio.iscoroutinefunction(handler):
+                    await handler(event)
+                else:
+                    # 将同步函数包装为异步任务
+                    async with self._async_lock:
+                        await asyncio.get_running_loop().run_in_executor(None, handler, event)
+                # 处理器执行后钩子
+                await self._run_hooks('after_handler', event, handler)
+            except Exception as e:
+                # 错误钩子
+                await self._run_hooks('on_error', event, handler, e)
+                raise EventHandlerError(e,handler)
+            # 收集结果
+            results.extend(event._results)
+        
+        # 发布后钩子
+        await self._run_hooks('after_publish', event)
+        return results
 
     def publish_sync(self, event: Event) -> List[Any]:
         """
