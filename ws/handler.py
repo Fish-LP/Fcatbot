@@ -152,19 +152,6 @@ class WebSocketHandler(WebSocketClient, Apis):
         """
         await self.api('send_privat_msg', user_id = user_id, message = messagechain.to_dict())
 
-    async def __aenter__(self):
-        """异步上下文管理器入口.
-
-        Returns:
-            WebSocketHandler: 当前实例
-        """
-        if await self.connect():
-            asyncio.create_task(self._start_client())
-            lifecycle = json.loads(str(await self.recv(prefer='wait')))
-            if lifecycle.get('post_type',None) == 'meta_event':
-                _LOG.info(f"{lifecycle['self_id']} 连接成功")
-        return self
-    
     def _api_hardler(self, echo: str):
         def func(data: Any):
             if isinstance(data, str):
