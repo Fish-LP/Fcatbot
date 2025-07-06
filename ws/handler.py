@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:27
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-07-06 14:01:05
+# @LastEditTime : 2025-07-06 16:19:44
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -132,7 +132,7 @@ class WebSocketHandler(WebSocketClient, Apis):
             _LOG.error(f"API调用异常: {data}")
             return None
         
-    async def send_group_msg(self, messagechain: MessageChain, group_id:str = None, wait: bool = True):
+    async def send_group_msg(self, messagechain: MessageChain, group_id:str = None):
         """发送群消息.
 
         Args:
@@ -140,9 +140,9 @@ class WebSocketHandler(WebSocketClient, Apis):
             group_id: 目标群号
             wait: 是否等待响应  
         """
-        await self.api('send_group_msg', wait = wait, group_id = group_id, message = messagechain.to_dict())
+        await self.api('send_group_msg', group_id = group_id, message = messagechain.to_dict())
 
-    async def send_privat_msg(self, messagechain: MessageChain, user_id:str = None, wait: bool = True):
+    async def send_privat_msg(self, messagechain: MessageChain, user_id:str = None):
         """发送私聊消息.
 
         Args:
@@ -150,7 +150,7 @@ class WebSocketHandler(WebSocketClient, Apis):
             user_id: 目标用户ID
             wait: 是否等待响应
         """
-        await self.api('send_privat_msg', wait = wait, user_id = user_id, message = messagechain.to_dict())
+        await self.api('send_privat_msg', user_id = user_id, message = messagechain.to_dict())
 
     async def __aenter__(self):
         """异步上下文管理器入口.
