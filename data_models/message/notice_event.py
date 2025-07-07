@@ -9,6 +9,8 @@ class NoticeEvent:
     '''上报类型'''
     notice_type: str = field(default=None)
     '''通知类型'''
+    time: int = field(default_factory=lambda: int(time.time()))
+    '''事件发生的时间戳'''
 
 @dataclass(frozen=True)
 class GroupFileUpload(NoticeEvent):
@@ -47,7 +49,6 @@ class GroupMemberDecrease(NoticeEvent):
     '''操作者QQ号'''
     user_id: int = field(default=None)
     '''离开者QQ号'''
-    time: int = field(default_factory=lambda: int(time.time()))
 
 @dataclass(frozen=True)
 class GroupMemberIncrease(NoticeEvent):
@@ -100,7 +101,6 @@ class GroupRecall(NoticeEvent):
     '''操作者QQ号'''
     message_id: int = field(default=None)
     '''被撤回的消息ID'''
-    time: int = field(default=None)
     '''当前时间'''
     self_id: int = field(default=None)
     '''接收者ID'''

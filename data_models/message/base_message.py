@@ -2,11 +2,12 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 15:16:05
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-19 20:26:29
+# @LastEditTime : 2025-07-07 21:27:47
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 from dataclasses import dataclass, field
+import time
 from typing import Literal, Optional, Dict
 
 @dataclass(frozen=True)
@@ -42,7 +43,7 @@ class BaseMessage:
     self_id: int = field(default=None)
     real_seq: int = field(default=None)
     reply_to: int = field(default=None)
-    time: int = field(default=None)
+    time: int = field(default_factory=lambda: int(time.time()))
     post_type: str = field(default=None)
     sender: Sender = field(default=None)
 
