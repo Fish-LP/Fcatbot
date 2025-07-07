@@ -43,9 +43,9 @@ class BaseMessage:
     self_id: int = field(default=None)
     real_seq: int = field(default=None)
     reply_to: int = field(default=None)
-    time: int = field(default_factory=lambda: int(time.time()))
     post_type: str = field(default=None)
     sender: Sender = field(default=None)
+    time: int = field(default_factory=lambda: int(time.time()))
 
     def __post_init__(self):
         if isinstance(self.sender, dict):
