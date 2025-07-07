@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:27
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-07-06 16:19:44
+# @LastEditTime : 2025-07-06 16:36:29
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -82,8 +82,7 @@ class WebSocketHandler(WebSocketClient, Apis):
     
     async def api(self,
                 action: str,
-                param: Optional[Any] = None, 
-                echo: uuid.UUID = uuid.uuid4().hex,
+                **param,
                 ) -> Optional[dict]:
         """调用API接口
 
@@ -99,7 +98,7 @@ class WebSocketHandler(WebSocketClient, Apis):
             JSONDecodeError: 响应数据JSON解析失败
             TypeError: 响应数据类型错误
         """
-        if not echo: echo = uuid.uuid4().hex
+        echo = uuid.uuid4().hex
         send_data = {
             "action": action,
             "params": param,

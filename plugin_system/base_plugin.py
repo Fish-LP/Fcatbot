@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-07-05 21:38:46
+# @LastEditTime : 2025-07-07 13:46:38
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -221,12 +221,7 @@ class BasePlugin(
             self.unregister_handlers()
             await asyncio.to_thread(self._close_, *arg, **kwd)
             await self.on_close(*arg, **kwd)
-            
-            if not self.first_load and self.debug:
-                LOG.warning(f"{Color.YELLOW}debug模式下将{Color.RED}取消{Color.YELLOW}退出时的默认保存行为{Color.RESET}")
-                print(f'{Color.GRAY}{self.name}\n', '\n'.join(visualize_tree(self.data)), sep='')
-            else:
-                await self.data.asave()
+            await self.data.asave()
                 
         except (FileTypeUnknownError, SaveError, FileNotFoundError) as e:
             raise PluginDataError(self.name, "保存", str(e))
@@ -249,7 +244,7 @@ class BasePlugin(
             await self.data.aload()
             
         except (FileTypeUnknownError, LoadError, FileNotFoundError) as e:
-            if not self.debug or self.first_load:
+            if self.first_load:
                 open(self._data_path, 'w', encoding='utf-8').close()
             else:
                 raise PluginDataError(self.name, "加载", str(e))
@@ -257,7 +252,7 @@ class BasePlugin(
         try:
             await asyncio.to_thread(self._init_)
             await self.on_load()
-            if self.debug and self.first_load:
+            if self.first_load:
                 await self.data.asave()
         except Exception as e:
             raise PluginInitError(self.name, str(e))

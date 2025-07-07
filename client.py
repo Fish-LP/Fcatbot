@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-07-06 16:05:09
+# @LastEditTime : 2025-07-07 13:40:02
 # @Description  : 喵喵喵, 超多导入(超导)
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -86,7 +86,6 @@ class BotClient:
         self.close()
 
     def close(self):
-        LOG.info('用户主动触发关闭事件...')
         LOG.info('准备关闭所有插件...')
         self.plugin_sys.unload_all()
         LOG.info('准备关闭连接...')
@@ -121,12 +120,13 @@ class BotClient:
                 asyncio.run(self.loop())
             except KeyboardInterrupt:
                 print()
+                LOG.info('用户主动触发关闭事件...')
             finally:
                 self.close()
 
     async def loop(self):
         listener = self.ws.create_listener(64)
-        while self.ws.is_connected:
+        while self.ws.connected:
             try:
                 data = self.ws.get_message(listener)
             except Exception:
@@ -150,7 +150,7 @@ class BotClient:
         Returns:
             dict: API响应数据
         """
-        result = await self.ws.api(action, params)
+        result = await self.ws.api(action, **params)
         return result
     
     def publish_sync(self, event: Event) -> List[Any]:

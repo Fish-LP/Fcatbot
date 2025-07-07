@@ -21,12 +21,12 @@ class WebSocketClient:
         *,
         uri: str,
         logger: Optional[Logger] = None,
-        headers: Optional[Dict[str, str]] = {},
+        headers: Optional[Dict[str, str]] = None,
         ping_interval: float = 30,
         ping_timeout: float = 10,
         reconnect_attempts: int = 3,
         timeout: float = 20,
-        auth: Optional[Union[Dict[str, str], None]] = {},
+        auth: Optional[Dict[str, str]] = None,
         max_queue_size: int = 127,
         random_jitter: float = 0.5,
     ):
@@ -45,237 +45,300 @@ class WebSocketClient:
             max_queue_size: 消息队列最大大小
             random_jitter: 重连随机延迟因子
         """
+        # 参数校验
+        if not uri.startswith(("ws://", "wss://")):
+            raise ValueError("无效的WebSocket URI")
+        if ping_interval <= 0 or ping_timeout <= 0:
+            raise ValueError("心跳间隔和超时必须大于0")
+        if reconnect_attempts < 0:
+            raise ValueError("重连尝试次数不能为负")
+        
         # 设置
         self.uri = uri
-        '''连接地址'''
+        self.headers = headers or {}
         if auth:
-            headers.update(auth)
-        self.headers = headers
-        '''连接头 + 认证信息'''
+            self.headers.update(auth)
         self.ping_interval = ping_interval
-        '''心跳间隔(秒)'''
         self.ping_timeout = ping_timeout
-        '''心跳超时(秒)'''
         self.reconnect_attempts = reconnect_attempts
-        '''最大重试次数'''
         self.timeout = timeout
-        '''操作超时时间（秒）'''
         self.max_queue_size = max_queue_size
-        '''消息队列最大大小'''
         self.random_jitter = random_jitter
-        '''重连随机延迟因子'''
         self.logger = logger
-        '''日志记录器'''
-        self.headers = headers
-        '''连接头'''
-        self.ping_interval = ping_interval
-        '''心跳间隔(秒)'''
-        self.ping_timeout = ping_timeout
-        '''心跳超时(秒)'''
         
-        # 状态
+        # 状态管理
         self._connected = threading.Event()
-        '''连接状态'''
         self._closing = threading.Event()
-        '''关闭信号'''
         self._closed = threading.Event()
-        '''关闭标志'''
         
         # 队列系统
-        self._send_queue = queue.Queue(maxsize=127)
-        '''发送队列'''
-        self._receive_queue = queue.Queue(maxsize=127)
-        '''接收队列'''
+        self._send_queue = queue.Queue(maxsize=max_queue_size)
+        self._receive_queue = queue.Queue(maxsize=max_queue_size)
         
+        # 监听器系统
         self._listeners: Dict[str, queue.Queue] = {}
-        '''监听器管道''' # 收到消息后广播copy的消息(我tm直接广播，分什么类)
-        self._listener_lock = threading.Lock()
-        '''监听器管道锁'''
+        self._listener_lock = threading.RLock()  # 使用可重入锁
         
-        # 异步事件循环和线程
+        # 连接管理
         self._loop = asyncio.new_event_loop()
-        '''异步循环'''
         self._connection_thread = threading.Thread(
             target=self._run_connection_loop,
             daemon=True,
-            name="WebSocketConnectionThread"
+            name=f"WSConnThread-{id(self)}"
         )
-        '''ws客户端线程'''
+        self._executor = ThreadPoolExecutor(
+            max_workers=2,
+            thread_name_prefix=f"WSWorker-{id(self)}"
+        )
 
     def start(self):
+        """启动客户端连接"""
+        if self._closed.is_set():
+            raise RuntimeError("客户端已关闭，无法重新启动")
+        
+        if self.logger:
+            self.logger.info(f"启动WebSocket客户端，连接至 {self.uri}")
+        
         self._connection_thread.start()
-        # 等待连接就绪
-        self._connected.wait(timeout=self.ping_timeout)
-
+        if not self._connected.wait(timeout=self.timeout):
+            if self.logger:
+                self.logger.warning("初始连接超时，后台继续尝试连接")
+    
     # 属性
-    def is_connected(self) -> bool:
-        """检查是否已连接"""
-        return self._connected.is_set()
     @property
     def connected(self) -> bool:
         """检查是否已连接"""
         return self._connected.is_set()
+    
+    @property
+    def closing(self) -> bool:
+        """检查是否正在关闭"""
+        return self._closing.is_set()
+    
+    @property
+    def closed(self) -> bool:
+        """检查是否已关闭"""
+        return self._closed.is_set()
 
-    # 实现
+    # 核心实现
     def _run_connection_loop(self):
         """运行连接管理的事件循环"""
         asyncio.set_event_loop(self._loop)
-        self._loop.run_until_complete(self._connection_manager())
+        try:
+            self._loop.run_until_complete(self._connection_manager())
+        except Exception as e:
+            if self.logger:
+                self.logger.critical(f"连接管理器意外终止: {e}")
+        finally:
+            # 清理资源
+            self._loop.close()
+            self._closed.set()
+            if self.logger:
+                self.logger.info("连接管理器已完全停止")
 
     async def _connection_manager(self):
         """连接管理协程，处理连接、重连和心跳"""
-        reconnect_attempt = 0   # 重连次数
-        base_delay = self.ping_interval
-        max_delay = 30.0    # 最大重连等待时间
-        logger = self.logger
+        reconnect_attempt = 0
+        base_delay = 1.0
+        max_delay = 60.0
         
-        # 建立连接
         while not self._closing.is_set():
             try:
-                self._connected.clear()
+                # 连接前日志
+                if self.logger:
+                    self.logger.info(f"尝试连接至 {self.uri} (尝试 {reconnect_attempt+1}/{self.reconnect_attempts})")
+                
+                # 建立连接
                 async with Connect(
-                    uri = self.uri,
-                    logger = self.logger or None,
+                    uri=self.uri,
                     extra_headers=self.headers,
                     timeout=self.timeout,
-                    ping_interval = self.ping_interval,
-                    ping_timeout = self.ping_timeout,
+                    ping_interval=self.ping_interval,
+                    ping_timeout=self.ping_timeout,
                 ) as ws:
-                    # 更新连接状态
+                    # 连接成功
                     self._connected.set()
                     reconnect_attempt = 0
                     
-                    # 启动
-                    receive_task = asyncio.create_task(self._receive_messages(ws))
-                    send_task = asyncio.create_task(self._send_messages(ws))
-                    ping_task = asyncio.create_task(self._monitor_ping(ws))
+                    if self.logger:
+                        self.logger.info(f"成功连接到 {self.uri}")
                     
-                    # 等待任何任务完成或关闭信号
+                    # 创建任务
+                    tasks = [
+                        asyncio.create_task(self._receive_messages(ws), name="receive"),
+                        asyncio.create_task(self._send_messages(ws), name="send"),
+                        asyncio.create_task(self._monitor_connection(ws), name="monitor")
+                    ]
+                    
+                    # 等待任务完成
                     done, pending = await asyncio.wait(
-                        {receive_task, send_task, ping_task},
-                        return_when=asyncio.FIRST_COMPLETED
+                        tasks,
+                        return_when=asyncio.FIRST_EXCEPTION
                     )
                     
-                    # 取消所有任务
+                    # 取消剩余任务
                     for task in pending:
                         task.cancel()
                     
-                    # 检查关闭原因
-                    if self._closing.is_set():
-                        pass
-                    elif ping_task in done:
-                        if logger: logger.warning("检测到Ping超时，重新连接...")
-                    elif receive_task in done:
-                        if logger: logger.warning("接收任务终止，正在重新连接...")
+                    # 记录任务结果
+                    for task in done:
+                        try:
+                            await task
+                        except Exception as e:
+                            if self.logger:
+                                self.logger.error(f"任务 {task.get_name()} 异常: {e}")
                     
-            except Exception as e:
-                self.logger.error(f"连接错误: {e}")
+                    # 检查关闭原因
+                    if not self._closing.is_set():
+                        if self.logger:
+                            self.logger.warning("连接意外断开，准备重连")
             
-            # 重连
+            except (ConnectionClosedOK, ConnectionClosedError) as e:
+                if self.logger:
+                    code = e.code if hasattr(e, 'code') else 1006
+                    reason = e.reason if hasattr(e, 'reason') else "未知原因"
+                    self.logger.warning(f"连接关闭: 代码={code}, 原因={reason}")
+            except asyncio.TimeoutError:
+                if self.logger:
+                    self.logger.warning("连接超时")
+            except Exception as e:
+                if self.logger:
+                    self.logger.error(f"连接错误: {type(e).__name__}: {e}")
+            
+            # 重连逻辑
             if not self._closing.is_set():
+                self._connected.clear()
                 reconnect_attempt += 1
+                
                 if reconnect_attempt > self.reconnect_attempts:
-                    if logger: logger.error("达到的最大重连尝试数")
+                    if self.logger:
+                        self.logger.error(f"达到最大重连尝试次数 ({self.reconnect_attempts})")
                     break
                 
+                # 指数退避 + 随机抖动
                 delay = min(base_delay * (2 ** (reconnect_attempt - 1)), max_delay)
-                if logger: logger.info(f"重连: {delay:.1f}s ({reconnect_attempt}/{self.reconnect_attempts})")
-                await asyncio.sleep(delay + random.uniform(0, self.random_jitter))
+                jitter = random.uniform(0, self.random_jitter)
+                total_delay = delay + jitter
+                
+                if self.logger:
+                    self.logger.info(f"将在 {total_delay:.2f} 秒后尝试重连 ({reconnect_attempt}/{self.reconnect_attempts})")
+                
+                await asyncio.sleep(total_delay)
         
         # 清理关闭
+        self._closing.set()
         self._closed.set()
-        if logger: logger.debug("连接管理器已停止")
+        if self.logger:
+            self.logger.info("连接管理器停止")
 
     async def _receive_messages(self, ws: Connect):
         """接收消息并分发到监听器"""
-        logger = self.logger
+        if self.logger:
+            self.logger.debug("开始接收消息循环")
         
-        while not self._closing.is_set():
+        try:
+            while self.connected and not self.closing:
+                try:
+                    message = await asyncio.wait_for(
+                        ws.recv(),
+                        timeout=self.ping_interval + self.ping_timeout
+                    )
+                    
+                    # 分发消息
+                    self._broadcast_message(message)
+                    
+                except asyncio.TimeoutError:
+                    # 正常超时，继续循环
+                    continue
+                except ConnectionClosed:
+                    if self.logger:
+                        self.logger.warning("接收循环中检测到连接关闭")
+                    break
+                except Exception as e:
+                    if self.logger:
+                        self.logger.error(f"接收消息错误: {type(e).__name__}: {e}")
+                    break
+        finally:
+            if self.logger:
+                self.logger.debug("接收消息循环结束")
+
+    def _broadcast_message(self, message: Any):
+        """广播消息到所有监听器（线程安全）"""
+        with self._listener_lock:
+            # 创建监听器的快照避免在广播时修改
+            listeners = list(self._listeners.items())
+        
+        # 使用线程池异步处理分发
+        def _deliver(qid, queue, msg):
             try:
-                message = await asyncio.wait_for(
-                    ws.recv(),  # 如果网络不稳定，ws.recv() 可能会阻塞较长时间。
-                    timeout=self.ping_interval + 1.0    # 所以加入这个
-                )
-                
-                # 分发到所有监听器
-                with self._listener_lock:
-                    for listener_id, q in self._listeners.items():
-                        if q.not_full:
-                            q.put_nowait(message)
-                        else:
-                            if logger: logger.warning(f"监听器 '{listener_id}' 队列已满，消息被丢弃")
-                
-            except asyncio.TimeoutError:
-                # 正常超时，继续循环
-                continue
-            except ConnectionClosedOK:
-                # 正常关闭
-                break
-            except ConnectionClosedError as e:
-                # e.code 属性用于向后兼容
-                if logger: logger.warning(f"连接被错误的关闭, 错误代码: {1006 if e.rcvd is None else e.rcvd.code}")
-                break
+                if queue.full():
+                    if self.logger:
+                        self.logger.warning(f"监听器 {qid} 队列已满，丢弃消息")
+                    return
+                queue.put_nowait(msg)
             except Exception as e:
-                if logger: logger.error(f"未知接收时错误: {e}")
-                break
+                if self.logger:
+                    self.logger.error(f"分发消息到监听器 {qid} 失败: {e}")
+        
+        for listener_id, q in listeners:
+            self._executor.submit(_deliver, listener_id, q, message)
 
     async def _send_messages(self, ws: Connect):
         """从队列中获取消息并发送"""
-        logger = self.logger
+        if self.logger:
+            self.logger.debug("开始发送消息循环")
         
-        while not self._closing.is_set():
-            try:
-                if self._send_queue.empty():
-                    await asyncio.sleep(0)  # 交还控制权给事件循环
-                    continue
-                else:
-                    message = self._send_queue.get_nowait()
-                
-                # 发送消息
+        try:
+            while self.connected and not self.closing:
                 try:
+                    # 非阻塞获取消息
+                    try:
+                        message = self._send_queue.get_nowait()
+                    except queue.Empty:
+                        await asyncio.sleep(0.01)
+                        continue
+                    
+                    # 发送消息
+                    if self.logger:
+                        self.logger.debug(f"发送消息: {message[:100]}{'...' if len(message) > 100 else ''}")
+                    
                     await ws.send(message)
+                    self._send_queue.task_done()
+                    
                 except ConnectionClosed:
-                    # 重新放入队列，如果可以
-                    if self._send_queue.not_full:
+                    if self.logger:
+                        self.logger.warning("发送循环中检测到连接关闭")
+                    # 将消息放回队列（如果可能）
+                    if not self._send_queue.full():
                         self._send_queue.put(message)
-                        if logger: logger.warning("在发送消息期间关闭连接，消息被放回队列")
-                    else:
-                        self.logger.warning("在发送消息期间关闭连接，因为队列已满，消息被丢弃")
                     break
                 except Exception as e:
-                    if logger: logger.error(f"发送错误(消息被丢弃): {e}")
-                    # 丢弃无法发送的消息
-                
-                # 标记任务完成
-                self._send_queue.task_done()
-                    
-            except Exception as e:
-                if logger: logger.error(f"未知发送错误: {e}")
+                    if self.logger:
+                        self.logger.error(f"发送消息失败: {type(e).__name__}: {e}")
+                    self._send_queue.task_done()  # 即使失败也标记完成
+        finally:
+            if self.logger:
+                self.logger.debug("发送消息循环结束")
 
-    async def _monitor_ping(self, ws: Connect):
+    async def _monitor_connection(self, ws: Connect):
         """监控连接状态"""
-        while not self._closing.is_set():
-            try:
-                # ping
-                pong_waiter = await ws.ping()
-                latency = await asyncio.wait_for(
-                    pong_waiter,
-                    timeout=self.ping_timeout,
-                )
-                self.logger.debug(f"ping-pong 延迟: {latency}")
+        if self.logger:
+            self.logger.debug("开始连接监控循环")
+        
+        try:
+            while self.connected and not self.closing:
                 await asyncio.sleep(self.ping_interval)
                 
-            except ConnectionClosed:
-                # 忽略关闭行为导致的错误
-                return
-            except TimeoutError:
-                # 超时
-                # _LOG.warning("Ping 超时") #   外部已经有提示
-                return
-            except Exception as e:
-                if self.logger: self.logger.error(f"Ping错误: {e}")
-                return  
+                # 简单检查连接是否活跃
+                if not ws.open:
+                    if self.logger:
+                        self.logger.warning("监控检测到连接已关闭")
+                    break
+        finally:
+            if self.logger:
+                self.logger.debug("连接监控循环结束")
 
+    # 公共接口
     def send(self, message: Union[str, bytes, dict]):
         """
         非阻塞发送消息
@@ -283,7 +346,7 @@ class WebSocketClient:
         Args:
             message: 可以是字符串、字节或字典（自动序列化为JSON）
         """
-        if self._closing.is_set() or self._closed.is_set():
+        if self.closing or self.closed:
             raise ConnectionError("连接正在关闭或已关闭")
         
         # 格式化消息
@@ -292,20 +355,21 @@ class WebSocketClient:
         elif isinstance(message, bytes):
             formatted = message
         else:
-            formatted = str(message)
+            formatted = str(message).encode('utf-8')
         
         try:
             self._send_queue.put_nowait(formatted)
         except queue.Full:
             # 队列满时丢弃最旧的消息
             try:
-                # 丢弃最旧的消息
                 self._send_queue.get_nowait()
                 self._send_queue.task_done()
+                self._send_queue.put_nowait(formatted)
+                if self.logger:
+                    self.logger.warning("发送队列已满，丢弃最旧的消息")
             except queue.Empty:
-                pass
-            self._send_queue.put_nowait(formatted)
-            if self.logger: self.logger.warning("发送队列已满, 丢弃最旧的消息")
+                # 如果队列在获取时变空，重试
+                self._send_queue.put_nowait(formatted)
 
     def create_listener(self, queue_size: int = 127) -> str:
         """
@@ -314,11 +378,14 @@ class WebSocketClient:
         Return:
             监听器ID，用于接收消息
         """
-        listener_id = uuid.uuid4()
+        listener_id = str(uuid.uuid4())
         q = queue.Queue(maxsize=queue_size)
         
         with self._listener_lock:
             self._listeners[listener_id] = q
+        
+        if self.logger:
+            self.logger.debug(f"创建监听器: {listener_id}")
         
         return listener_id
 
@@ -326,9 +393,18 @@ class WebSocketClient:
         """移除消息监听器"""
         with self._listener_lock:
             if listener_id in self._listeners:
-                del self._listeners[listener_id]
+                # 清空队列避免内存泄漏
+                q = self._listeners.pop(listener_id)
+                while not q.empty():
+                    try:
+                        q.get_nowait()
+                        q.task_done()
+                    except queue.Empty:
+                        break
+                if self.logger:
+                    self.logger.debug(f"移除监听器: {listener_id}")
 
-    def get_message(self, listener_id: uuid.UUID, timeout: Optional[float] = None) -> Any:
+    def get_message(self, listener_id: str, timeout: Optional[float] = None) -> Any:
         """
         从监听器获取消息
         
@@ -339,7 +415,7 @@ class WebSocketClient:
         Return:
             消息内容，超时返回None
         """
-        if self._closed.is_set():
+        if self.closed:
             return None
         
         try:
@@ -351,6 +427,10 @@ class WebSocketClient:
             
             return q.get(timeout=timeout)
         except queue.Empty:
+            return None
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"获取消息错误: {e}")
             return None
 
     def request(
@@ -370,42 +450,49 @@ class WebSocketClient:
         Return:
             匹配的响应消息，超时返回None
         """
-        # 创建专用监听器
         listener_id = self.create_listener(queue_size=5)
         
         try:
-            # 发送请求
             self.send(request)
             
-            # 等待匹配的响应
             start_time = time.monotonic()
             while time.monotonic() - start_time < timeout:
                 message = self.get_message(listener_id, timeout=0.1)
                 if message is None:
                     continue
                 
-                # 尝试匹配响应
                 try:
                     if response_matcher(message):
                         return message
                 except Exception as e:
-                    if self.logger: self.logger.error(f"响应匹配器错误: {e}")
-            
-            return None  # 超时
+                    if self.logger:
+                        self.logger.error(f"响应匹配器错误: {e}")
         finally:
             self.remove_listener(listener_id)
+        
+        if self.logger:
+            self.logger.warning(f"请求超时 (timeout={timeout}s)")
+        return None
 
     def close(self, timeout: float = 5.0):
         """关闭连接"""
-        if self._closed.is_set():
+        if self.closed:
             return
         
+        if self.logger:
+            self.logger.info("正在关闭WebSocket客户端...")
+        
         self._closing.set()
-        self._closed.wait(timeout=timeout)
+        self._connected.clear()
+        
+        # 等待连接线程停止
+        if self._connection_thread.is_alive():
+            self._connection_thread.join(timeout=timeout)
         
         # 清理资源
         with self._listener_lock:
-            self._listeners.clear()
+            for qid in list(self._listeners.keys()):
+                self.remove_listener(qid)
         
         # 清空队列
         while not self._send_queue.empty():
@@ -414,13 +501,19 @@ class WebSocketClient:
                 self._send_queue.task_done()
             except queue.Empty:
                 break
+        
+        self._closed.set()
+        
+        if self.logger:
+            self.logger.info("WebSocket客户端已关闭")
 
     def __enter__(self):
+        self.start()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
     def __del__(self):
-        # 不可靠
-        self.close()
+        if not self.closed:
+            self.close()
