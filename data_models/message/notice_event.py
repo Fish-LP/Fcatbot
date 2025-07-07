@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 import time
 from typing import Literal, Dict
-from .base_message import BaseMessage
 
 @dataclass(frozen=True)
 class NoticeEvent:
@@ -48,6 +47,7 @@ class GroupMemberDecrease(NoticeEvent):
     '''操作者QQ号'''
     user_id: int = field(default=None)
     '''离开者QQ号'''
+    time: int = field(default_factory=lambda: int(time.time()))
 
 @dataclass(frozen=True)
 class GroupMemberIncrease(NoticeEvent):
