@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 15:16:05
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-07-07 21:47:08
+# @LastEditTime : 2025-07-07 21:51:17
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 import time
 from typing import Literal, Optional, Dict
 from .message_chain import MessageChain
+# TODO 根据napcat文档更新最新数据类型
 
 @dataclass(frozen=True)
 class Sender:
@@ -45,10 +46,6 @@ class BaseMessage:
     '''真实消息序列号'''
     self_id: int
     '''收到事件的机器人 QQ 号'''
-    id: int
-    '''消息 ID'''
-    raw: dict
-    '''原始数据'''
     post_type: str
     '''消息类型'''
     sender: Sender
@@ -59,6 +56,10 @@ class BaseMessage:
     '''消息 ID'''
     message: MessageChain
     '''消息内容'''
+    id: int = None
+    '''消息 ID'''
+    raw: dict = None
+    '''原始数据'''
     time: int = field(default_factory=lambda: int(time.time()))
     '''事件发生的时间戳'''
     sub_type: Literal['friend', 'group', 'other'] = 'other'
