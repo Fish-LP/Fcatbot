@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-13 21:47:01
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-07-07 15:01:29
+# @LastEditTime : 2025-07-08 13:09:51
 # @Description  : 通用文件加载器，支持JSON/TOML/YAML/PICKLE格式的同步/异步读写
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -39,6 +39,8 @@ from typing import Any, Callable, Dict, Literal, Optional, Union
 # ---------------------
 
 # 文件操作防抖时间(100ms)
+# ! 此值过高只会造成读取延迟，但是过低会导致频繁触发保存操作
+# ! 需要根据实际情况调整
 FILE_DEBOUNCE_TIME = 0.1
 
 # regionend
