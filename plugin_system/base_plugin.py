@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-07-07 13:46:38
+# @LastEditTime : 2025-07-08 18:14:04
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -221,7 +221,7 @@ class BasePlugin(
             self.unregister_handlers()
             await asyncio.to_thread(self._close_, *arg, **kwd)
             await self.on_close(*arg, **kwd)
-            await self.data.asave()
+            self.data.close()
                 
         except (FileTypeUnknownError, SaveError, FileNotFoundError) as e:
             raise PluginDataError(self.name, "保存", str(e))
@@ -241,7 +241,7 @@ class BasePlugin(
         try:
             if isinstance(self.data, dict):
                 self.data = self._data
-            await self.data.aload()
+            self.data.load()
             
         except (FileTypeUnknownError, LoadError, FileNotFoundError) as e:
             if self.first_load:
@@ -253,7 +253,7 @@ class BasePlugin(
             await asyncio.to_thread(self._init_)
             await self.on_load()
             if self.first_load:
-                await self.data.asave()
+                self.data.save()
         except Exception as e:
             raise PluginInitError(self.name, str(e))
 

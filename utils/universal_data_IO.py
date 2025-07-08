@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-13 21:47:01
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-07-08 13:09:51
+# @LastEditTime : 2025-07-08 17:50:33
 # @Description  : 通用文件加载器，支持JSON/TOML/YAML/PICKLE格式的同步/异步读写
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -341,6 +341,11 @@ class UniversalLoader(dict):
             warnings.warn("实时读取功能不可用，缺少watchdog模块。", ModuleNotInstalledError)
 
     def __del__(self):
+        self.close()
+
+    def close(self):
+        if self._file_path and self._check_file_exists(self._file_path):
+            self.save()
         if getattr(self, '_observer', None):
             self._observer.stop()
             self._observer.join()

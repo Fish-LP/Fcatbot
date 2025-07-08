@@ -9,6 +9,7 @@ class NoticeEvent:
     '''上报类型'''
     notice_type: str = field(default=None)
     '''通知类型'''
+    self_id: int = field(default=None)
     time: int = field(default_factory=lambda: int(time.time()))
     '''事件发生的时间戳'''
 
