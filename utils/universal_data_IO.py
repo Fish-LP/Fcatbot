@@ -14,7 +14,7 @@
 注意:
     1. UniversalLoader 并不是一个专门用于处理纯列表的工具
     2. 读取未知来源的pickle文件可能导致任意代码执行漏洞请手动开启支持
-    3. 创建UniversalLoader实例后不会立刻读取文件,请手动调用load或者aload读取文件
+    3. 创建UniversalLoader实例后会立刻读取文件
 
 Raises:
     FileTypeUnknownError:       当文件类型无法识别时抛出
@@ -270,6 +270,7 @@ class UniversalLoader(dict):
         # 检查模块可用性
         self._check_module_availability()
         
+        self.load()  # 初始化时加载数据
         # 动态重写方法以支持实时保存
         if realtime_save:
             self._wrap_methods_for_realtime_save()
