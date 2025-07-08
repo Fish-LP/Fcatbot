@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-07-07 13:40:02
+# @LastEditTime : 2025-07-08 16:40:57
 # @Description  : 喵喵喵, 超多导入(超导)
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -97,18 +97,15 @@ class BotClient:
         self.ws.start()
         return self.ws
 
-    def load_plugin(self):
+    async def load_plugin(self):
         '''仅加载插件'''
         if not os.path.exists(PLUGINS_DIR):
             os.makedirs(PLUGINS_DIR, exist_ok=True)
         # 设置插件系统的调试模式
-        asyncio.run(self.plugin_sys.load_plugins(api=self.ws))
+        await self.plugin_sys.load_plugins(api=self.ws)
 
     def run(self, load_plugins:bool = True):
         '''连接并启用bot客户端'''
-        if load_plugins:
-            LOG.info('准备加载插件')
-            self.load_plugin()
         LOG.info('准备启动Fcatbot')
         if self.debug:
             LOG.warning('以 DEBUG 模式启动')
@@ -117,14 +114,19 @@ class BotClient:
         else:
             self.ws.start()  # 启动 WebSocket 连接
             try:
-                asyncio.run(self.loop())
+                asyncio.run(self.loop(load_plugins))
             except KeyboardInterrupt:
                 print()
                 LOG.info('用户主动触发关闭事件...')
+            except Exception as e:
+                LOG.error(f"发生错误: {e}")
             finally:
                 self.close()
 
-    async def loop(self):
+    async def loop(self, load_plugins:bool = True):
+        if load_plugins:
+            LOG.info('准备加载插件')
+            await self.load_plugin()
         listener = self.ws.create_listener(64)
         while self.ws.connected:
             try:
