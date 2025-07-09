@@ -1,3 +1,11 @@
+# -------------------------
+# @Author       : Fish-LP fish.zh@outlook.com
+# @Date         : 2025-03-21 18:06:59
+# @LastEditors  : Fish-LP fish.zh@outlook.com
+# @LastEditTime : 2025-07-09 12:30:36
+# @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
+# @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
+# -------------------------
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -14,6 +22,10 @@ class RequestEvent:
     '''验证信息'''
     flag: str = field(default=None)
     '''请求 flag，在调用处理请求的 API 时需要传入'''
+    time: int = field(default_factory=lambda: int(time.time()))
+    '''事件发生的时间戳'''
+    self_id: int = field(default=None)
+    '''收到事件的机器人 QQ 号'''
 
 @dataclass(frozen=True)
 class FriendRequestEvent(RequestEvent):
