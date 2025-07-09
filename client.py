@@ -136,7 +136,10 @@ class BotClient:
                 continue
             if data:
                 # print(data)
-                await self.on_message(data)
+                try:
+                    await self.on_message(data)
+                except Exception as e:
+                    LOG.exception("处理消息时发生错误: {e}")
         # for data in listener.iter_messages():
         #     print(f"接收到消息: {data}")
         #     if data:
