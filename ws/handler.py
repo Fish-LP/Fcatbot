@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:59:27
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-07-06 16:36:29
+# @LastEditTime : 2025-07-22 15:40:20
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -67,6 +67,7 @@ class WebSocketHandler(WebSocketClient, Apis):
             max_queue_size = max_queue_size,
             random_jitter = random_jitter,
         )
+        Apis.__init__(self, client=self)
         self.ping:int = -1
         self.request_cache:Dict[uuid.UUID: dict] = {}
         self.request_interceptor = None
@@ -82,6 +83,7 @@ class WebSocketHandler(WebSocketClient, Apis):
     
     async def api(self,
                 action: str,
+                pack: dict = {},
                 **param,
                 ) -> Optional[dict]:
         """调用API接口
@@ -99,15 +101,17 @@ class WebSocketHandler(WebSocketClient, Apis):
             TypeError: 响应数据类型错误
         """
         echo = uuid.uuid4().hex
+        if action.startswith('/'):
+            action = action[1:]
         send_data = {
             "action": action,
-            "params": param,
+            "params": param or pack,
             "echo": echo,
         }
 
         # 如果在debug模式下且设置了拦截器,则使用拦截器处理请求
         if self.request_interceptor is not None:
-            return await self.request_interceptor(action, param)
+            return await self.request_interceptor(action, param or pack)
 
         data: str = self.request(
             send_data,
@@ -124,7 +128,7 @@ class WebSocketHandler(WebSocketClient, Apis):
             return data
         elif data.get('status', '').lower() in ('ok', '200') or 'self_id' in data:
             if data.get('echo', None) == echo:
-                return data['data']
+                return data.get('data', None)
             else:
                 _LOG.error(f"API响应的 echo 标识不符")
         else:
@@ -141,7 +145,7 @@ class WebSocketHandler(WebSocketClient, Apis):
         """
         await self.api('send_group_msg', group_id = group_id, message = messagechain.to_dict())
 
-    async def send_privat_msg(self, messagechain: MessageChain, user_id:str = None):
+    async def send_private_msg(self, messagechain: MessageChain, user_id:str = None):
         """发送私聊消息.
 
         Args:
@@ -149,7 +153,7 @@ class WebSocketHandler(WebSocketClient, Apis):
             user_id: 目标用户ID
             wait: 是否等待响应
         """
-        await self.api('send_privat_msg', user_id = user_id, message = messagechain.to_dict())
+        await self.api('send_private_msg', user_id = user_id, message = messagechain.to_dict())
 
     def _api_hardler(self, echo: str):
         def func(data: Any):

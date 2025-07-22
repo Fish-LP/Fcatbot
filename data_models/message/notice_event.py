@@ -13,6 +13,8 @@ class NoticeEvent:
     '''事件发生的时间戳'''
     self_id: int = field(default=None)
     '''收到事件的机器人 QQ 号'''
+    raw_info: dict = field(default=None)
+    '''原始信息'''
 
 @dataclass(frozen=True)
 class GroupFileUpload(NoticeEvent):

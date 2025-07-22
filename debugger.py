@@ -1,3 +1,11 @@
+# -------------------------
+# @Author       : Fish-LP fish.zh@outlook.com
+# @Date         : 2025-03-30 14:22:37
+# @LastEditors  : Fish-LP fish.zh@outlook.com
+# @LastEditTime : 2025-07-21 13:51:12
+# @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
+# @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
+# -------------------------
 import ast
 import asyncio
 import inspect
@@ -361,6 +369,7 @@ def send_simulated_message(client, text: str) -> None:
         'id': msg_id,
         'self_id': int(debug_state['bot_id']),
         'real_seq': msg_id,
+        'real_id': msg_id,
         'reply_to': None,
         'time': int(time() * 1000),
         'post_type': 'message',
