@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:31:16
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-07-08 18:34:01
+# @LastEditTime : 2025-07-22 16:02:10
 # @Description  : 事件总线类,用于管理和分发事件
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -196,6 +196,7 @@ class EventBus:
             except Exception as e:
                 # 错误钩子
                 await self._run_hooks('on_error', event, handler, e)
+                print(e)
                 # raise EventHandlerError(e,handler)
             # 收集结果
             results.extend(event._results)
