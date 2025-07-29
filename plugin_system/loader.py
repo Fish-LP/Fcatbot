@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-03-21 18:06:59
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-07-29 16:26:21
+# @LastEditTime : 2025-07-29 16:38:40
 # @Description  : 插件加载器
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
@@ -115,7 +115,7 @@ class _ModuleImporter:
             
             # 检查包是否已安装
             pkg_resources.working_set.find(requirement)
-            LOG.info("依赖包已存在: %s", req)
+            # LOG.info("依赖包已存在: %s", req)
             
         except pkg_resources.VersionConflict:
             LOG.warning("依赖包版本冲突，尝试更新: %s", req)
@@ -203,7 +203,7 @@ class PluginLoader:
         temp = {}
         for name in load_order:
             cls = next(c for c in valid_classes if c.name == name)
-            LOG.info("加载插件 %s", name)
+            LOG.info("加载插件「%s」", name)
             temp[name] = cls(
                 event_bus=self.event_bus,
                 debug=self._debug,

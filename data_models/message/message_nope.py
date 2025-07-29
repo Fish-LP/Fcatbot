@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 13:35:26
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-22 21:33:06
+# @LastEditTime : 2025-07-29 16:55:36
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -173,6 +173,8 @@ class Video(OccupyElement):
     '''[视频]消息元素'''
     file: str
     '''[参见napcat]'''
+    file_size: int
+    url: str
     type: str = field(default='video', init=False)
 
 
