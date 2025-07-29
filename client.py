@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-07-08 16:40:57
+# @LastEditTime : 2025-07-29 15:36:36
 # @Description  : 喵喵喵, 超多导入(超导)
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -67,7 +67,7 @@ class BotClient:
     """
     def __init__(self, uri: str, token: str = None, command_prefix: tuple[str] = ('/','#'), debug: bool = False):
         self.event_bus = EventBus()
-        self.plugin_sys = PluginLoader(self.event_bus, debug)
+        self.plugin_sys = PluginLoader(self.event_bus, debug=debug)
         self.last_heartbeat:dict = {}
         self.command_prefix = command_prefix
         self.debug = debug
@@ -102,7 +102,7 @@ class BotClient:
         if not os.path.exists(PLUGINS_DIR):
             os.makedirs(PLUGINS_DIR, exist_ok=True)
         # 设置插件系统的调试模式
-        await self.plugin_sys.load_plugins(api=self.ws)
+        await self.plugin_sys.load_plugins(plugins_path=PLUGINS_DIR,api=self.ws)
 
     def run(self, load_plugins:bool = True):
         '''连接并启用bot客户端'''
@@ -131,6 +131,8 @@ class BotClient:
         while self.ws.connected:
             try:
                 data = self.ws.get_message(listener)
+            except KeyboardInterrupt:
+                return
             except Exception:
                 await asyncio.sleep(0)
                 continue
@@ -140,6 +142,7 @@ class BotClient:
                     await self.on_message(data)
                 except Exception as e:
                     LOG.exception("处理消息时发生错误: {e}")
+            await asyncio.sleep(0)
         # for data in listener.iter_messages():
         #     print(f"接收到消息: {data}")
         #     if data:

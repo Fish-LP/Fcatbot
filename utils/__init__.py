@@ -6,7 +6,7 @@
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
-from .universal_data_IO import UniversalLoader
+from .uniloader import UniversalLoader
 from .logger import get_log
 from .color import Color
 from .change_dir import ChangeDir

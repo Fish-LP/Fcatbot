@@ -2,222 +2,197 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:31:16
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-07-22 16:02:10
-# @Description  : 事件总线类,用于管理和分发事件
-# @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
+# @LastEditTime : 2025-07-29 14:25:07
+# @Description  : 事件总线类（优化版）
 # -------------------------
-from typing import List, Any, Callable, Dict
-from ..pluginsys_err import EventHandlerError
-from .event import Event
-import re
+from __future__ import annotations
+
 import asyncio
-import uuid
+import re
 import threading
+import uuid
+from functools import lru_cache
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+from .event import Event
+
+_Handler = Tuple[Optional[re.Pattern], int, Callable[[Event], Any], uuid.UUID]
+
 
 class EventBus:
-    """
-    事件总线类,用于管理和分发事件
-    """
-    def __init__(self):
-        """
-        初始化事件总线
-        """
-        self._exact_handlers = {}
-        self._regex_handlers = []
-        # 钩子存储-按事件类型
+    """线程安全、支持同步/异步的事件总线"""
+
+    # 钩子类型
+    _HOOKS = (
+        "before_publish",
+        "after_publish",
+        "before_handler",
+        "after_handler",
+        "on_error",
+    )
+
+    # ---------- 初始化 ----------
+    def __init__(self) -> None:
+        self._exact: Dict[str, List[_Handler]] = {}
+        self._regex: List[_Handler] = []
+
         self._type_hooks: Dict[str, Dict[str, List[Callable]]] = {}
-        # 钩子存储-按处理器UUID
         self._uuid_hooks: Dict[uuid.UUID, Dict[str, List[Callable]]] = {}
-        # 钩子类型列表
-        self._hook_types = [
-            'before_publish',  # 发布事件前
-            'after_publish',   # 发布事件后 
-            'before_handler',  # 处理器执行前
-            'after_handler',   # 处理器执行后
-            'on_error'        # 发生错误时
-        ]
-        self._lock = threading.Lock()  # 同步锁
-        self._async_lock = asyncio.Lock()  # 异步锁
 
-    def subscribe(self, event_type: str, handler: Callable[[Event], Any], priority: int = 0) -> uuid.UUID:
+        self._lock = threading.RLock()          # 支持同线程重入
+        self._loop_lock = asyncio.Lock()        # 仅用于 async 钩子
+
+    # ---------- 订阅/取消 ----------
+    def subscribe(
+        self,
+        event_type: str,
+        handler: Callable[[Event], Any],
+        priority: int = 0,
+    ) -> uuid.UUID:
         """
-        订阅事件处理器,并返回处理器的唯一 ID
-
-        Args
-            event_type: str - 事件类型或正则模式（以 're:' 开头表示正则匹配）
-            handler: Callable[[Event], Any] - 事件处理器函数
-            priority: int - 处理器的优先级（数字越大,优先级越高）
-
-        return:
-            UUID - 处理器的唯一 ID
+        订阅事件处理器，返回唯一 ID。
+        event_type 以 're:' 开头表示正则匹配。
         """
         with self._lock:
-            handler_id = uuid.uuid4()
-            pattern = None
+            hid = uuid.uuid4()
             if event_type.startswith("re:"):
-                try:
-                    pattern = re.compile(event_type[3:])
-                except re.error as e:
-                    raise ValueError(f"无效正则表达式: {event_type[3:]}") from e
-                self._regex_handlers.append((pattern, priority, handler, handler_id))
+                pattern = _compile_regex(event_type[3:])
+                self._regex.append((pattern, priority, handler, hid))
+                self._regex.sort(key=lambda t: (-t[1], t[2].__name__))  # 保持优先级
             else:
-                self._exact_handlers.setdefault(event_type, []).append(
-                    (pattern, priority, handler, handler_id)
-                )
-        return handler_id
+                bucket = self._exact.setdefault(event_type, [])
+                bucket.append((None, priority, handler, hid))
+                bucket.sort(key=lambda t: (-t[1], t[2].__name__))
+            return hid
 
     def unsubscribe(self, handler_id: uuid.UUID) -> bool:
-        """
-        取消订阅事件处理器
-
-        Args
-            handler_id: UUID - 处理器的唯一 ID
-
-        return:
-            bool - 是否成功取消订阅
-        """
+        """按 ID 移除处理器"""
         with self._lock:
-            # 取消精确匹配处理器
-            for event_type in list(self._exact_handlers.keys()):
-                self._exact_handlers[event_type] = [
-                    (patt, pr, h, hid) for (patt, pr, h, hid) in self._exact_handlers[event_type] if hid != handler_id
-                ]
-                if not self._exact_handlers[event_type]:
-                    del self._exact_handlers[event_type]
-            # 取消正则匹配处理器
-            self._regex_handlers = [
-                (patt, pr, h, hid) for (patt, pr, h, hid) in self._regex_handlers if hid != handler_id
-            ]
-            # 移除UUID关联的钩子
-            if handler_id in self._uuid_hooks:
-                del self._uuid_hooks[handler_id]
-        
-        return True
-
-    def add_hook(self, hook_type: str, func: Callable, event_type: str = None, handler_id: uuid.UUID = None) -> None:
-        """添加钩子函数
-        
-        Args:
-            hook_type: 钩子类型
-            func: 钩子函数
-            event_type: 事件类型,用于关联特定事件类型
-            handler_id: 处理器ID,用于关联特定处理器
-        """
-        with self._lock:
-            if hook_type not in self._hook_types:
-                raise ValueError(f"无效的钩子类型: {hook_type}")
-                
-            if handler_id:
-                # UUID关联
-                if handler_id not in self._uuid_hooks:
-                    self._uuid_hooks[handler_id] = {t:[] for t in self._hook_types}
-                self._uuid_hooks[handler_id][hook_type].append(func)
-            elif event_type:
-                # 事件类型关联
-                if event_type not in self._type_hooks:
-                    self._type_hooks[event_type] = {t:[] for t in self._hook_types}
-                self._type_hooks[event_type][hook_type].append(func)
-            else:
-                raise ValueError("必须指定event_type或handler_id之一")
-
-    async def _run_hooks(self, hook_type: str, event: Event, handler=None, *args, **kwargs) -> None:
-        """运行指定类型的钩子函数"""
-        async with self._async_lock:
-            hooks_to_run = []
-            
-            # 获取事件类型关联的钩子
-            if event.type in self._type_hooks:
-                hooks_to_run.extend(self._type_hooks[event.type][hook_type])
-                
-            # 获取处理器UUID关联的钩子
-            if handler and hasattr(handler, 'id'):
-                handler_id = handler.id
-                if handler_id in self._uuid_hooks:
-                    hooks_to_run.extend(self._uuid_hooks[handler_id][hook_type])
-
-            # 执行钩子
-            for hook in hooks_to_run:
-                if asyncio.iscoroutinefunction(hook):
-                    await hook(event, *args, **kwargs)
+            removed = False
+            # 精确匹配
+            for typ, bucket in list(self._exact.items()):
+                self._exact[typ] = [h for h in bucket if h[3] != handler_id]
+                if not self._exact[typ]:
+                    del self._exact[typ]
                 else:
-                    await asyncio.get_running_loop().run_in_executor(
-                        None, hook, event, *args, **kwargs
-                    )
+                    removed |= len(self._exact[typ]) != len(bucket)
+            # 正则匹配
+            original = len(self._regex)
+            self._regex = [h for h in self._regex if h[3] != handler_id]
+            removed |= len(self._regex) != original
 
+            self._uuid_hooks.pop(handler_id, None)
+            return removed
+
+    # ---------- 钩子 ----------
+    def add_hook(
+        self,
+        hook_type: str,
+        func: Callable[..., Any],
+        *,
+        event_type: Optional[str] = None,
+        handler_id: Optional[uuid.UUID] = None,
+    ) -> None:
+        if hook_type not in self._HOOKS:
+            raise ValueError(f"无效钩子类型: {hook_type}")
+        if (event_type is None) == (handler_id is None):
+            raise ValueError("必须且只能指定 event_type 或 handler_id")
+
+        with self._lock:
+            key = event_type if event_type else handler_id
+            container = self._type_hooks if event_type else self._uuid_hooks
+            bucket = container.setdefault(key, {t: [] for t in self._HOOKS})
+            bucket[hook_type].append(func)
+
+    # ---------- 发布 ----------
     async def publish_async(self, event: Event) -> List[Any]:
-        """
-        异步发布事件
-
-        Args
-            event: Event - 要发布的事件
-
-        return:
-            List[Any] - 所有处理器返回的结果的列表
-        """
-        # 发布前钩子
-        await self._run_hooks('before_publish', event)
-        
+        """异步发布事件（核心实现）"""
+        await self._run_hooks("before_publish", event)
         if event.intercepted:
-            await self._run_hooks('after_publish', event)
+            await self._run_hooks("after_publish", event)
             return event.results
 
-        handlers = []
-        if event.type in self._exact_handlers:
-            # 处理精确匹配处理器
-            for (pattern, priority, handler, handler_id) in self._exact_handlers[event.type]:
-                handlers.append((handler, priority, handler_id))
-        else:
-            # 处理正则匹配处理器
-            for (pattern, priority, handler, handler_id) in self._regex_handlers:
-                if pattern and pattern.match(event.type):
-                    handlers.append((handler, priority, handler_id))
-        
-        # 按优先级排序
-        sorted_handlers = sorted(handlers, key=lambda x: (-x[1], x[0].__name__))
-        
-        results = []
-        # 按优先级顺序调用处理器
-        for handler, priority, handler_id in sorted_handlers:
+        handlers = self._collect_handlers(event.type)
+        for _, _, handler, hid in handlers:
             if event._propagation_stopped:
                 break
+            await self._run_hooks("before_handler", event, handler_id=hid)
 
-            # 处理器执行前钩子
-            await self._run_hooks('before_handler', event, handler)
-            
             try:
                 if asyncio.iscoroutinefunction(handler):
                     await handler(event)
                 else:
-                    # 将同步函数包装为异步任务
-                    async with self._async_lock:
-                        await asyncio.get_running_loop().run_in_executor(None, handler, event)
-                # 处理器执行后钩子
-                await self._run_hooks('after_handler', event, handler)
-            except Exception as e:
-                # 错误钩子
-                await self._run_hooks('on_error', event, handler, e)
-                print(e)
-                # raise EventHandlerError(e,handler)
-            # 收集结果
-            results.extend(event._results)
-        
-        # 发布后钩子
-        await self._run_hooks('after_publish', event)
-        return results
+                    # 使用默认线程池执行同步回调
+                    loop = asyncio.get_running_loop()
+                    await loop.run_in_executor(None, handler, event)
+                await self._run_hooks("after_handler", event, handler_id=hid)
+            except Exception as exc:
+                await self._run_hooks("on_error", event, handler_id=hid, exc=exc)
+                # 全局抛出
+                # raise EventHandlerError(exc, handler) from exc
+
+        await self._run_hooks("after_publish", event)
+        return event._results.copy()
 
     def publish_sync(self, event: Event) -> List[Any]:
-        """
-        同步发布事件
-
-        Args
-            event: Event - 要发布的事件
-
-        return:
-            List[Any] - 所有处理器返回的结果的列表
-        """
-        loop = asyncio.new_event_loop()  # 创建新的事件循环
+        """同步发布事件，复用当前线程已存在的事件循环；没有则新建临时循环。"""
         try:
-            asyncio.set_event_loop(loop)  # 设置为当前事件循环
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # 当前线程无事件循环
+            return asyncio.run(self.publish_async(event))
+        else:
+            # 已在事件循环内（例如 jupyter / pytest-asyncio）
+            if loop.is_running():
+                # 防止嵌套事件循环
+                return loop.create_task(self.publish_async(event)).result()
             return loop.run_until_complete(self.publish_async(event))
-        finally:
-            loop.close()  # 关闭事件循环
+
+    # ---------- 内部工具 ----------
+    def _collect_handlers(self, event_type: str) -> List[_Handler]:
+        """收集所有匹配处理器，已按优先级排序"""
+        with self._lock:
+            # 精确匹配
+            handlers = list(self._exact.get(event_type, []))
+            # 正则匹配
+            handlers.extend(h for h in self._regex if h[0] and h[0].match(event_type))
+            # 按优先级降序
+            handlers.sort(key=lambda t: (-t[1], t[2].__name__))
+            return handlers
+
+    async def _run_hooks(
+        self,
+        hook_type: str,
+        event: Event,
+        *,
+        handler_id: Optional[uuid.UUID] = None,
+        exc: Optional[Exception] = None,
+    ) -> None:
+        """执行钩子函数。锁仅保护钩子列表读取，不阻塞钩子本身。"""
+        assert hook_type in self._HOOKS
+        to_run: List[Callable[..., Any]] = []
+
+        # 收集钩子（读操作，需加锁）
+        async with self._loop_lock:
+            if event.type in self._type_hooks:
+                to_run.extend(self._type_hooks[event.type].get(hook_type, []))
+            if handler_id and handler_id in self._uuid_hooks:
+                to_run.extend(self._uuid_hooks[handler_id].get(hook_type, []))
+
+        # 执行钩子（无锁，可并发）
+        for hook in to_run:
+            if asyncio.iscoroutinefunction(hook):
+                await hook(event, exc=exc)
+            else:
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(None, hook, event, exc)
+
+
+# ---------- 工具 ----------
+@lru_cache(maxsize=128)
+def _compile_regex(pattern: str) -> re.Pattern[str]:
+    """正则编译缓存，避免重复编译"""
+    try:
+        return re.compile(pattern)
+    except re.error as e:
+        raise ValueError(f"无效正则表达式: {pattern}") from e

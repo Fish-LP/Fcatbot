@@ -2,11 +2,12 @@
 [build-system]
 requires = ["setuptools >= 64", "wheel"]
 build-backend = "setuptools.build_meta"
-
+[tool.pytest.ini_options]
+pythonpath = ["."]
 # 项目元数据
 [project]
 name = "Fcatbot" # 包名称
-version = "2.3.0-alpha" # 版本号
+version = "2.4.0-alpha" # 版本号
 description = "基于ncatbot开发" # 简短描述
 authors = [
     { name = "Fish-LP", email = "fish.zh@outlook.com" }, # 作者姓名和邮箱

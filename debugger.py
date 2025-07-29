@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-03-30 14:22:37
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-07-21 13:51:12
+# @LastEditTime : 2025-07-29 15:37:08
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
@@ -416,7 +416,6 @@ def start_debug_mode(client: BotClient):
     async def debug_interceptor(action: str, params: dict) -> dict:
         """Debug模式下的API请求拦截器"""
         LOG.debug(f"Debug模式拦截API请求: {action} {params}")
-        
         if action == "get_group_info":
             return {
                 "group_id": params.get("group_id", 0),
@@ -464,7 +463,6 @@ def start_debug_mode(client: BotClient):
     except KeyboardInterrupt:
         print()
         LOG.info("退出调试模式")
-        LOG.info("可能需要第二次 Ctrl+C 退出")
         client.close()
         if readline_support:
             try:

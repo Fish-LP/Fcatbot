@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-05-15 19:12:16
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-29 20:25:30
+# @LastEditTime : 2025-07-29 14:21:15
 # @Description  : IPluginApi用于显示声明动态添加的属性
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
@@ -14,10 +14,6 @@ if TYPE_CHECKING:
 else:
     BasePlugin = object
     EventBus = object
-
-class IPluginApi:
-    '''用于注释加载时动态添加的属性'''
-    api: WebSocketHandler
 
 class AbstractPluginApi:
     def init_api(self):

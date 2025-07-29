@@ -1,7 +1,7 @@
 from typing import Any, List, Callable, final
 from uuid import UUID
 from ..event import EventBus, Event
-from ..abc_api import AbstractPluginApi
+from ..abc import AbstractPluginApi
 
 class EventHandlerMixin(AbstractPluginApi):
     """事件处理混入类，提供事件发布和订阅功能

@@ -2,14 +2,14 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-16 12:50:14
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-07-22 16:32:31
+# @LastEditTime : 2025-07-29 15:51:46
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 from setuptools import setup, find_packages 
 setup(
     name='Fcatbot',  # 包名称
-    version='2.3.0-alpha',  # 版本号
+    version='2.4.0-alpha',  # 版本号
     # 版本号的格式为: 主版本号.次版本号.修订号（MAJOR.MINOR.PATCH）,其中每个部分都是非负整数,且禁止在数字前补零。
     # 主版本号（MAJOR） : 表示软件的重大变更,通常涉及不兼容的 API 修改、重大功能新增或旧功能的废弃。当主版本号增加时,次版本号和修订号必须归零。
     # 次版本号（MINOR） : 表示向后兼容的功能新增或改进。当次版本号增加时,修订号必须归零。

@@ -7,7 +7,7 @@
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
 from asyncio import Queue, Lock
-from ..abc_api import AbstractPluginApi
+from ..abc import AbstractPluginApi
 
 class QueueManager(AbstractPluginApi):
     _queues = {}

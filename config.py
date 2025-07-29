@@ -2,22 +2,15 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-11 17:32:53
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-03-30 12:58:09
+# @LastEditTime : 2025-07-24 19:29:12
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 from .utils import UniversalLoader
 
-# 读取配置文件
-def load_config(config_path="config.yaml"):
-    try:
-        with UniversalLoader(config_path) as f:
-            return f.load()
-    except FileNotFoundError:
-        return {}
 
 # 加载配置
-config = load_config()
+config = {}
 
 # 使用配置
 EVENT_QUEUE_MAX_SIZE = config.get("EVENT_QUEUE_MAX_SIZE", 64)  # 事件队列最大长度

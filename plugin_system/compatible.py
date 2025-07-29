@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-05-04 22:39:56
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-30 21:34:51
+# @LastEditTime : 2025-07-29 14:07:33
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
@@ -10,7 +10,7 @@ from typing import Callable, Any, Optional, TypeVar
 import inspect
 from functools import wraps
 
-from .abc_api import CompatibleHandler
+from .abc import CompatibleHandler
 from .base_plugin import BasePlugin
 from .event.event_bus import EventBus
 from .event import Event

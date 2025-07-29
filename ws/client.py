@@ -24,7 +24,7 @@ class WebSocketClient:
         headers: Optional[Dict[str, str]] = None,
         ping_interval: float = 30,
         ping_timeout: float = 10,
-        reconnect_attempts: int = 3,
+        reconnect_attempts: int = 5,
         timeout: float = 20,
         auth: Optional[Dict[str, str]] = None,
         max_queue_size: int = 127,
@@ -97,7 +97,7 @@ class WebSocketClient:
             raise RuntimeError("客户端已关闭，无法重新启动")
         
         if self.logger:
-            self.logger.info(f"启动WebSocket客户端，连接至 {self.uri}")
+            self.logger.info(f"启动WebSocket客户端，准备连接至 {self.uri}")
         
         self._connection_thread.start()
         if not self._connected.wait(timeout=self.timeout):
@@ -404,7 +404,7 @@ class WebSocketClient:
                 if self.logger:
                     self.logger.debug(f"移除监听器: {listener_id}")
 
-    def get_message(self, listener_id: str, timeout: Optional[float] = None) -> Any:
+    def get_message(self, listener_id: str, timeout: Optional[float] = 1) -> Any:
         """
         从监听器获取消息
         

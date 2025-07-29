@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-15 20:08:02
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-07-08 18:14:04
+# @LastEditTime : 2025-07-29 15:42:08
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -10,7 +10,7 @@ import asyncio
 import inspect
 
 from pathlib import Path
-from typing import List, final
+from typing import List, final, Protocol
 from uuid import UUID
 from logging import getLogger
 
@@ -25,12 +25,8 @@ from .pluginsys_err import (
 )
 from .event import EventBus
 from ..utils import ChangeDir
-from ..utils import Color
 from ..utils import UniversalLoader
-from ..utils.universal_data_IO import FileTypeUnknownError, SaveError, LoadError
-from ..utils import visualize_tree
 from .config import config
-from .abc_api import IPluginApi
 from .plugin_funcs import (
     EventHandlerMixin,
     QueueManager
@@ -39,7 +35,6 @@ from .plugin_funcs import (
 LOG = getLogger('BasePlugin')
 
 class BasePlugin(
-        IPluginApi, # 插件额外属性定义
         EventHandlerMixin, # 事件处理器接口(基础功能)
         # QueueManager, # 管道管理器
     ):
@@ -223,7 +218,7 @@ class BasePlugin(
             await self.on_close(*arg, **kwd)
             self.data.close()
                 
-        except (FileTypeUnknownError, SaveError, FileNotFoundError) as e:
+        except FileNotFoundError as e:
             raise PluginDataError(self.name, "保存", str(e))
         except Exception as e:
             raise PluginUnloadError(self.name, str(e))
@@ -243,7 +238,7 @@ class BasePlugin(
                 self.data = self._data
             self.data.load()
             
-        except (FileTypeUnknownError, LoadError, FileNotFoundError) as e:
+        except FileNotFoundError as e:
             if self.first_load:
                 open(self._data_path, 'w', encoding='utf-8').close()
             else:
