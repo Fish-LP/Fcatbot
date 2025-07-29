@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-03-21 18:06:59
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-29 20:08:39
+# @LastEditTime : 2025-07-29 16:26:21
 # @Description  : 插件加载器
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
@@ -12,6 +12,7 @@ import importlib
 import importlib.util
 import os
 import sys
+import pkg_resources
 from collections import defaultdict, deque
 from pathlib import Path
 from types import ModuleType
@@ -107,10 +108,22 @@ class _ModuleImporter:
             self._ensure_package(req)
 
     def _ensure_package(self, req: str) -> None:
-        """按需安装/升级单个包。"""
-        # 此处仅演示核心思路；真实代码请用 pkg_resources / packaging 解析
-        LOG.info("开始安装: %s", req)
-        self.pip_tool.install(req)
+        """检查包是否存在，不存在则安装。"""
+        try:
+            # 尝试解析requirement字符串
+            requirement = pkg_resources.Requirement.parse(req)
+            
+            # 检查包是否已安装
+            pkg_resources.working_set.find(requirement)
+            LOG.info("依赖包已存在: %s", req)
+            
+        except pkg_resources.VersionConflict:
+            LOG.warning("依赖包版本冲突，尝试更新: %s", req)
+            self.pip_tool.install(req)
+            
+        except pkg_resources.DistributionNotFound:
+            LOG.info("开始安装缺失的依赖: %s", req)
+            self.pip_tool.install(req)
 
 
 class _DependencyResolver:
