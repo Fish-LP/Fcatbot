@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-06-22 17:03:21
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-06-22 19:15:54
+# @LastEditTime : 2025-10-02 15:20:09
 # @Description  : 终端颜色
 # @Copyright (c) 2025 by Fish.zh@outlook.com, Fcatbot使用许可协议
 # -------------------------

@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-03-30 14:22:37
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-07-29 15:37:08
+# @LastEditTime : 2025-10-02 12:45:18
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
@@ -33,9 +33,10 @@ def pre_input_hook():
         readline.insert_text(readline.get_history_item(readline.get_current_history_length()))  # 插入历史命令
         readline.redisplay()  # 再次重新显示当前行
 if TYPE_CHECKING:
-    from .client import BotClient
+    from .webclient import NcatbotClient
 else:
-    BotClient = object
+    NcatbotClient = object
+
 # 设置回调函数
 readline.set_pre_input_hook(pre_input_hook)
 
@@ -51,7 +52,7 @@ from .config import (
     OFFICIAL_PRIVATE_COMMAND_EVENT,
     OFFICIAL_PRIVATE_MESSAGE_EVENT
 )
-from .plugin_system import Event
+from .plugins import Event
 
 LOG = get_log('Debug')
 
@@ -411,7 +412,7 @@ def send_simulated_message(client, text: str) -> None:
     if out:
         print(f'{Color.CYAN}收集到的返回:{Color.RESET} {out}')
 
-def start_debug_mode(client: BotClient):
+def start_debug_mode(client: NcatbotClient):
     """启动调试模式"""
     async def debug_interceptor(action: str, params: dict) -> dict:
         """Debug模式下的API请求拦截器"""

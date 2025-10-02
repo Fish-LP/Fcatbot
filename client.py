@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-07-29 15:36:36
+# @LastEditTime : 2025-10-02 19:53:00
 # @Description  : 喵喵喵, 超多导入(超导)
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -10,10 +10,11 @@ import os
 import asyncio
 import json
 
+from pathlib import Path
 import sys
 from typing import Any, List
 
-from .ws import WebSocketHandler
+from .webclient import NcatbotClient
 
 from .utils import get_log
 from .debugger import start_debug_mode
@@ -25,9 +26,9 @@ from .data_models import LifecycleEvent
 from .data_models import GroupRequestEvent
 from .data_models import FriendRequestEvent
 
-from .plugin_system import EventBus
-from .plugin_system import Event
-from .plugin_system import PluginLoader
+from .plugins.abc import ConcurrentEventBus as EventBus
+from .plugins import Event
+from .plugins import PluginManager
 
 from .config import OFFICIAL_HEARTBEAT_EVENT
 from .config import OFFICIAL_LIFECYCLE_EVENT
@@ -67,7 +68,12 @@ class BotClient:
     """
     def __init__(self, uri: str, token: str = None, command_prefix: tuple[str] = ('/','#'), debug: bool = False):
         self.event_bus = EventBus()
-        self.plugin_sys = PluginLoader(self.event_bus, debug=debug)
+        self.plugin_sys = PluginManager(
+            plugin_dirs=[PLUGINS_DIR],
+            config_base_dir=Path('./config'),
+            data_base_dir=Path('./data'),
+            event_bus=self.event_bus,
+        )
         self.last_heartbeat:dict = {}
         self.command_prefix = command_prefix
         self.debug = debug
@@ -76,18 +82,15 @@ class BotClient:
             auth = {
                 "Authorization": f"Bearer {token}"
             }
-        self.ws = WebSocketHandler(
+        self.ws = NcatbotClient(
             uri,
             headers = {"Content-Type": "application/json"},
             auth = auth,
         )
 
-    def exit(self):
-        self.close()
-
-    def close(self):
+    async def close(self):
         LOG.info('准备关闭所有插件...')
-        self.plugin_sys.unload_all()
+        await self.plugin_sys.close()
         LOG.info('准备关闭连接...')
         self.ws.close()
         LOG.info('Fcatbot 关闭完成')
@@ -102,26 +105,28 @@ class BotClient:
         if not os.path.exists(PLUGINS_DIR):
             os.makedirs(PLUGINS_DIR, exist_ok=True)
         # 设置插件系统的调试模式
-        await self.plugin_sys.load_plugins(plugins_path=PLUGINS_DIR,api=self.ws)
+        await self.plugin_sys.load_plugins(
+            client=self,
+            api=self.ws
+            )
 
-    def run(self, load_plugins:bool = True):
-        '''连接并启用bot客户端'''
-        LOG.info('准备启动Fcatbot')
+    def run(self, load_plugins: bool = True):
+        """连接并启用 bot 客户端（手动事件循环版本）"""
+        LOG.info('准备启动 Fcatbot')
         if self.debug:
             LOG.warning('以 DEBUG 模式启动')
-            LOG.warning('推荐配合 DEGUB 级别食用')
+            LOG.warning('推荐配合 DEBUG 级别食用')
             start_debug_mode(self)
-        else:
-            self.ws.start()  # 启动 WebSocket 连接
-            try:
-                asyncio.run(self.loop(load_plugins))
-            except KeyboardInterrupt:
-                print()
-                LOG.info('用户主动触发关闭事件...')
-            except Exception as e:
-                LOG.error(f"发生错误: {e}")
-            finally:
-                self.close()
+            return
+
+        self.ws.start()          # 启动 WebSocket 连接
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(self.loop(load_plugins))
+        # 给事件循环一次机会做异步清理
+        if not loop.is_closed():
+            loop.run_until_complete(self.close())
+            loop.close()
 
     async def loop(self, load_plugins:bool = True):
         if load_plugins:
@@ -132,6 +137,9 @@ class BotClient:
             try:
                 data = self.ws.get_message(listener)
             except KeyboardInterrupt:
+                print()
+                LOG.info('用户主动触发关闭事件...')
+                await self.close()
                 return
             except Exception:
                 await asyncio.sleep(0)
@@ -170,7 +178,7 @@ class BotClient:
         Returns:
             List[Any]: 所有处理器返回的结果列表
         """
-        return self.event_bus.publish_sync(event)
+        return self.event_bus.publish(event)
 
     async def publish_async(self, event: Event) -> List[Any]:
         """异步发布事件.
@@ -181,7 +189,7 @@ class BotClient:
         Returns:
             List[Any]: 所有处理器返回的结果列表
         """
-        return await self.event_bus.publish_async(event)
+        return self.event_bus.publish(event)
     
     async def on_message(self, data: str):
         """处理接收到的WebSocket消息.
@@ -206,17 +214,17 @@ class BotClient:
                 group_info = await self.api('get_group_info', group_id=message.group_id)
                 _LOG.info(f"[{group_info['group_name']}({message.group_id})] {message.sender.nickname}({message.user_id}) -> {message.raw_message}")
                 if message.raw_message.startswith(self.command_prefix):
-                    await self.event_bus.publish_async(Event(OFFICIAL_GROUP_COMMAND_EVENT, message))
+                    self.event_bus.publish(Event(OFFICIAL_GROUP_COMMAND_EVENT, message))
                 else:
-                    await self.event_bus.publish_async(Event(OFFICIAL_GROUP_MESSAGE_EVENT, message))
+                    self.event_bus.publish(Event(OFFICIAL_GROUP_MESSAGE_EVENT, message))
             elif msg["message_type"] == "private":
                 # 私聊消息
                 message = PrivateMessage(**msg)
                 _LOG.info(f"Bot.{message.self_id}: [{message.sender.nickname}({message.user_id})] -> {message.raw_message}")
                 if message.raw_message.startswith(self.command_prefix):
-                    await self.event_bus.publish_async(Event(OFFICIAL_PRIVATE_COMMAND_EVENT, message))
+                    self.event_bus.publish(Event(OFFICIAL_PRIVATE_COMMAND_EVENT, message))
                 else:
-                    await self.event_bus.publish_async(Event(OFFICIAL_PRIVATE_MESSAGE_EVENT, message))
+                    self.event_bus.publish(Event(OFFICIAL_PRIVATE_MESSAGE_EVENT, message))
         elif msg["post_type"] == "notice":
             # 处理不同类型的通知事件
             notice_type = msg.get("notice_type")
@@ -269,20 +277,20 @@ class BotClient:
                     _LOG.info(f"群 {notice_event.group_id} 荣誉变更: {notice_event.user_id}")
 
             if notice_event:
-                await self.event_bus.publish_async(Event(OFFICIAL_NOTICE_EVENT, notice_event))
+                self.event_bus.publish(Event(OFFICIAL_NOTICE_EVENT, notice_event))
             
         elif msg["post_type"] == "request":
             if msg['request_type'] == 'friend':
                 message = FriendRequestEvent(msg)
-                await self.event_bus.publish_async(Event(OFFICIAL_FRIEND_REQUEST_EVENT, message))
+                self.event_bus.publish(Event(OFFICIAL_FRIEND_REQUEST_EVENT, message))
             elif msg['request_type'] == 'group':
                 message = GroupRequestEvent(msg)
-                await self.event_bus.publish_async(Event(OFFICIAL_GROUP_REQUEST_EVENT, message))
+                self.event_bus.publish(Event(OFFICIAL_GROUP_REQUEST_EVENT, message))
         elif msg["post_type"] == "meta_event":
             if msg["meta_event_type"] == "lifecycle":
                 message = LifecycleEvent(msg)
                 _LOG.info(f"机器人 {msg.get('self_id')} 成功启动")
-                await self.event_bus.publish_async(Event(OFFICIAL_LIFECYCLE_EVENT, message))
+                self.event_bus.publish(Event(OFFICIAL_LIFECYCLE_EVENT, message))
             elif msg["meta_event_type"] == "heartbeat":
                 message = HeartbeatEvent(msg)
                 try:
@@ -296,7 +304,7 @@ class BotClient:
                             _LOG.error(f'Status: {status}')
                 except Exception:
                     self.last_heartbeat: HeartbeatEvent = message
-                await self.event_bus.publish_async(Event(OFFICIAL_HEARTBEAT_EVENT, message))
+                self.event_bus.publish(Event(OFFICIAL_HEARTBEAT_EVENT, message))
         else:
             _LOG.error("这是一个错误,请反馈给开发者\n" + str(msg))
             return False
