@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-10-03 12:12:23
+# @LastEditTime : 2025-10-03 14:09:12
 # @Description  : 喵喵喵, 超多导入(超导)
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
@@ -123,24 +123,36 @@ class BotClient:
             start_debug_mode(self)
             return
 
-        self.ws.start()          # 启动 WebSocket 连接
+        self.ws.start()          # 启动 WebSocket
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(self.loop(load_plugins))
-        # 给事件循环一次机会做异步清理
-        if not loop.is_closed():
-            loop.run_until_complete(self.close())
-            loop.close()
+
+        # 把消息循环做成任务
+        main_task = loop.create_task(self.loop(load_plugins))
+        # 把控制台循环做成任务
+        self._start_console_task()
+
+        try:
+            loop.run_until_complete(main_task)   # 这里只 wait 主任务
+        except KeyboardInterrupt:
+            LOG.info('用户按 Ctrl-C，准备退出……')
+        finally:
+            # 给事件循环一次清理机会
+            if not loop.is_closed():
+                loop.run_until_complete(self.close())
+                loop.close()
 
     async def loop(self, load_plugins:bool = True):
         if load_plugins:
             LOG.info('准备加载插件')
             await self.load_plugin()
         listener = self.ws.create_listener(64)
-        await self.console_loop()
+        loop = asyncio.get_running_loop()
         while self.ws.connected:
             try:
-                data = self.ws.get_message(listener)
+                data = await loop.run_in_executor(
+                    None, self.ws.get_message, listener
+                )
             except KeyboardInterrupt:
                 print()
                 LOG.info('用户主动触发关闭事件...')
@@ -308,8 +320,8 @@ class BotClient:
         """独立协程：一直读控制台，解析后执行命令。"""
         while self.ws.connected:
             try:
-                with patch_stdout():                       # 防止日志冲掉输入行
-                    cmd = await session.prompt_async('>')
+                with patch_stdout(raw=True):
+                    cmd = await session.prompt_async('> ', handle_sigint=True)
             except (EOFError, KeyboardInterrupt) as e:          # Ctrl-D / Ctrl-C
                 if isinstance(e, EOFError):
                     LOG.info("控制台退出；输入 q 或 quit 可完全关闭机器人")
@@ -328,7 +340,6 @@ class BotClient:
         """把 console_loop 作为后台任务丢进当前事件循环"""
         loop = asyncio.get_event_loop()
         self._console_task = loop.create_task(self.console_loop())
-    
     
     # ---------- 路由主入口 ----------
     async def command(self, raw: str) -> None:
@@ -353,7 +364,7 @@ class BotClient:
                 LOG.warning("用法: send private|group id 内容")
                 return
             msg_type, target, text = argv[1], argv[2], argv[3:]
-            text = " ".join(text)
+            text = " ".join(*text)
             if msg_type == "private":
                 await ctx.api("send_private_msg", user_id=int(target), message=text)
                 LOG.info("已发送私聊消息给 %s: %s", target, text)
