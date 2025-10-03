@@ -2,20 +2,21 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-02-12 12:38:32
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-10-02 19:53:00
+# @LastEditTime : 2025-10-03 12:12:23
 # @Description  : 喵喵喵, 超多导入(超导)
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议
 # -------------------------
 import os
 import asyncio
 import json
-
+from prompt_toolkit.patch_stdout import patch_stdout   # 日志不打断输入行PromptSession
+from prompt_toolkit import PromptSession
 from pathlib import Path
 import sys
 from typing import Any, List
 
 from .webclient import NcatbotClient
-
+from .command import Router
 from .utils import get_log
 from .debugger import start_debug_mode
 
@@ -54,6 +55,7 @@ from .data_models import LuckyKingNotify
 from .data_models import HonorNotify
 
 LOG = get_log('FcatBot')
+session = PromptSession()
 
 class BotClient:
     """QQ机器人客户端类.
@@ -77,6 +79,8 @@ class BotClient:
         self.last_heartbeat:dict = {}
         self.command_prefix = command_prefix
         self.debug = debug
+        self.router = Router()
+        self._register_builtin()
         auth = None
         if token:
             auth = {
@@ -133,6 +137,7 @@ class BotClient:
             LOG.info('准备加载插件')
             await self.load_plugin()
         listener = self.ws.create_listener(64)
+        await self.console_loop()
         while self.ws.connected:
             try:
                 data = self.ws.get_message(listener)
@@ -169,19 +174,8 @@ class BotClient:
         result = await self.ws.api(action, **params)
         return result
     
-    def publish_sync(self, event: Event) -> List[Any]:
-        """同步发布事件.
-
-        Args:
-            event: 要发布的事件
-
-        Returns:
-            List[Any]: 所有处理器返回的结果列表
-        """
-        return self.event_bus.publish(event)
-
-    async def publish_async(self, event: Event) -> List[Any]:
-        """异步发布事件.
+    def publish(self, event: Event) -> List[Any]:
+        """发布事件.
 
         Args:
             event: 要发布的事件
@@ -309,3 +303,71 @@ class BotClient:
             _LOG.error("这是一个错误,请反馈给开发者\n" + str(msg))
             return False
         return True # 成功处理
+    # ========== 控制台后台任务 ==========
+    async def console_loop(self):
+        """独立协程：一直读控制台，解析后执行命令。"""
+        while self.ws.connected:
+            try:
+                with patch_stdout():                       # 防止日志冲掉输入行
+                    cmd = await session.prompt_async('>')
+            except (EOFError, KeyboardInterrupt) as e:          # Ctrl-D / Ctrl-C
+                if isinstance(e, EOFError):
+                    LOG.info("控制台退出；输入 q 或 quit 可完全关闭机器人")
+                    cmd = 'EOF'
+                if isinstance(e, KeyboardInterrupt):
+                    await self.close()
+                    break
+            
+            if cmd:
+                try:
+                    await self.command(cmd)
+                except Exception as e:
+                    LOG.warning("未知命令: %s", cmd)
+
+    def _start_console_task(self):
+        """把 console_loop 作为后台任务丢进当前事件循环"""
+        loop = asyncio.get_event_loop()
+        self._console_task = loop.create_task(self.console_loop())
+    
+    
+    # ---------- 路由主入口 ----------
+    async def command(self, raw: str) -> None:
+        await self.router.dispatch(self, raw)
+    
+    # ---------- 内置命令 ----------
+    def _register_builtin(self):
+        r = self.router
+
+        @r.register("quit", alias=["q", "exit"], usage="q|quit|exit", desc="优雅退出")
+        async def _(ctx: "BotClient", _: List[str]) -> None:
+            LOG.info("收到退出指令，准备关闭机器人…")
+            await ctx.close()
+
+        @r.register("ping", usage="ping", desc="测试 websocket 连通性")
+        async def _(ctx: "BotClient") -> None:
+            LOG.info("pong! websocket 状态: %s", ctx.ws.connected)
+
+        @r.register("send", usage="send private|group id 内容", desc="发送消息")
+        async def _(ctx: "BotClient", argv: List[str]) -> None:
+            if len(argv) < 4:
+                LOG.warning("用法: send private|group id 内容")
+                return
+            msg_type, target, text = argv[1], argv[2], argv[3:]
+            text = " ".join(text)
+            if msg_type == "private":
+                await ctx.api("send_private_msg", user_id=int(target), message=text)
+                LOG.info("已发送私聊消息给 %s: %s", target, text)
+            elif msg_type == "group":
+                await ctx.api("send_group_msg", group_id=int(target), message=text)
+                LOG.info("已发送群消息到 %s: %s", target, text)
+            else:
+                LOG.warning("send 用法: send private|group id 内容")
+
+        @r.register("reload", usage="reload", desc="重载插件")
+        async def _(ctx: "BotClient") -> None:
+            LOG.info("重载插件…")
+            await ctx.load_plugin()
+
+        @r.register("help", usage="help", desc="查看帮助")
+        async def _(ctx: "BotClient") -> None:
+            LOG.info("\n" + ctx.router.help_text())

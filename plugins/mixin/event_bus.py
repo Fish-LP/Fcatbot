@@ -2,7 +2,7 @@
 # @Author       : Fish-LP fish.zh@outlook.com
 # @Date         : 2025-10-02 14:45:10
 # @LastEditors  : Fish-LP fish.zh@outlook.com
-# @LastEditTime : 2025-10-02 15:29:34
+# @LastEditTime : 2025-10-03 08:12:02
 # @Description  : 喵喵喵, 我还没想好怎么介绍文件喵
 # @Copyright (c) 2025 by Fish-LP, Fcatbot使用许可协议 
 # -------------------------
@@ -14,7 +14,7 @@ from Fcatbot.plugins.abc import DEFAULT_REQUEST_TIMEOUT, EventHandler
 from .base import BaseMixin
 
 
-class EventBusApi(BaseMixin):
+class EventBusApiMixin(BaseMixin):
     def register_handler(
         self, 
         event: Union[str, Pattern[str]],  # 支持字符串或正则表达式

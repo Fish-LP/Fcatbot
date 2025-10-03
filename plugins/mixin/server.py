@@ -6,7 +6,7 @@ from ..abc import EventHandler
 
 logger = logging.getLogger("PluginsSys")
 
-class Server(BaseMixin):
+class ServerMixin(BaseMixin):
     event = "server.{name}"
 
     def register_server(self, handler: EventHandler, name: str) -> None:
