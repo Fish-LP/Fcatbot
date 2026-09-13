@@ -1,0 +1,113 @@
+# -------------------------
+# @Author       : Fish-LP fish.zh@outlook.com
+# @Description  : 项目构建与元信息
+# @Copyright (c) 2025 by Fish-LP, MIT 使用许可协议
+# -------------------------
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fcatbot"
+dynamic = ["version"]
+description = "Fcatbot —— 一个可插拔、多平台的聊天机器人框架。"
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.11"
+
+[tool.hatch.version]
+path = "src/fcatbot/__init__.py"
+
+# 许可证：SPDX 表达式（PEP 639，推荐）
+license = "MIT"
+license-files = ["LICENSE"]
+
+authors = [
+    { name = "Fish-LP", email = "Fish.zh@outlook.com" },
+]
+maintainers = [
+    { name = "Fish-LP", email = "Fish.zh@outlook.com" },
+]
+
+keywords = [
+    "chatbot",
+    "bot",
+    "framework",
+    "plugin",
+    "qq",
+    "onebot",
+    "adapter",
+    "async",
+]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Typing :: Typed",
+    "Framework :: AsyncIO",
+]
+
+dependencies = [
+    "pluginforge>=0.10.0",
+    "luckperms-python>=1.0.6",
+    "aiohttp>=3.9",
+    "prompt-toolkit>=3.0",
+    "pyyaml>=6.0",
+    "packaging>=23.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.6",
+    "mypy>=1.10",
+]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.25",
+]
+
+[project.scripts]
+fcatbot = "fcatbot.app:main"
+fcatbot-new-plugin = "fcatbot.tools.new_plugin:main"
+
+[project.urls]
+Homepage = "https://github.com/Fish-LP/fcatbot"
+Repository = "https://github.com/Fish-LP/fcatbot"
+Issues = "https://github.com/Fish-LP/fcatbot/issues"
+Changelog = "https://github.com/Fish-LP/fcatbot/blob/main/CHANGELOG.md"
+Documentation = "https://fcatbot.readthedocs.io/"
+
+# -------------------------
+# 打包
+# -------------------------
+[tool.hatch.build.targets.wheel]
+packages = ["src/fcatbot"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/fcatbot",
+    "tests",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+]
+
+# -------------------------
+# 测试
+# -------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra --strict-markers"
+asyncio_mode = "auto"
