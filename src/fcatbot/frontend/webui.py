@@ -37,6 +37,7 @@ import hmac
 import inspect
 import json
 import logging
+import re
 import secrets
 import time
 from pathlib import Path
@@ -62,6 +63,14 @@ _PASSWORD_ALPHABET = (
     "abcdefghijkmnpqrstuvwxyz"
     "0123456789"
 )
+
+# 插件名校验: 与插件类 ``name`` 的字符集一致，禁掉路径分隔符与 ".."。
+# 用于 URL 路径参数拼进文件名前的前置校验，阻止路径穿越。
+_PLUGIN_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.\-]{0,63}$")
+
+# 登录限速: 每 IP 在滑动窗口内最多失败多少次
+_LOGIN_MAX_ATTEMPTS = 10
+_LOGIN_WINDOW_SECONDS = 60
 
 
 # ==================== 登录页（内联，无需额外静态资源） ====================
@@ -343,17 +352,16 @@ class WebUI:
         # -------- 加载错误忽略集合 --------
         self._dismissed_errors: set[str] = set()
 
+        # -------- 登录限速（per-remote） --------
+        # remote_ip -> [失败时间戳, ...]，滑动窗口，惰性清理
+        self._login_attempts: dict[str, list[float]] = {}
+
     # ==================== 访问凭据 ====================
 
     @staticmethod
     def _generate_password(length: int = _GENERATED_PASSWORD_LENGTH) -> str:
         """生成 ``length`` 位随机访问密码（字符集已剔除易混淆字符）。"""
         return "".join(secrets.choice(_PASSWORD_ALPHABET) for _ in range(length))
-
-    @property
-    def password_generated(self) -> bool:
-        """访问密码是否为本次启动自动生成（而非来自配置文件）。"""
-        return self._password_generated
 
     @property
     def auth_enabled(self) -> bool:
@@ -396,6 +404,19 @@ class WebUI:
             "└─ 如需固定密码，请在 config/app.yaml → webui.password 中配置\n"
         )
         return self._password
+
+    # ==================== 插件名校验 ====================
+
+    @staticmethod
+    def _validate_plugin_name(name: str) -> str | None:
+        """校验 URL 传入的插件名。
+
+        返回错误消息；合法时返回 None。
+        拒掉路径分隔符与 ".."，防止 ``name`` 拼进路径后穿越 ``plugins/`` 目录。
+        """
+        if not name or not _PLUGIN_NAME_RE.match(name):
+            return "非法插件名"
+        return None
 
     # ==================== 生命周期 ====================
 
@@ -523,6 +544,17 @@ class WebUI:
         token = request.cookies.get(self._cookie_name)
         return self._verify_session_token(token) if token else False
 
+    # ---------- 登录限速 ----------
+
+    def _login_rate_ok(self, remote: str) -> bool:
+        now = time.time()
+        attempts = self._login_attempts.setdefault(remote or "unknown", [])
+        attempts[:] = [t for t in attempts if now - t < _LOGIN_WINDOW_SECONDS]
+        return len(attempts) < _LOGIN_MAX_ATTEMPTS
+
+    def _login_record_failure(self, remote: str) -> None:
+        self._login_attempts.setdefault(remote or "unknown", []).append(time.time())
+
     async def _dispatch_with_auth(self, request: web.Request, handler):
         # 关闭认证 → 直接放行所有请求（含 / 与 /api/*）
         if not self._auth_enabled:
@@ -565,6 +597,14 @@ class WebUI:
     async def _api_login(self, request: web.Request) -> web.Response:
         if not self._auth_enabled:
             return web.json_response({"ok": True, "message": "认证已关闭"})
+
+        remote = request.remote or "unknown"
+        if not self._login_rate_ok(remote):
+            log.warning("WebUI 登录限速触发（来源 %s）", remote)
+            return web.json_response(
+                {"ok": False, "message": "尝试过于频繁，请稍后再试"}, status=429
+            )
+
         try:
             body = await request.json()
         except Exception:
@@ -572,12 +612,16 @@ class WebUI:
         password = str(body.get("password", ""))
 
         if not self._check_password(password):
-            # 简单固定延迟，缓解暴力破解
+            self._login_record_failure(remote)
+            # 固定延迟，缓解暴力破解
             await asyncio.sleep(0.25)
-            log.warning("WebUI 登录失败（来源 %s）", request.remote)
+            log.warning("WebUI 登录失败（来源 %s）", remote)
             return web.json_response(
                 {"ok": False, "message": "密码错误"}, status=401
             )
+
+        # 成功 → 清掉该 IP 的失败记录，避免正常用户被自己之前的失败拖累
+        self._login_attempts.pop(remote, None)
 
         token = self._make_session_token()
         self._sessions[token] = time.time() + self._session_ttl
@@ -593,7 +637,7 @@ class WebUI:
             secure=self._cookie_secure,
             path="/",
         )
-        log.info("WebUI 登录成功（来源 %s）", request.remote)
+        log.info("WebUI 登录成功（来源 %s）", remote)
         return resp
 
     async def _api_logout(self, request: web.Request) -> web.Response:
@@ -644,29 +688,27 @@ class WebUI:
         return errors
 
     def _get_plugin_dependencies(self, name: str) -> list[str]:
-        """获取插件声明的依赖名列表（可能为空）。"""
+        """获取插件声明的依赖名列表（可能为空）。
+
+        PluginForge ``BasePlugin`` 使用 ``depends_on``；为兼容第三方子类
+        也接受 ``dependencies``。优先读活跃实例（实例属性可能被运行时覆盖），
+        再退回已发现的类。
+        """
         pm = self._app._pm
 
-        for method_name in ("get_dependencies", "dependencies_of", "get_requires"):
-            method = getattr(pm, method_name, None)
-            if callable(method):
-                try:
-                    result = method(name)
-                    if result is not None:
-                        return list(result)
-                except Exception:
-                    log.exception("调用 %s(%s) 失败", method_name, name)
+        for p in pm.get_active_plugins():
+            if p.name == name:
+                deps = (
+                    getattr(p, "depends_on", None)
+                    or getattr(p, "dependencies", None)
+                )
+                return list(deps or [])
 
         cls = self._app.discovered_plugins.get(name)
         if cls is None:
-            for p in pm.get_active_plugins():
-                if p.name == name:
-                    cls = type(p)
-                    break
-        if cls is None:
             return []
 
-        deps = getattr(cls, "dependencies", None)
+        deps = getattr(cls, "depends_on", None) or getattr(cls, "dependencies", None)
         if not deps:
             return []
         if isinstance(deps, dict):
@@ -720,6 +762,9 @@ class WebUI:
 
     async def _api_toggle(self, request: web.Request) -> web.Response:
         name = request.match_info["name"]
+        if (err := self._validate_plugin_name(name)) is not None:
+            return web.json_response({"ok": False, "message": err}, status=400)
+
         body = await request.json()
         enabled = bool(body.get("enabled"))
         force = bool(body.get("force", False))
@@ -771,6 +816,9 @@ class WebUI:
 
     async def _api_reload(self, request: web.Request) -> web.Response:
         name = request.match_info["name"]
+        if (err := self._validate_plugin_name(name)) is not None:
+            return web.json_response({"ok": False, "message": err}, status=400)
+
         ok, msg = await self._app.reload_plugin(name)
 
         # 重载无论成败，都应清除“忽略”标记: 
@@ -784,6 +832,9 @@ class WebUI:
 
     async def _api_get_config(self, request: web.Request) -> web.Response:
         name = request.match_info["name"]
+        if (err := self._validate_plugin_name(name)) is not None:
+            return web.json_response({"ok": False, "message": err}, status=400)
+
         path = self._config_dir / f"{name}.yaml"
 
         # 只读: 不存在就返回空串，不在磁盘上制造文件
@@ -798,6 +849,9 @@ class WebUI:
 
     async def _api_put_config(self, request: web.Request) -> web.Response:
         name = request.match_info["name"]
+        if (err := self._validate_plugin_name(name)) is not None:
+            return web.json_response({"ok": False, "message": err}, status=400)
+
         body = await request.json()
         content = body.get("content", "")
 
@@ -953,10 +1007,12 @@ class WebUI:
             self._log_handler = None
 
     def _schedule_broadcast(self, text: str) -> None:
-        if not self._ws_clients or self._loop is None or self._loop.is_closed():
+        loop = self._loop
+        if (not self._ws_clients or loop is None
+                or loop.is_closed() or not loop.is_running()):
             return
         try:
-            self._loop.call_soon_threadsafe(self._do_broadcast, text)
+            loop.call_soon_threadsafe(self._do_broadcast, text)
         except RuntimeError:
             pass
 
@@ -996,14 +1052,28 @@ class WebUI:
         with open(path, "w", encoding="utf-8") as f:
             yaml.dump(data, f, allow_unicode=True, sort_keys=False)
 
-    def _read_enabled_list(self) -> list[str]:
+    def _read_raw_plugins_config(self) -> dict:
+        """返回 app.yaml 中的 ``plugins`` 段（不展开 None 语义）。"""
         data = self._read_app_config()
-        plugins = data.get("plugins") or {}
+        return data.get("plugins") or {}
+
+    def _read_enabled_list(self) -> list[str]:
+        """当前「显式启用」的插件名集合。
+
+        ``plugins.enabled`` 缺省（None）时返回**全部已知插件**——这是为了
+        让 UI 上每个插件都能正确渲染 ``enabled=True``。真正写入时使用
+        :meth:`_set_enabled` 的原始语义（区分 None 与 []）。
+        """
+        plugins = self._read_raw_plugins_config()
         raw = plugins.get("enabled")
         if raw is None:
             # 缺省语义: enabled 为 None → 全部通过
             return self._known_plugin_names()
         return list(raw)
+
+    def _read_disabled_list(self) -> list[str]:
+        plugins = self._read_raw_plugins_config()
+        return list(plugins.get("disabled") or [])
 
     def _known_plugin_names(self) -> list[str]:
         """当前已知的插件名（活跃 + 发现）。"""
@@ -1012,21 +1082,46 @@ class WebUI:
         return sorted(names)
 
     def _set_enabled(self, name: str, enabled: bool) -> bool:
-        """写入 ``plugins.enabled``；返回是否真的发生了变更。"""
+        """写入 ``plugins.enabled`` / ``plugins.disabled``；返回是否真正发生变更。
+
+        语义保留 ``enabled=None``（全启用）:
+        - 若 ``enabled`` 为 None，禁用走 ``disabled`` 黑名单；
+        - 若 ``enabled`` 是列表，禁用/启用维护该列表。
+        这样既保持与 PluginForge 一致的缺省语义，也不会在首次切换时把
+        所有已知插件意外写进白名单。
+        """
         data = self._read_app_config()
         plugins = data.setdefault("plugins", {})
-        enabled_list = self._read_enabled_list()
+        raw_enabled = plugins.get("enabled")
+        raw_disabled = list(plugins.get("disabled") or [])
 
         changed = False
-        if enabled and name not in enabled_list:
-            enabled_list.append(name)
-            changed = True
-        elif not enabled and name in enabled_list:
-            enabled_list.remove(name)
-            changed = True
+        if enabled:
+            # 启用: 从 disabled 黑名单移除；若 enabled 是白名单则加入
+            if name in raw_disabled:
+                raw_disabled.remove(name)
+                changed = True
+            if raw_enabled is not None and name not in raw_enabled:
+                plugins["enabled"] = list(raw_enabled) + [name]
+                changed = True
+        else:
+            # 停用: enabled 是 None（全启用）→ 走黑名单；否则从白名单移除
+            if raw_enabled is None:
+                if name not in raw_disabled:
+                    raw_disabled.append(name)
+                    changed = True
+            else:
+                if name in raw_enabled:
+                    plugins["enabled"] = [n for n in raw_enabled if n != name]
+                    changed = True
+
+        if raw_disabled:
+            plugins["disabled"] = raw_disabled
+        elif "disabled" in plugins:
+            # 空的黑名单不落盘
+            del plugins["disabled"]
 
         if changed:
-            plugins["enabled"] = enabled_list
             self._write_app_config(data)
         return changed
 

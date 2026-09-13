@@ -42,6 +42,49 @@ from fcatbot import __version__, __api_version__
 
 log = logging.getLogger("fcatbot")
 
+# fcatbot/app.py —— 常量区（放在 log 定义之后、safe_name 之前）
+
+DEFAULT_APP_CONFIG: dict[str, Any] = {
+    "plugins": {
+        "dirs": ["plugins"],
+        "enabled": [],
+        "data_dir": "data",
+    },
+    "permissions": {
+        "backend": "luckperms",          # allow_all | null | luckperms
+        "data_dir": "data/permissions",
+        "default_group": "default",
+        "console_user": "console",
+    },
+    "transport": {
+        "mode": "forward_ws",                  # none | forward_ws | http
+        "forward_ws": {
+            "url": "",
+            "token": "",
+            "reconnect": True,
+            "reconnect_delay": 1.0,
+            "max_reconnect_delay": 30.0,
+            "heartbeat": 30.0,
+        },
+        "http": {
+            "host": "127.0.0.1",
+            "port": 8080,
+            "path": "/",
+            "api_base_url": "",
+            "token": "",
+        },
+    },
+    "webui": {
+        "enabled": True,
+        "host": "127.0.0.1",
+        "port": 8765,
+        "password": "",                  # 留空 → 启动时随机生成并打到本地控制台
+        "auth_enabled": True,
+        "secret_key": "",                # 留空 → 每次启动随机
+        "session_ttl": 7 * 24 * 3600,
+        "cookie_secure": False,
+    },
+}
 
 def safe_name(name: str, *, max_length: int = 64) -> str:
     # 只允许字母数字下划线连字符，替换其他字符
@@ -78,6 +121,7 @@ class FcatbotApp:
         self._debug = bool(debug)
         if debug:
             logging.getLogger().setLevel(logging.DEBUG)
+        self._ensure_app_config() 
         self._app_config = self._load_app_config()
         self._plugin_dirs = self._resolve_plugin_dirs(plugin_dirs)
 
@@ -109,6 +153,9 @@ class FcatbotApp:
         self._console: ConsoleApp | None = None
         self._stop_event = asyncio.Event()
         self._cleaned = False
+        # 运行时装卸保护：WebUI 按钮 / 命令可能并发触发。
+        # asyncio.Lock 延迟到运行中的事件循环内创建（见 _get_runtime_lock）。
+        self._runtime_lock: asyncio.Lock | None = None
 
     def _load_app_config(self) -> dict:
         """读取 ``config/app.yaml``（缺失 / 解析失败时返回空 dict，不阻断启动）。"""
@@ -121,6 +168,25 @@ class FcatbotApp:
         except Exception:
             log.exception("读取配置失败，使用内置默认值: %s", self._config_path)
             return {}
+
+    def _ensure_app_config(self) -> None:
+        """配置文件缺失时落一份带默认值的 ``config/app.yaml``。
+
+        - 已存在则**绝不覆盖**，避免抹掉用户改动；
+        - 落盘失败只记日志，由 ``_load_app_config`` 回退到代码内默认值，
+          不阻断启动。
+        """
+        if self._config_path.exists():
+            return
+        try:
+            self._config_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self._config_path, "w", encoding="utf-8") as f:
+                yaml.dump(
+                    DEFAULT_APP_CONFIG, f, allow_unicode=True, sort_keys=False
+                )
+            log.info("已生成默认配置文件: %s", self._config_path)
+        except Exception:
+            log.exception("生成默认配置文件失败，将使用内置默认值: %s", self._config_path)
 
     def _resolve_plugin_dirs(self, plugin_dirs: list[Path] | None) -> list[Path]:
         """插件目录: 显式入参优先，否则读 ``config/app.yaml → plugins.dirs``。
@@ -286,6 +352,19 @@ class FcatbotApp:
     #   命令注册 / 服务注册（停用后会残留资源）；
     # - 对启动时未加载（未在 plugins.enabled 内 / 后来才发现）的插件，
     #   activate_plugin 找不到实例，只会打一条 warning 而不报错。
+    #
+    # 并发保护：WebUI 按钮 / 命令行可能并发触发同名启用/停用/重载。
+    # 所有对外入口统一串行化，避免 PluginForge 收到重复的 register/unregister。
+
+    def _get_runtime_lock(self) -> asyncio.Lock:
+        """延迟创建运行时锁。
+
+        ``asyncio.Lock`` 必须在运行中的事件循环里创建（避免在 Python 3.10/3.11
+        上绑定到错误的循环）。首次调用时创建即可。
+        """
+        if self._runtime_lock is None:
+            self._runtime_lock = asyncio.Lock()
+        return self._runtime_lock
 
     def _active_plugin(self, name: str):
         """按插件名（类属性 ``name``，非目录名）查找当前活跃实例。"""
@@ -295,6 +374,21 @@ class FcatbotApp:
         return None
 
     async def enable_plugin(self, name: str) -> tuple[bool, str]:
+        """运行时启用插件（并发安全）。参见 :meth:`_enable_plugin_locked`。"""
+        async with self._get_runtime_lock():
+            return await self._enable_plugin_locked(name)
+
+    async def disable_plugin(self, name: str) -> tuple[bool, str]:
+        """运行时停用插件（并发安全）。参见 :meth:`_disable_plugin_locked`。"""
+        async with self._get_runtime_lock():
+            return await self._disable_plugin_locked(name)
+
+    async def reload_plugin(self, name: str) -> tuple[bool, str]:
+        """运行时热重载插件（并发安全）。参见 :meth:`_reload_plugin_locked`。"""
+        async with self._get_runtime_lock():
+            return await self._reload_plugin_locked(name)
+
+    async def _enable_plugin_locked(self, name: str) -> tuple[bool, str]:
         """运行时启用插件: ``init → activate``（PluginForge）+ ``on_load → 装配 → on_enable``。
 
         与启动装配序列一致；插件类取自 :attr:`discovered_plugins`（启动时发现，
@@ -334,7 +428,7 @@ class FcatbotApp:
         log.info("插件 '%s' 已运行时启用", name)
         return True, f"插件 {name} 已启用"
 
-    async def disable_plugin(self, name: str) -> tuple[bool, str]:
+    async def _disable_plugin_locked(self, name: str) -> tuple[bool, str]:
         """运行时停用插件: ``on_disable → 取消任务 → 拆卸 → on_unload`` + PluginForge 反注册。
 
         「拆卸」会退订该插件的全部事件订阅、注销其命令与服务，
@@ -364,12 +458,14 @@ class FcatbotApp:
         log.info("插件 '%s' 已运行时停用", name)
         return True, f"插件 {name} 已停用（事件/命令/服务已注销）"
 
-    async def reload_plugin(self, name: str) -> tuple[bool, str]:
+    async def _reload_plugin_locked(self, name: str) -> tuple[bool, str]:
         """运行时热重载插件: ``disable`` → PluginForge 重新导入/实例化 → ``enable``。
 
         必须先走 :meth:`disable_plugin` 的拆卸: PluginForge 的 ``reload_plugin``
         只重建插件实例，内核里的事件订阅 / 命令仍指向**旧实例**的绑定方法，
         不拆卸就会出现「重载后旧代码仍在响应」的残留。
+
+        内部直接调用集成层的 ``disable`` / ``enable``，避免与外层锁重入。
 
         Returns:
             ``(ok, message)``；``ok=False`` 时 ``message`` 可直接展示给用户。
@@ -413,6 +509,8 @@ class FcatbotApp:
         log.info("插件 '%s' 已重载", name)
         return True, f"插件 {name} 已重载"
 
+    # ==================== 启动 / 停止 ====================
+
     async def run(self) -> None:
         log.info("Fcatbot starting ...")
         log.info("Plugin dirs: %s", self._plugin_dirs)
@@ -455,13 +553,45 @@ class FcatbotApp:
         console_task = asyncio.create_task(self._console.run(), name="console")
         ws_task = asyncio.create_task(self._ws_loop(), name="ws")
 
-        # 启动 WebUI（可选；输入参数来自 config/app.yaml → webui）
-        if self._webui_config.get("enabled"):
-            console_handler = next(
-                h for h in logging.getLogger().handlers
-                if isinstance(h, logging.StreamHandler)
+        try:
+            # WebUI 启动放在 try 内: 任何异常都不会泄漏上面的两个任务，
+            # 且会走到 finally 完成 clean shutdown。
+            if self._webui_config.get("enabled"):
+                await self._start_webui()
+
+            log.info("Fcatbot started. Type 'help' for available commands.")
+            await self._stop_event.wait()
+        finally:
+            console_task.cancel()
+            ws_task.cancel()
+            for t in (console_task, ws_task):
+                try:
+                    await t
+                except asyncio.CancelledError:
+                    pass
+                except Exception:
+                    log.exception("Task cleanup failed")
+            await self._cleanup()
+
+    async def _start_webui(self) -> None:
+        """启动 WebUI（可选）。
+
+        - 找宿主日志的 console handler 作为 WebUI 日志模板；找不到就传 None，
+          由 WebUI 自造一个默认 formatter（修复了原先 ``next(...)`` 在无
+          StreamHandler 环境下抛 ``StopIteration`` 的问题）。
+        - 任何失败只记录日志，不影响主流程；``self._webui`` 会保持 ``None``。
+        """
+        # 尝试找一个 StreamHandler 作为日志格式模板（不是必须的）
+        console_handler: logging.Handler | None = None
+        for h in logging.getLogger().handlers:
+            if (
+                isinstance(h, logging.StreamHandler)
                 and not isinstance(h, logging.FileHandler)
-            )
+            ):
+                console_handler = h
+                break
+
+        try:
             self._webui = WebUI(
                 self,
                 host=self._webui_config["host"],
@@ -477,28 +607,11 @@ class FcatbotApp:
             # 必须走 console_print 直写终端而非 logging: WebUI 的日志处理器会把
             # 日志广播给所有 WebSocket 客户端，密码进入日志即等于泄露。
             self._webui.report_access_password()
-            
-            try:
-                await self._webui.start()
-            except Exception:
-                log.exception("WebUI 启动失败")
-                self._webui = None
 
-        log.info("Fcatbot started. Type 'help' for available commands.")
-
-        try:
-            await self._stop_event.wait()
-        finally:
-            console_task.cancel()
-            ws_task.cancel()
-            for t in (console_task, ws_task):
-                try:
-                    await t
-                except asyncio.CancelledError:
-                    pass
-                except Exception:
-                    log.exception("Task cleanup failed")
-            await self._cleanup()
+            await self._webui.start()
+        except Exception:
+            log.exception("WebUI 启动失败")
+            self._webui = None
 
     def _request_shutdown(self) -> None:
         self._stop_event.set()
@@ -529,7 +642,6 @@ class FcatbotApp:
                 log.info("Created default config: %s", path)
             except Exception:
                 log.exception("Failed to create default config for '%s'", name)
-
 
     async def _cleanup(self) -> None:
         if self._cleaned:
@@ -584,14 +696,26 @@ class FcatbotApp:
         在本协程（``ws_task``）内启停连接件: 
         - 启动时机晚于 ``integration.start_all()``（此时适配器插件已订阅 ``raw.*``，
           不会丢弃首帧）；
-        - 收到停止信号 / 任务被取消时负责 ``stop()``（``_cleanup`` 另有一道幂等兜底）。
+        - 收到停止信号 / 任务被取消时负责 ``stop()``（``_cleanup`` 另有一道幂等兜底）；
+        - ``transport.start()`` 抛出的异常在此捕获并记录——宿主继续运行，
+          连接件内部的重连逻辑负责其运行期恢复。
         """
         transport = self._transport
         if transport is None:
             log.info("未配置连接件（transport.mode = none），连接后端未启动")
             return
 
-        await transport.start()
+        try:
+            await transport.start()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # 启动失败: 记录并退出 ws_task。不做自动重启——连接件自身的
+            # reconnect 逻辑负责运行期重连；启动期失败多为配置错误，
+            # 无意义地重试只会刷日志。
+            log.exception("连接后端启动失败: %s", transport)
+            return
+
         log.info("连接后端已启动: %s", transport)
         try:
             await self._stop_event.wait()

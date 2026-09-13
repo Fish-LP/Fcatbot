@@ -13,7 +13,7 @@
     └── plugin.py                   # 插件实现（生命周期 + 事件订阅 + 控制台命令）
     config/plugins/<name>.yaml      # 默认配置（--no-config 可关闭）
 
-约定（与框架一致）: 
+约定（与框架一致）:
 
 - 插件名用作 ``FcatbotPlugin.name`` 与权限节点前缀；建议小写下划线命名；
 - 单一插件直接使用**公共 API**（``from fcatbot import ...``），不 import 内部模块；
@@ -32,6 +32,8 @@ from pathlib import Path
 from string import Template
 from typing import Iterable
 
+from fcatbot import __version__, __api_version__
+
 __all__ = ["PluginSpec", "ScaffoldError", "create_plugin", "main"]
 
 _NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -49,68 +51,84 @@ _PLUGIN_TEMPLATE = Template(
 
 from __future__ import annotations
 
+from typing import Any
+
 from fcatbot import Event, FcatbotPlugin, console_command, on_event
 
 
 class $class_name(FcatbotPlugin):
     """$description"""
 
+    # ---- 元信息（由 PluginLoader 在发现阶段读取）----
     name = "$name"
     version = "$version"
     description = "$description"
     author = "$author"
-    target_application = "fcatbot"
-    min_app_version = "1.0.0"
+    # 当前框架版本限制
+    api_version = "$api_version"
+    min_app_version = "$app_version"
 
-    # 依赖的插件名（按此顺序加载；被依赖插件失败时本插件不加载）
+    # ---- 依赖 ----
+    # 按此顺序加载；被依赖插件失败时本插件不加载。
     depends_on: list[str] = []
 
-    # 配置声明: {键: 类型}；default_config 会在启动时落盘为 config/plugins/$name.yaml
+    # ---- 配置 ----
+    # 宿主启动时若 config/plugins/$name.yaml 缺失，会用 default_config 自动落盘；
+    # config_schema 用于启动前进行类型检查
     config_schema = {"greeting": str, "prefix": str}
     default_config = {"greeting": "hello from $name", "prefix": "$prefix"}
 
-    # 提供的服务: 其他插件通过 get_service("$name.api") 获取（值见 FcatbotPlugin.provides）
+    # ---- 对外服务 ----
+    # 值语义: None=插件实例自身 / "attr"=实例属性名 / 类型 / 实例。
+    # 其他插件用 get_service("$name.api") 获取。
     provides = {"$name.api": None}
 
-    # ---------- 生命周期 ----------
+    # ==================== 生命周期（异步入口）====================
+    #
+    # 调用顺序（由 IntegrationLayer 编排）:
+    #   init(同步) → activate(同步) → on_load → [装配: 订阅 + 命令] → on_enable
+    #   停用: on_disable → [取消后台任务] → [拆卸: 退订/注销] → on_unload → deactivate(同步)
+    #
+    # 这四个钩子可安全 await 权限检查 / 服务查询 / 事件发布。
 
-    def init(self, app_config, plugin_config):
+    def init(self, app_config: dict[str, Any], plugin_config: dict[str, Any]) -> None:
         super().init(app_config, plugin_config)
-        self._greeting = self.config.get("greeting", "hello")
-        self._prefix = self.config.get("prefix", "$prefix")
+        self._greeting: str = self.config.get("greeting", "hello")
+        self._prefix: str = self.config.get("prefix", "$prefix")
 
-    # 异步入口: pluginforge 的 init/activate 是同步的（无法 await），
-    # 需要 await 权限/服务/事件时请写在这三个钩子里（由框架编排调用）。
     async def on_load(self) -> None:
+        """已加载并注入配置；此时尚未订阅事件 / 注册命令。"""
         self.log.info("$name loaded")
 
     async def on_enable(self) -> None:
+        """已订阅事件并注册命令，插件正式生效；适合启动后台任务。"""
         self.log.info("$name enabled (prefix=%s)", self._prefix)
-        # 常驻后台工作可在作用域内起任务（插件停用时自动取消）: 
+        # 常驻后台任务（插件停用时自动取消）:
         # self.create_task(self._worker(), name="worker")
 
     async def on_disable(self) -> None:
+        """即将退订（还在接收事件）；先收敛内部状态。后台任务随后由框架统一取消。"""
         self.log.info("$name disabled")
 
-    # ---------- 事件订阅 ----------
+    async def on_unload(self) -> None:
+        """已退订并注销服务；释放外部资源。"""
 
-    # 事件源（适配器）插件: 覆盖下面两个钩子，把平台语义注入权限上下文: 
-    #   def permission_subject(self, event) -> str | None: ...        # 默认 metadata["user_id"]
-    #   def permission_context(self, event) -> dict | None: ...       # 默认按 permission_context_keys 白名单
+    # ==================== 事件订阅 ====================
+    #
+    # 事件源（适配器）插件可覆盖 permission_subject / permission_context，
+    # 把平台语义注入权限上下文；业务插件一般无需关心。
 
     @on_event("raw.*")
     async def on_raw_frame(self, event: Event) -> None:
-        """示例: 观察原始连接帧（``raw.<transport>.<kind>``，载荷未解析）。
+        """示例: 观察原始连接帧 ``raw.<transport>.<kind>``（载荷未解析）。
 
-        业务插件通常应改为订阅**平台事件**: 内核契约类型（如 ``MessageEvent``）
-        或适配器发布的 ``<platform>.<kind>``（如 ``napcat.message.group``）；
-        此处用 ``raw.*`` 仅作不依赖任何适配器的通用示例。
-        权限节点 ``$name.use``（无权限则静默忽略）。
+        业务插件通常应改为订阅**平台事件**（如 ``napcat.message.group``）
+        或内核契约类型（如 ``MessageEvent``）；这里用 ``raw.*`` 只是为了让
+        生成的骨架不依赖任何具体适配器。权限节点 ``$name.use``。
         """
-        data = event.data
-        text = (
-            str(data.get("raw_message", "")) if isinstance(data, dict) else str(data)
-        ).strip()
+        if not isinstance(event.data, dict):
+            return
+        text = str(event.data.get("raw_message", "")).strip()
         if not text.startswith(self._prefix):
             return
         if not await self.has_permission_for(event, "use"):
@@ -118,7 +136,7 @@ class $class_name(FcatbotPlugin):
         payload = text[len(self._prefix):].strip()
         self.log.info("echo: %s", payload or self._greeting)
 
-    # ---------- 控制台命令 ----------
+    # ==================== 控制台命令 ====================
 
     @console_command(
         "$name",
@@ -126,13 +144,18 @@ class $class_name(FcatbotPlugin):
         usage="$name [text]",
     )
     def cmd_$name(self, args: list[str]) -> str:
-        """权限节点未显式声明时自动派生为 ``$name:command.$name``。"""
+        """未显式声明权限节点时自动派生为 ``$name:command.$name``。"""
         return f"{self._greeting} {' '.join(args)}".strip()
 
-    # ---------- 对外 API（供其他插件/服务调用）----------
+    # ==================== 对外 API（供其他插件 / 服务调用）====================
 
     async def greet(self, text: str = "") -> str:
         return f"{self._greeting} {text}".strip()
+
+    # ==================== 健康检查（可选）====================
+
+    def health(self) -> dict[str, Any]:
+        return {"status": "ok"}
 '''
 )
 
@@ -143,8 +166,8 @@ from __future__ import annotations
 
 from .plugin import $class_name
 
+# PluginLoader 通过 __plugins__ 发现插件类。
 __plugins__ = [$class_name]
-# __all__ = ["$class_name"] # 二选一
 '''
 )
 
@@ -156,7 +179,9 @@ __plugins__ = [$class_name]
 )
 
 _CONFIG_TEMPLATE = Template(
-    """# $name 插件配置（由 fcatbot-new-plugin 生成；缺省值见插件 default_config）
+    """# $name 插件配置
+# 宿主启动时若本文件缺失，会用插件 default_config 自动生成；
+# 此处填写的值会覆盖 default_config 中的同名键。
 greeting: hello from $name
 prefix: "$prefix"
 """
@@ -182,6 +207,8 @@ class PluginSpec:
     version: str = "1.0.0"
     mode: str = "package"          # package | single
     prefix: str = ""               # 聊天触发前缀（默认 "!<name>"）
+    app_version = __version__
+    api_version = __api_version__
 
     def normalized(self) -> "PluginSpec":
         """补齐默认值并校验，返回规范化后的新规格。"""
@@ -195,22 +222,18 @@ class PluginSpec:
         mode = self.mode.strip().lower()
         if mode not in _MODES:
             raise ScaffoldError(f"未知模式 '{self.mode}': 可选 {', '.join(_MODES)}")
-        description = self.description.strip() or f"{name} 插件"
-        author = self.author.strip() or "unknown"
-        version = self.version.strip() or "1.0.0"
-        prefix = self.prefix.strip() or f"!{name}"
         return PluginSpec(
             name=name,
-            description=description,
-            author=author,
-            version=version,
+            description=self.description.strip() or f"{name} 插件",
+            author=self.author.strip() or "unknown",
+            version=self.version.strip() or "1.0.0",
             mode=mode,
-            prefix=prefix,
+            prefix=self.prefix.strip() or f"!{name}",
         )
 
     @property
     def class_name(self) -> str:
-        """插件类名: ``my_plugin`` → ``MyPluginPlugin`` 之外的 ``MyPlugin``。"""
+        """插件类名: ``my_plugin`` → ``MyPlugin``；``echo`` → ``EchoPlugin``。"""
         parts = [part for part in self.name.split("_") if part]
         class_name = "".join(part[:1].upper() + part[1:] for part in parts) or "Plugin"
         if not class_name.endswith("Plugin"):
@@ -225,6 +248,8 @@ class PluginSpec:
             "author": self.author,
             "version": self.version,
             "prefix": self.prefix,
+            "app_version": self.app_version,
+            "api_version": self.api_version
         }
 
 
@@ -240,13 +265,22 @@ def _render_plugin_module(spec: PluginSpec) -> str:
     return module
 
 
-def _targets(spec: PluginSpec, plugin_dir: Path) -> Iterable[Path]:
+def _targets(
+    spec: PluginSpec,
+    plugin_dir: Path,
+    config_dir: Path | None,
+) -> Iterable[Path]:
+    """列出本次生成会涉及的所有路径（用于存在性判断）。"""
     if spec.mode == "single":
         yield plugin_dir / f"{spec.name}.py"
-        return
-    yield plugin_dir / spec.name
-    yield plugin_dir / spec.name / "__init__.py"
-    yield plugin_dir / spec.name / "plugin.py"
+        # 同名包目录若已存在，会与单文件插件产生加载歧义。
+        yield plugin_dir / spec.name
+    else:
+        yield plugin_dir / spec.name
+        yield plugin_dir / spec.name / "__init__.py"
+        yield plugin_dir / spec.name / "plugin.py"
+    if config_dir is not None:
+        yield config_dir / f"{spec.name}.yaml"
 
 
 def create_plugin(
@@ -259,7 +293,7 @@ def create_plugin(
     """按 ``spec`` 生成插件骨架，返回写入的文件路径列表。
 
     Args:
-        spec: 插件规格（会先做校验与默认值补齐）。
+        spec: 插件规格（会先做校验与默认值补齐；传入已规范化对象亦安全）。
         plugin_dir: 插件目录（包模式生成子目录，单文件模式生成 ``<name>.py``）。
         config_dir: 配置目录；None 表示不生成配置文件。
         force: 目标已存在时是否覆盖。
@@ -271,7 +305,9 @@ def create_plugin(
     plugin_dir = Path(plugin_dir)
     config_dir_path = Path(config_dir) if config_dir is not None else None
 
-    existing = [path for path in _targets(spec, plugin_dir) if path.exists()]
+    existing = [
+        path for path in _targets(spec, plugin_dir, config_dir_path) if path.exists()
+    ]
     if existing and not force:
         shown = ", ".join(str(path) for path in existing)
         raise ScaffoldError(f"目标已存在: {shown}（使用 --force 覆盖）")
@@ -298,7 +334,9 @@ def create_plugin(
     if config_dir_path is not None:
         config_dir_path.mkdir(parents=True, exist_ok=True)
         config_file = config_dir_path / f"{spec.name}.yaml"
-        config_file.write_text(_CONFIG_TEMPLATE.substitute(spec.context()), encoding="utf-8")
+        config_file.write_text(
+            _CONFIG_TEMPLATE.substitute(spec.context()), encoding="utf-8"
+        )
         written.append(config_file)
 
     return written
@@ -316,23 +354,33 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("name", help="插件名（小写字母开头，如 my_plugin）")
     parser.add_argument(
-        "-d", "--dir", default=str(DEFAULT_PLUGIN_DIR), help="插件目录（默认 plugins）"
+        "-d",
+        "--dir",
+        default=str(DEFAULT_PLUGIN_DIR),
+        help=f"插件目录（默认 {DEFAULT_PLUGIN_DIR}）",
     )
     parser.add_argument(
         "--config-dir",
         default=str(DEFAULT_CONFIG_DIR),
-        help="配置目录（默认 config/plugins；--no-config 时忽略）",
+        help=f"配置目录（默认 {DEFAULT_CONFIG_DIR}；--no-config 时忽略）",
     )
     parser.add_argument(
-        "--no-config", action="store_true", help="不生成 config/plugins/<name>.yaml"
+        "--no-config",
+        action="store_true",
+        help="不生成 config/plugins/<name>.yaml",
     )
     parser.add_argument(
-        "--mode", choices=_MODES, default="package", help="生成形态（默认 package）"
+        "--mode",
+        choices=_MODES,
+        default="package",
+        help="生成形态（默认 package）",
     )
     parser.add_argument("--description", default="", help="插件描述")
     parser.add_argument("--author", default="", help="作者")
     parser.add_argument("--version", default="1.0.0", help="插件版本（默认 1.0.0）")
-    parser.add_argument("--prefix", default="", help="聊天触发前缀（默认 !<name>）")
+    parser.add_argument(
+        "--prefix", default="", help="聊天触发前缀（默认 !<name>）"
+    )
     parser.add_argument("--force", action="store_true", help="覆盖已存在的目标")
     return parser
 
@@ -340,7 +388,7 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     """CLI 入口。返回退出码（0 成功 / 1 失败）。"""
     args = _build_parser().parse_args(argv)
-    spec = PluginSpec(
+    raw_spec = PluginSpec(
         name=args.name,
         description=args.description,
         author=args.author,
@@ -349,6 +397,7 @@ def main(argv: list[str] | None = None) -> int:
         prefix=args.prefix,
     )
     try:
+        spec = raw_spec.normalized()
         written = create_plugin(
             spec,
             plugin_dir=Path(args.dir),
@@ -359,14 +408,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[new-plugin] {exc}", file=sys.stderr)
         return 1
 
-    normalized = spec.normalized()
-    print(f"[new-plugin] 已生成插件 '{normalized.name}'（模式: {normalized.mode}）: ")
+    print(f"[new-plugin] 已生成插件 '{spec.name}'（模式: {spec.mode}）:")
     for path in written:
         print(f"  + {path}")
-    print("\n下一步: ")
-    print(f"  1. 在 config/app.yaml 的 plugins.enabled 中加入 '{normalized.name}'")
-    print(f"  2. 启动宿主: python main.py")
-    print(f"  3. 控制台执行 '{normalized.name}' 验证命令；聊天触发前缀 '{normalized.prefix}'")
+    print("\n下一步:")
+    print(f"  1. 在 config/app.yaml 的 plugins.enabled 中加入 '{spec.name}'")
+    print("  2. 启动宿主: python main.py")
+    print(f"  3. 控制台执行 '{spec.name}' 验证命令；聊天触发前缀 '{spec.prefix}'")
     return 0
 
 

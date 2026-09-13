@@ -254,7 +254,7 @@ class ForwardWebSocketTransport(Transport):
         headers: Mapping[str, str] | None = None,
         reconnect: bool = True,
         reconnect_delay: float = 1.0,
-        max_reconnect_delay: float = 30.0,
+        max_reconnect_delay: float = 60.0,
         heartbeat: float | None = 30.0,
         kind_extractor: KindExtractor | None = None,
         session: aiohttp.ClientSession | None = None,

@@ -44,6 +44,9 @@ class FcatbotPlugin(BasePlugin):
     _transport: Transport
     _data_dir: Path
     _debug: bool
+    
+    # 目标管理器
+    target_application = 'fcatbot'
 
     # ---- 子类可覆盖: 声明本插件提供的服务 ----
     # 格式: {"service.name": None | "attr_name" | SomeType | instance}
@@ -180,7 +183,7 @@ class FcatbotPlugin(BasePlugin):
         约定：适配器在 ``f"{source}.translator"`` 服务名下注册一个
         :class:`EventTranslator`。找不到时返回 None——调用方据此拒绝。
         """
-        service_name = f"{event.source}.translator"
+        service_name = f"translator.{event.source}"
         translator = self._services.resolve(service_name)
         if translator is None:
             self.log.warning(
