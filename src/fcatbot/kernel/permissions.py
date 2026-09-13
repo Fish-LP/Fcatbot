@@ -44,7 +44,7 @@ class EventTranslator(Protocol):
     """把一个平台事件翻译成权限系统需要的主体与上下文。
 
     适配器实现本协议，并通过服务注册表对外提供（推荐服务名
-    ``f"{source}.translator"``）。业务插件与基类都不直接依赖它——基类按
+    ``f"translator.{source}"``）。业务插件与基类都不直接依赖它——基类按
     ``event.source`` 查找，业务插件通过 ``has_permission_for`` 间接使用。
 
     翻译器是**纯函数**：
