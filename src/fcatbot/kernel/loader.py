@@ -2,17 +2,17 @@
 
 保留原 fcatbot3 loader.py 的源发现与加载风格，适配 PluginForge 的 BasePlugin。
 
-支持的源形态（按优先级）: 
+支持的源形态（按优先级）:
 - <dir>/<name>/__init__.py   文件夹模式（包）
 - <dir>/<name>.py            单文件模式
 - <dir>/<name>.zip           ZIP 模式（内部须有 <name>/__init__.py，可选）
 
-插件类提取规则（按优先级）: 
+插件类提取规则（按优先级）:
 - 若模块定义了 __plugins__ = [Cls1, Cls2]，只取列出的类
 - 否则若模块定义了 __all__ = ["Cls1", "Cls2"]，只取其中是 BasePlugin 子类的类
 - 否则自动扫描模块内所有非抽象 BasePlugin 子类
 
-用法: 
+用法:
     loader = PluginLoader([Path("plugins")])
     classes = loader.discover()          # 返回 list[type[BasePlugin]]
     result = pm.register_plugins(classes)
@@ -83,7 +83,9 @@ class PluginLoader:
                     classes.append(cls)
                     log.info(
                         "Discovered plugin: %s -> %s (from %s)",
-                        name, cls.__name__, entry,
+                        name,
+                        cls.__name__,
+                        entry,
                     )
                 except Exception:
                     log.exception("Failed to load plugin from %s", entry)

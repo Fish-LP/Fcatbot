@@ -172,11 +172,29 @@ class DynamicFormatter(logging.Formatter):
 class JsonFormatter(logging.Formatter):
     _StdRecordKeys = frozenset(
         {
-            "name", "msg", "args", "levelname", "levelno", "pathname",
-            "filename", "module", "exc_info", "exc_text", "stack_info",
-            "lineno", "funcName", "created", "msecs", "relativeCreated",
-            "thread", "threadName", "processName", "process", "message",
-            "asctime", "taskName",
+            "name",
+            "msg",
+            "args",
+            "levelname",
+            "levelno",
+            "pathname",
+            "filename",
+            "module",
+            "exc_info",
+            "exc_text",
+            "stack_info",
+            "lineno",
+            "funcName",
+            "created",
+            "msecs",
+            "relativeCreated",
+            "thread",
+            "threadName",
+            "processName",
+            "process",
+            "message",
+            "asctime",
+            "taskName",
         }
     )
 
@@ -326,7 +344,9 @@ def setup_logging(config: Optional[LogConfig] = None) -> Optional[QueueListener]
     # 1) 停旧 listener，并关闭它持有的 file handler（避免句柄泄漏）
     if _listener is not None:
         _listener.stop()
-        for h in getattr(_listener, "handlers", ()):  # QueueListener.handlers 是公开属性
+        for h in getattr(
+            _listener, "handlers", ()
+        ):  # QueueListener.handlers 是公开属性
             try:
                 h.close()
             except Exception:
@@ -412,9 +432,7 @@ def setup_logging(config: Optional[LogConfig] = None) -> Optional[QueueListener]
         root.addHandler(console_handler)
         root.addHandler(queue_handler)
 
-        listener = QueueListener(
-            log_queue, file_handler, respect_handler_level=True
-        )
+        listener = QueueListener(log_queue, file_handler, respect_handler_level=True)
         listener.start()
         _listener = listener
         return listener

@@ -1,6 +1,6 @@
 """kernel.events 单元测试（M1 内核事件层）。
 
-覆盖（docs/architecture.md §6 M1 验收 + ADR-0002/0004/0005 契约）: 
+覆盖（docs/architecture.md §6 M1 验收 + ADR-0002/0004/0005 契约）:
 
 - 旧字符串事件 API 兼容（``Event(name=...)`` 发布 / 旧式订阅 / ``unsubscribe(token)``）
 - 类型订阅与继承匹配、``raw.*`` 通配、``RawEvent`` 动态事件键
@@ -50,7 +50,9 @@ def test_legacy_string_event_roundtrip() -> None:
         received: list[tuple[str, Any, str, dict]] = []
 
         def handler(event: Event) -> None:  # 同步处理器（旧系统同样支持）
-            received.append((event.name, event.data, event.source, dict(event.metadata)))
+            received.append(
+                (event.name, event.data, event.source, dict(event.metadata))
+            )
 
         bus.subscribe("sdk.raw", handler)
         await bus.publish(
@@ -239,7 +241,9 @@ def test_subscription_filter_predicate() -> None:
         bus = EventBus()
         bus.start()
         got: list[int] = []
-        bus.subscribe("x", lambda e: got.append(e.data), filter=lambda e: e.data % 2 == 0)
+        bus.subscribe(
+            "x", lambda e: got.append(e.data), filter=lambda e: e.data % 2 == 0
+        )
         for value in (1, 2, 3, 4):
             await bus.publish(Event(name="x", data=value))
         await bus.close()
@@ -432,7 +436,9 @@ def test_channel_exception_handler_isolates() -> None:
         def boom(event: Event) -> None:
             raise ValueError("boom")
 
-        bus.channel.exception_handler(lambda exc: errors.append(str(exc))).subscribe(boom)
+        bus.channel.exception_handler(lambda exc: errors.append(str(exc))).subscribe(
+            boom
+        )
         bus.subscribe("x", lambda e: after.append("after"))
         await bus.publish(Event(name="x"))
         await bus.close()

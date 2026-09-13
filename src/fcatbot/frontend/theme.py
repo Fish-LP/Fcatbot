@@ -1,7 +1,9 @@
 """终端着色主题。ANSI 码仅在最后注入，不影响宽度计算。"""
+
 from __future__ import annotations
 
 import os
+
 from fcatbot.utils import Color
 
 
@@ -44,12 +46,13 @@ class Theme:
         try:
             from prompt_toolkit.output import ColorDepth
             from prompt_toolkit.output.defaults import create_output
+
             output = create_output()
             enabled = output.get_default_color_depth() != ColorDepth.DEPTH_1_BIT
         except Exception:
             enabled = True
 
         if enabled:
-            Color.init()          # Windows 上顺手打开 VT
+            Color.init()  # Windows 上顺手打开 VT
         else:
             Color.disable()

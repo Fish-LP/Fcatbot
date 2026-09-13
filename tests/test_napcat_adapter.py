@@ -1,6 +1,6 @@
 """NapCat 适配器（OneBot11）移植到 fcatbot4 后的回归测试。
 
-覆盖: 
+覆盖:
 
 - 插件按加载器的方式可被发现（顶层模块名 ``adapter``，插件名 ``NapcatAdapter``）；
 - ``provides`` 使用「属性名」形式注册服务（fcatbot4 中 ``None`` 表示插件实例自身）；
@@ -58,12 +58,14 @@ class FakeTransport:
 
     async def send(self, payload):
         self.sent.append(payload)
-        self._listener({
-            "status": "ok" if self._retcode == 0 else "failed",
-            "retcode": self._retcode,
-            "data": {"message_id": 7},
-            "echo": payload["echo"],
-        })
+        self._listener(
+            {
+                "status": "ok" if self._retcode == 0 else "failed",
+                "retcode": self._retcode,
+                "data": {"message_id": 7},
+                "echo": payload["echo"],
+            }
+        )
 
 
 def _load_adapter_class():

@@ -32,7 +32,7 @@ from pathlib import Path
 from string import Template
 from typing import Iterable
 
-from fcatbot import __version__, __api_version__
+from fcatbot import __api_version__, __version__
 
 __all__ = ["PluginSpec", "ScaffoldError", "create_plugin", "main"]
 
@@ -205,8 +205,8 @@ class PluginSpec:
     description: str = ""
     author: str = ""
     version: str = "1.0.0"
-    mode: str = "package"          # package | single
-    prefix: str = ""               # 聊天触发前缀（默认 "!<name>"）
+    mode: str = "package"  # package | single
+    prefix: str = ""  # 聊天触发前缀（默认 "!<name>"）
     app_version = __version__
     api_version = __api_version__
 
@@ -249,7 +249,7 @@ class PluginSpec:
             "version": self.version,
             "prefix": self.prefix,
             "app_version": self.app_version,
-            "api_version": self.api_version
+            "api_version": self.api_version,
         }
 
 
@@ -378,9 +378,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--description", default="", help="插件描述")
     parser.add_argument("--author", default="", help="作者")
     parser.add_argument("--version", default="1.0.0", help="插件版本（默认 1.0.0）")
-    parser.add_argument(
-        "--prefix", default="", help="聊天触发前缀（默认 !<name>）"
-    )
+    parser.add_argument("--prefix", default="", help="聊天触发前缀（默认 !<name>）")
     parser.add_argument("--force", action="store_true", help="覆盖已存在的目标")
     return parser
 

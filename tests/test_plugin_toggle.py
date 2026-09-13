@@ -1,6 +1,6 @@
 """运行时启用 / 停用（WebUI 开关）集成测试。
 
-回归两个缺陷: 
+回归两个缺陷:
 
 1. **启动时未加载（未列入 ``plugins.enabled``）的插件无法在 WebUI 中启用**
    —— ``PluginForge.activate_plugin`` 只认已经初始化过的实例，找不到就只打 warning；
@@ -21,7 +21,7 @@ from fcatbot import app as host_app
 from fcatbot.frontend.webui import WebUI
 from fcatbot.kernel.events import Event
 
-ALPHA_SOURCE = '''
+ALPHA_SOURCE = """
 from fcatbot import FcatbotPlugin, console_command, on_event
 
 
@@ -42,9 +42,9 @@ class AlphaPlugin(FcatbotPlugin):
     @on_event("raw.test")
     async def on_raw(self, event) -> None:
         self.seen.append(event.data)
-'''
+"""
 
-BETA_SOURCE = '''
+BETA_SOURCE = """
 import asyncio
 
 from fcatbot import FcatbotPlugin, console_command, on_event
@@ -72,7 +72,7 @@ class BetaPlugin(FcatbotPlugin):
     @on_event("raw.test")
     async def on_raw(self, event) -> None:
         self.seen.append(event.data)
-'''
+"""
 
 
 def _write_workspace(tmp_path: Path, *, enabled: list[str]) -> tuple[Path, Path]:
@@ -135,8 +135,16 @@ def test_enable_previously_unloaded_plugin(tmp_path: Path) -> None:
         try:
             # 启动时 beta 未加载: 无命令、无事件订阅、无服务
             assert _active_names(app) == ["alpha"]
-            assert _command_names(app) == {"alpha", "help", "plugins", "reload",
-                                           "services", "config", "health", "lp"}
+            assert _command_names(app) == {
+                "alpha",
+                "help",
+                "plugins",
+                "reload",
+                "services",
+                "config",
+                "health",
+                "lp",
+            }
 
             ok, msg = await app.enable_plugin("beta")
             assert ok, msg

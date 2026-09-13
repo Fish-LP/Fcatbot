@@ -6,7 +6,7 @@ from fcatbot.utils.color import Color
 class LogFormats:
     """日志格式系统 - 按风格分类，每种风格支持 message / notice / request / meta_event。
 
-    调用方式: 
+    调用方式:
         LogFormats.Modern.message(...)
         LogFormats.Simple.notice(...)
         LogFormats.Professional.meta_event(...)

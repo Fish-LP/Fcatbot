@@ -1,6 +1,6 @@
 """Fcatbot 内核: 平台无关的核心抽象（架构 §2.3）。
 
-模块: 
+模块:
 - ``events``       事件基类族 / EventBus / EventChannel（M1）
 - ``entities``     Bot / Contact 等实体抽象（最小骨架，M4 扩展）
 - ``commands``     CommandRegistry / CommandSpec / CommandContext

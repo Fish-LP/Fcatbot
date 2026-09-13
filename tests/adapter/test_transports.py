@@ -1,6 +1,6 @@
 """adapter.transports 单元测试（M4 连接件: 正向 WS + HTTP）。
 
-覆盖: 
+覆盖:
 - ``Transport`` 基座: ``build_raw`` / ``publish_raw`` / ``publish_raw_nowait`` / ``raw.*`` 事件键
 - ``ForwardWebSocketTransport``: 连接 → 收帧发布 ``raw.ws.message``、``send`` 出站、断开事件
 - ``HttpTransport``: 回调服务器入站 → ``raw.http.*``、出站 HTTP API（``send`` / ``call``）、
@@ -280,7 +280,15 @@ def test_http_outbound_send() -> None:
             await runner.cleanup()
 
         # 动作/信封不被解释: 原样发往 api_base_url
-        assert received == [("/api", {"action": "send_group_msg", "params": {"group_id": 7, "message": "hi"}})]
+        assert received == [
+            (
+                "/api",
+                {
+                    "action": "send_group_msg",
+                    "params": {"group_id": 7, "message": "hi"},
+                },
+            )
+        ]
 
     run(scenario())
 

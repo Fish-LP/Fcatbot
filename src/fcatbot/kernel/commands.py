@@ -1,12 +1,12 @@
 """控制台命令的注册与分发。
 
-参考 Mirai Console 规范: 
+参考 Mirai Console 规范:
 - 每个命令有主名 + 别名、usage、description、permission
 - 支持子命令树（CompositeCommand 风格）
 - 命令权限自动派生为 {plugin}:command.{name}
 - Tab 补全从注册表动态生成
 
-插件声明示例: 
+插件声明示例:
     class WeatherPlugin(FcatbotPlugin):
         @console_command("weather", help="查天气", permission="weather.query")
         async def cmd_weather(self, args):
@@ -41,7 +41,7 @@ class CommandConflict(CommandError):
 class CommandContext:
     """命令执行上下文（过渡桥）。
 
-    在 M3 的 ``CommandSender`` 落地前，为命令处理器提供**来源感知**能力: 
+    在 M3 的 ``CommandSender`` 落地前，为命令处理器提供**来源感知**能力:
 
     - ``source``: 命令来源（``console`` / 未来的 ``chat``、``web`` 等）；
     - ``user_id`` / ``group_id``: 来源身份（聊天适配器在事件 ``metadata`` 中提供）；
@@ -75,7 +75,7 @@ def accepts_context(handler: Any) -> bool:
 class CommandSpec:
     """单个命令的元数据。
 
-    权限节点命名规则（参考 Mirai）: 
+    权限节点命名规则（参考 Mirai）:
     - 显式指定 permission 时用它
     - 否则自动派生为 {plugin}:command.{name}
     """
@@ -162,9 +162,9 @@ class CommandRegistry:
     """命令注册表。支持层级结构（子命令）和别名。"""
 
     def __init__(self) -> None:
-        self._roots: dict[str, CommandSpec] = {}       # 主名 → spec
-        self._aliases: dict[str, CommandSpec] = {}     # 别名 → spec
-        self._by_plugin: dict[str, set[str]] = {}      # 插件 → 根命令名集合
+        self._roots: dict[str, CommandSpec] = {}  # 主名 → spec
+        self._aliases: dict[str, CommandSpec] = {}  # 别名 → spec
+        self._by_plugin: dict[str, set[str]] = {}  # 插件 → 根命令名集合
 
     # ---------- 注册 ----------
     def register(self, spec: CommandSpec) -> None:
@@ -276,6 +276,7 @@ class CommandRegistry:
 
 # ---------- 扫描 ----------
 
+
 def scan_plugin_commands(plugin: Any, plugin_name: str) -> list[CommandSpec]:
     """扫描实例上所有 @console_command 方法，返回顶层 spec 列表。
 
@@ -314,7 +315,9 @@ def scan_plugin_commands(plugin: Any, plugin_name: str) -> list[CommandSpec]:
         if parent is None:
             log.error(
                 "Subcommand '%s' of plugin '%s' has unknown parent '%s'",
-                child.name, plugin_name, parent_name,
+                child.name,
+                plugin_name,
+                parent_name,
             )
             continue
         child.parent = parent

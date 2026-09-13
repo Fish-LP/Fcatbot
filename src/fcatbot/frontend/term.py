@@ -13,9 +13,11 @@ import shutil
 try:
     from wcwidth import wcswidth as _wcswidth
 except ImportError:
+
     def _wcswidth(s: str) -> int:
         # 回退: 无 wcwidth 库时，粗略估算
         import unicodedata
+
         w = 0
         for ch in s:
             if unicodedata.east_asian_width(ch) in ("W", "F"):
@@ -25,6 +27,7 @@ except ImportError:
             else:
                 w += 1
         return w
+
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 

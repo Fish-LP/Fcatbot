@@ -31,7 +31,7 @@ import json
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from typing import Any, ClassVar, Callable
+from typing import Any, Callable, ClassVar
 
 import aiohttp
 from aiohttp import web
@@ -139,7 +139,7 @@ class Transport(ABC):
         用途: 协议层需要在总线派发**之外**拿到原始帧时使用（典型场景是
         OneBot 式「出站请求 → 入站应答」的 ``echo`` 路由）。
 
-        与 ``raw.*`` 事件订阅的关键差别: 
+        与 ``raw.*`` 事件订阅的关键差别:
 
         - 监听器在**收帧任务**中被调用，不经过单 worker 总线队列；
         - 因此**不会**与正在执行的事件处理器互相等待——若改用事件订阅做应答
@@ -311,7 +311,11 @@ class ForwardWebSocketTransport(Transport):
             self._task = None
         self._ws = None
 
-        if self._owns_session and self._session is not None and not self._session.closed:
+        if (
+            self._owns_session
+            and self._session is not None
+            and not self._session.closed
+        ):
             await self._session.close()
         self._session = None
 
@@ -356,7 +360,9 @@ class ForwardWebSocketTransport(Transport):
                     self._ws = ws
                     connected = True
                     delay = self._reconnect_delay
-                    await self.publish_raw("connected", None, metadata={"url": self._url})
+                    await self.publish_raw(
+                        "connected", None, metadata={"url": self._url}
+                    )
                     await self._read_loop(ws)
             except asyncio.CancelledError:
                 raise
@@ -371,7 +377,9 @@ class ForwardWebSocketTransport(Transport):
                 break
             log.info("%s 将在 %.1fs 后重连: %s", self._name, delay, self._url)
             await self._sleep_or_stop(delay)
-            delay = min(delay * 2 if delay else self._reconnect_delay, self._max_reconnect_delay)
+            delay = min(
+                delay * 2 if delay else self._reconnect_delay, self._max_reconnect_delay
+            )
 
     async def _read_loop(self, ws: aiohttp.ClientWebSocketResponse) -> None:
         async for msg in ws:
@@ -514,7 +522,9 @@ class HttpTransport(Transport):
             payload = await self._parse_body(request)
         except Exception:
             log.exception("%s 解析请求体失败", self._name)
-            return web.json_response({"status": "error", "reason": "bad_body"}, status=400)
+            return web.json_response(
+                {"status": "error", "reason": "bad_body"}, status=400
+            )
 
         kind = self._kind_extractor(payload)
         # 与 WS 连接件保持一致: 先直通协议层（旁路总线），再走总线分发。

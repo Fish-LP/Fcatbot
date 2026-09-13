@@ -1,6 +1,6 @@
 """Web 管理界面后端。
 
-提供: 
+提供:
 - 插件列表 + 启用/禁用开关（含依赖检查）
 - YAML 配置文件读取/保存
 - 插件重载
@@ -13,7 +13,7 @@
 调用 ``report_access_password()`` 打印到本地可信控制台（不走 logging，
 否则会被 ``_WebLogHandler`` 广播给 WebSocket 客户端）。
 
-路由: 
+路由:
   GET  /                              主页（未登录 → 重定向 /login）
   GET  /login                         登录页
   POST /api/login                     登录（设置 Cookie）
@@ -39,15 +39,12 @@ import json
 import logging
 import re
 import secrets
+import sys
 import time
 from pathlib import Path
-from typing import Any
 
 import yaml
 from aiohttp import WSMsgType, web
-
-import asyncio
-import sys
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -58,11 +55,7 @@ STATIC_DIR = Path(__file__).parent / "webui_static"
 
 # 自动生成访问密码: 12 位，字符集剔除易混淆字符（O/o/l/I）
 _GENERATED_PASSWORD_LENGTH = 12
-_PASSWORD_ALPHABET = (
-    "ABCDEFGHJKLMNPQRSTUVWXYZ"
-    "abcdefghijkmnpqrstuvwxyz"
-    "0123456789"
-)
+_PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ" "abcdefghijkmnpqrstuvwxyz" "0123456789"
 
 # 插件名校验: 与插件类 ``name`` 的字符集一致，禁掉路径分隔符与 ".."。
 # 用于 URL 路径参数拼进文件名前的前置校验，阻止路径穿越。
@@ -453,15 +446,19 @@ class WebUI:
         self._install_log_handler()
         log.info("WebUI 运行在 http://%s:%d", self._host, self._port)
         if self._auth_enabled:
-            log.info("WebUI 已启用登录认证（Cookie: %s，有效期 %d 秒）",
-                    self._cookie_name, self._session_ttl)
+            log.info(
+                "WebUI 已启用登录认证（Cookie: %s，有效期 %d 秒）",
+                self._cookie_name,
+                self._session_ttl,
+            )
             if self._password_generated:
                 log.info("访问密码为本次启动自动生成，已打印到本地控制台")
         else:
             log.warning(
                 "WebUI 未启用登录认证（auth_enabled=False），"
                 "请确保仅监听可信网络（当前 %s:%d）",
-                self._host, self._port,
+                self._host,
+                self._port,
             )
 
     async def stop(self) -> None:
@@ -616,9 +613,7 @@ class WebUI:
             # 固定延迟，缓解暴力破解
             await asyncio.sleep(0.25)
             log.warning("WebUI 登录失败（来源 %s）", remote)
-            return web.json_response(
-                {"ok": False, "message": "密码错误"}, status=401
-            )
+            return web.json_response({"ok": False, "message": "密码错误"}, status=401)
 
         # 成功 → 清掉该 IP 的失败记录，避免正常用户被自己之前的失败拖累
         self._login_attempts.pop(remote, None)
@@ -650,11 +645,13 @@ class WebUI:
 
     async def _api_auth_status(self, request: web.Request) -> web.Response:
         authed = self._is_authed(request) if self._auth_enabled else True
-        return web.json_response({
-            "ok": True,
-            "authenticated": authed,
-            "auth_required": self._auth_enabled,
-        })
+        return web.json_response(
+            {
+                "ok": True,
+                "authenticated": authed,
+                "auth_required": self._auth_enabled,
+            }
+        )
 
     # ==================== 静态 ====================
 
@@ -666,7 +663,7 @@ class WebUI:
     def _current_load_errors(self) -> dict[str, str]:
         """当前仍应展示的加载错误。
 
-        过滤规则: 
+        过滤规则:
           1. 已经在 active 中的插件 → 视为加载成功，移除其历史错误；
           2. 本次会话中被明确处理过的插件（成功启用 / 正常停用）→ 移除残留错误。
         """
@@ -698,9 +695,8 @@ class WebUI:
 
         for p in pm.get_active_plugins():
             if p.name == name:
-                deps = (
-                    getattr(p, "depends_on", None)
-                    or getattr(p, "dependencies", None)
+                deps = getattr(p, "depends_on", None) or getattr(
+                    p, "dependencies", None
                 )
                 return list(deps or [])
 
@@ -746,17 +742,19 @@ class WebUI:
             deps = self._get_plugin_dependencies(name)
             missing = [d for d in deps if d not in enabled and d not in active]
 
-            plugins_data.append({
-                "name": name,
-                "version": getattr(meta, "version", "-") if meta else "-",
-                "description": getattr(meta, "description", "") if meta else "",
-                "activated": name in active,
-                "enabled": name in enabled,
-                "has_config": (self._config_dir / f"{name}.yaml").exists(),
-                "error": errors.get(name, ""),
-                "dependencies": deps,
-                "missing_dependencies": missing,
-            })
+            plugins_data.append(
+                {
+                    "name": name,
+                    "version": getattr(meta, "version", "-") if meta else "-",
+                    "description": getattr(meta, "description", "") if meta else "",
+                    "activated": name in active,
+                    "enabled": name in enabled,
+                    "has_config": (self._config_dir / f"{name}.yaml").exists(),
+                    "error": errors.get(name, ""),
+                    "dependencies": deps,
+                    "missing_dependencies": missing,
+                }
+            )
 
         return web.json_response({"plugins": plugins_data})
 
@@ -773,14 +771,16 @@ class WebUI:
         if enabled and not force:
             missing = self._unmet_dependencies(name)
             if missing:
-                return web.json_response({
-                    "ok": False,
-                    "message": (
-                        f"依赖未满足，无法启用 {name}: "
-                        f"请先启用 {', '.join(missing)}"
-                    ),
-                    "missing": missing,
-                })
+                return web.json_response(
+                    {
+                        "ok": False,
+                        "message": (
+                            f"依赖未满足，无法启用 {name}: "
+                            f"请先启用 {', '.join(missing)}"
+                        ),
+                        "missing": missing,
+                    }
+                )
 
         # 1. 运行时装卸: 走宿主生命周期
         if enabled:
@@ -821,7 +821,7 @@ class WebUI:
 
         ok, msg = await self._app.reload_plugin(name)
 
-        # 重载无论成败，都应清除“忽略”标记: 
+        # 重载无论成败，都应清除“忽略”标记:
         #   - 成功 → 插件进入 active，错误自动隐藏
         #   - 失败 → 若确有加载错误，应重新展示
         self._dismissed_errors.discard(name)
@@ -840,12 +840,14 @@ class WebUI:
         # 只读: 不存在就返回空串，不在磁盘上制造文件
         content = path.read_text(encoding="utf-8") if path.exists() else ""
 
-        return web.json_response({
-            "name": name,
-            "path": str(path),
-            "content": content,
-            "exists": path.exists(),
-        })
+        return web.json_response(
+            {
+                "name": name,
+                "path": str(path),
+                "content": content,
+                "exists": path.exists(),
+            }
+        )
 
     async def _api_put_config(self, request: web.Request) -> web.Response:
         name = request.match_info["name"]
@@ -894,18 +896,20 @@ class WebUI:
 
     async def _api_commands(self, request: web.Request) -> web.Response:
         specs = self._app._commands.all_roots()
-        return web.json_response({
-            "commands": [
-                {
-                    "name": s.name,
-                    "usage": s.usage_text(),
-                    "help": s.help,
-                    "plugin": s.plugin,
-                    "permission": s.resolved_permission(),
-                }
-                for s in specs
-            ]
-        })
+        return web.json_response(
+            {
+                "commands": [
+                    {
+                        "name": s.name,
+                        "usage": s.usage_text(),
+                        "help": s.help,
+                        "plugin": s.plugin,
+                        "permission": s.resolved_permission(),
+                    }
+                    for s in specs
+                ]
+            }
+        )
 
     # ==================== WebSocket 控制台 ====================
 
@@ -916,10 +920,12 @@ class WebUI:
         self._ws_clients.add(ws)
 
         try:
-            await ws.send_json({
-                "type": "info",
-                "text": "控制台已连接。输入 help 查看命令。",
-            })
+            await ws.send_json(
+                {
+                    "type": "info",
+                    "text": "控制台已连接。输入 help 查看命令。",
+                }
+            )
             async for msg in ws:
                 if msg.type == WSMsgType.TEXT:
                     try:
@@ -954,15 +960,11 @@ class WebUI:
             spec, args = self._app._commands.find(tokens)
             if spec is None:
                 log.info("WebConsole: unknown command: %s", text)
-                await ws.send_json(
-                    {"type": "error", "text": f"未知命令: {text}"}
-                )
+                await ws.send_json({"type": "error", "text": f"未知命令: {text}"})
                 return
             if spec.handler is None:
                 log.info("WebConsole: command needs subcommand: %s", text)
-                await ws.send_json(
-                    {"type": "info", "text": "(该命令需要子命令)"}
-                )
+                await ws.send_json({"type": "info", "text": "(该命令需要子命令)"})
                 return
             result = spec.handler(args)
             if inspect.isawaitable(result):
@@ -982,9 +984,11 @@ class WebUI:
         tmpl = self._log_handler_template
         if tmpl is None:
             for h in root.handlers:
-                if (isinstance(h, logging.StreamHandler)
-                        and not isinstance(h, logging.FileHandler)
-                        and h.formatter is not None):
+                if (
+                    isinstance(h, logging.StreamHandler)
+                    and not isinstance(h, logging.FileHandler)
+                    and h.formatter is not None
+                ):
                     tmpl = h
                     break
 
@@ -993,10 +997,12 @@ class WebUI:
             for f in tmpl.filters:
                 handler.addFilter(f)
         else:
-            handler.setFormatter(logging.Formatter(
-                "[%(asctime)s] %(levelname)-8s %(name)s ➜ %(message)s",
-                datefmt="%H:%M:%S",
-            ))
+            handler.setFormatter(
+                logging.Formatter(
+                    "[%(asctime)s] %(levelname)-8s %(name)s ➜ %(message)s",
+                    datefmt="%H:%M:%S",
+                )
+            )
         handler.setLevel(root.level or logging.INFO)
         root.addHandler(handler)
         self._log_handler = handler
@@ -1008,8 +1014,12 @@ class WebUI:
 
     def _schedule_broadcast(self, text: str) -> None:
         loop = self._loop
-        if (not self._ws_clients or loop is None
-                or loop.is_closed() or not loop.is_running()):
+        if (
+            not self._ws_clients
+            or loop is None
+            or loop.is_closed()
+            or not loop.is_running()
+        ):
             return
         try:
             loop.call_soon_threadsafe(self._do_broadcast, text)

@@ -1,6 +1,6 @@
 """PluginForge 与 EventBus / CommandRegistry / ServiceRegistry 的协调。
 
-除同步的事件订阅 / 命令注册 / 服务注销外，本层负责**插件异步生命周期的编排**: 
+除同步的事件订阅 / 命令注册 / 服务注销外，本层负责**插件异步生命周期的编排**:
 
 - ``enable(plugin)``: ``on_load`` → 装配（订阅 + 命令） → ``on_enable``
 - ``disable(plugin)``: ``on_disable`` → 取消后台任务 → 拆卸 → ``on_unload``
@@ -15,15 +15,13 @@ from __future__ import annotations
 import inspect
 import logging
 
-from pluginforge import BasePlugin, PluginManager
+from pluginforge import BasePlugin
 
 from fcatbot.kernel.commands import (
     CommandConflict,
-    CommandRegistry,
     scan_plugin_commands,
 )
-from fcatbot.kernel.events import Event, EventBus
-from fcatbot.kernel.services import ServiceRegistry
+from fcatbot.kernel.events import Event
 
 log = logging.getLogger("fcatbot.integration")
 
@@ -47,7 +45,9 @@ class IntegrationLayer:
 
         log.info(
             "Plugin '%s' attached: %d event sub(s), %d command(s)",
-            plugin.name, len(tokens), cmd_count,
+            plugin.name,
+            len(tokens),
+            cmd_count,
         )
 
     def detach(self, plugin: BasePlugin) -> None:
@@ -60,7 +60,10 @@ class IntegrationLayer:
 
         log.info(
             "Plugin '%s' detached: %d sub(s), %d cmd(s), %d svc(s)",
-            plugin.name, len(tokens), cmd_removed, len(svc_removed),
+            plugin.name,
+            len(tokens),
+            cmd_removed,
+            len(svc_removed),
         )
 
     def attach_all(self) -> None:
@@ -147,7 +150,9 @@ class IntegrationLayer:
             except CommandConflict as exc:
                 log.error(
                     "Plugin '%s' command '%s' conflicts with '%s'",
-                    plugin.name, spec.name, exc.existing_plugin,
+                    plugin.name,
+                    spec.name,
+                    exc.existing_plugin,
                 )
         return count
 
@@ -157,4 +162,5 @@ class IntegrationLayer:
             r = handler(event)
             if inspect.isawaitable(r):
                 await r
+
         return wrapper

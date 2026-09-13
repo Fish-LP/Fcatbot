@@ -23,7 +23,7 @@
     lp group <group> setweight <n> / setdisplayname <name> / showtracks / create ...
     lp track <track> info|append|insert|remove|clear|create ...
 
-参考实现扩展: 
+参考实现扩展:
 
 - ``lp check <用户|me> <节点> [key=value ...]``: 快速权限检查（官方经由 ``user/group permission check``）；
 - ``lp root <用户ID>``: **控制台专用**根管理员引导（授予 ``*``；聊天来源禁止分发 ``*``）；
@@ -34,7 +34,7 @@
 - ``lp editor`` / ``lp applyedits``: LuckPerms Web Editor（打开会话 → 手动应用 edit 码）；
   网络操作转入**后台任务**，命令立即返回（避免阻塞事件总线单 worker，ADR-0004）。
 
-权限节点（官方风格 ``luckperms.*``）: 
+权限节点（官方风格 ``luckperms.*``）:
 
 - 命令入口 ``core:command.lp``（框架约定，决定 ``help`` 可见性）；
 - 单一命令使用官方叶子节点（``luckperms.info`` / ``luckperms.creategroup`` / ``luckperms.editor`` …）；
@@ -43,14 +43,14 @@
   在处理器内部按官方叶子节点校验（如 ``luckperms.user.permission.set``）；
 - 控制台来源一律放行（本地操作员语义）；``*`` 仅允许在控制台授予。
 
-参数约定（与官方一致）: 
+参数约定（与官方一致）:
 
 - 上下文 ``key=value``（可多个，空格分隔），省略即为全局上下文；
 - 时长 ``30s`` / ``10m`` / ``2h`` / ``7d`` / ``1w``（纯数字视为秒，支持组合 ``1d2h30m``）；
 - ``true|false`` 省略时默认 ``true``；``settemp`` 需要时长；
 - 暂不支持引号转义空格（参数按空白切分）。
 
-库能力边界（luckperms-python v1.0.6）: 
+库能力边界（luckperms-python v1.0.6）:
 
 - 组临时权限（``group permission settemp``）由 ``Node(expiry=...)`` 直写实现（库无 duration 参数）；
 - 任意键 ``meta set/unset`` 未实现（库仅识别 prefix/suffix/displayname/weight 元数据）。
@@ -73,7 +73,7 @@ log = logging.getLogger("fcatbot.lp")
 # 权限节点（官方风格，https://luckperms.net/wiki/Permissions）
 # ---------------------------------------------------------------------------
 
-LP_ENTRY = "core:command.lp"          # 命令入口（框架约定）
+LP_ENTRY = "core:command.lp"  # 命令入口（框架约定）
 LP_INFO = "luckperms.info"
 LP_SYNC = "luckperms.sync"
 LP_VERBOSE = "luckperms.verbose"
@@ -480,7 +480,9 @@ class LuckPermsCommands:
         usage="lp info",
         permission=LP_INFO,
     )
-    def cmd_info(self, args: List[str], context: Optional[CommandContext] = None) -> str:
+    def cmd_info(
+        self, args: List[str], context: Optional[CommandContext] = None
+    ) -> str:
         manager = self._manager()
         if manager is None:
             return self._backend_hint()
@@ -493,7 +495,9 @@ class LuckPermsCommands:
         usage="lp sync",
         permission=LP_SYNC,
     )
-    def cmd_sync(self, args: List[str], context: Optional[CommandContext] = None) -> str:
+    def cmd_sync(
+        self, args: List[str], context: Optional[CommandContext] = None
+    ) -> str:
         manager = self._manager()
         if manager is None:
             return self._backend_hint()
@@ -507,7 +511,9 @@ class LuckPermsCommands:
         usage="lp check <用户|me> <节点> [key=value ...]",
         permission=LP_CHECK,
     )
-    def cmd_check(self, args: List[str], context: Optional[CommandContext] = None) -> str:
+    def cmd_check(
+        self, args: List[str], context: Optional[CommandContext] = None
+    ) -> str:
         if len(args) < 2:
             return "[lp] 用法: lp check <用户|me> <节点> [key=value ...]"
         manager = self._manager()
@@ -529,7 +535,9 @@ class LuckPermsCommands:
         usage="lp verbose [on|record|off|upload] [filter|me]",
         permission=LP_VERBOSE,
     )
-    def cmd_verbose(self, args: List[str], context: Optional[CommandContext] = None) -> str:
+    def cmd_verbose(
+        self, args: List[str], context: Optional[CommandContext] = None
+    ) -> str:
         if not args:
             if self._verbose.active:
                 return self._verbose.dump(20)
@@ -574,7 +582,9 @@ class LuckPermsCommands:
         usage="lp tree <用户|组> [depth]",
         permission=LP_TREE,
     )
-    def cmd_tree(self, args: List[str], context: Optional[CommandContext] = None) -> str:
+    def cmd_tree(
+        self, args: List[str], context: Optional[CommandContext] = None
+    ) -> str:
         if not args:
             return "[lp] 用法: lp tree <用户|组> [depth]"
         depth = 5
@@ -597,7 +607,9 @@ class LuckPermsCommands:
         usage="lp root <用户ID>",
         permission=LP_ENTRY,
     )
-    def cmd_root(self, args: List[str], context: Optional[CommandContext] = None) -> str:
+    def cmd_root(
+        self, args: List[str], context: Optional[CommandContext] = None
+    ) -> str:
         if context is not None and not context.is_console:
             return (
                 "[lp] lp root 仅允许在控制台执行"
@@ -630,7 +642,9 @@ class LuckPermsCommands:
         usage="lp editor [type] [filter]",
         permission=LP_EDITOR,
     )
-    async def cmd_editor(self, args: List[str], context: Optional[CommandContext] = None) -> str:
+    async def cmd_editor(
+        self, args: List[str], context: Optional[CommandContext] = None
+    ) -> str:
         self._spawn(self._open_webeditor(args))
         return "[lp] 正在打开 Web Editor 会话（网络操作已转后台，完成后输出 URL）"
 
@@ -642,11 +656,15 @@ class LuckPermsCommands:
             await session.close()
         except Exception as exc:
             log.exception("Web Editor 会话打开失败")
-            log.warning("[lp] Web Editor 会话打开失败: %s（需要可访问 luckperms.net）", exc)
+            log.warning(
+                "[lp] Web Editor 会话打开失败: %s（需要可访问 luckperms.net）", exc
+            )
             return
         note = "（type/filter 参数当前忽略）" if args else ""
         log.info("[lp] Web Editor 会话已打开: %s %s", url, note)
-        log.info("[lp] 在浏览器中编辑并 Save 后，在控制台执行 lp applyedits <code> 应用更改")
+        log.info(
+            "[lp] 在浏览器中编辑并 Save 后，在控制台执行 lp applyedits <code> 应用更改"
+        )
 
     @console_command(
         "applyedits",
@@ -655,7 +673,9 @@ class LuckPermsCommands:
         usage="lp applyedits <code>",
         permission=LP_APPLYEDITS,
     )
-    async def cmd_applyedits(self, args: List[str], context: Optional[CommandContext] = None) -> str:
+    async def cmd_applyedits(
+        self, args: List[str], context: Optional[CommandContext] = None
+    ) -> str:
         if not args:
             return "[lp] 用法: lp applyedits <code>"
         code = args[0].strip()
@@ -682,7 +702,9 @@ class LuckPermsCommands:
         usage="lp creategroup <名称> [权重] [显示名]",
         permission=LP_CREATEGROUP,
     )
-    def cmd_creategroup(self, args: List[str], context: Optional[CommandContext] = None) -> str:
+    def cmd_creategroup(
+        self, args: List[str], context: Optional[CommandContext] = None
+    ) -> str:
         if not args:
             return "[lp] 用法: lp creategroup <名称> [权重] [显示名]"
         return self._create_group(args[0], args[1:])
@@ -694,7 +716,9 @@ class LuckPermsCommands:
         usage="lp deletegroup <名称>",
         permission=LP_DELETEGROUP,
     )
-    def cmd_deletegroup(self, args: List[str], context: Optional[CommandContext] = None) -> str:
+    def cmd_deletegroup(
+        self, args: List[str], context: Optional[CommandContext] = None
+    ) -> str:
         if not args:
             return "[lp] 用法: lp deletegroup <名称>"
         manager = self._manager()
@@ -713,7 +737,9 @@ class LuckPermsCommands:
         usage="lp listgroups",
         permission=LP_LISTGROUPS,
     )
-    def cmd_listgroups(self, args: List[str], context: Optional[CommandContext] = None) -> str:
+    def cmd_listgroups(
+        self, args: List[str], context: Optional[CommandContext] = None
+    ) -> str:
         manager = self._manager()
         if manager is None:
             return self._backend_hint()
@@ -736,7 +762,9 @@ class LuckPermsCommands:
         usage="lp createtrack <名称> [组...]",
         permission=LP_CREATETRACK,
     )
-    def cmd_createtrack(self, args: List[str], context: Optional[CommandContext] = None) -> str:
+    def cmd_createtrack(
+        self, args: List[str], context: Optional[CommandContext] = None
+    ) -> str:
         if not args:
             return "[lp] 用法: lp createtrack <名称> [组...]"
         return self._create_track(args[0], args[1:])
@@ -748,7 +776,9 @@ class LuckPermsCommands:
         usage="lp deletetrack <名称>",
         permission=LP_DELETETRACK,
     )
-    def cmd_deletetrack(self, args: List[str], context: Optional[CommandContext] = None) -> str:
+    def cmd_deletetrack(
+        self, args: List[str], context: Optional[CommandContext] = None
+    ) -> str:
         if not args:
             return "[lp] 用法: lp deletetrack <名称>"
         manager = self._manager()
@@ -767,7 +797,9 @@ class LuckPermsCommands:
         usage="lp listtracks",
         permission=LP_LISTTRACKS,
     )
-    def cmd_listtracks(self, args: List[str], context: Optional[CommandContext] = None) -> str:
+    def cmd_listtracks(
+        self, args: List[str], context: Optional[CommandContext] = None
+    ) -> str:
         manager = self._manager()
         if manager is None:
             return self._backend_hint()
@@ -788,7 +820,9 @@ class LuckPermsCommands:
         usage="lp user <用户|me> <info|permission|parent|meta|promote|demote|showtracks> ...",
         permission=LP_USER,
     )
-    def cmd_user(self, args: List[str], context: Optional[CommandContext] = None) -> str:
+    def cmd_user(
+        self, args: List[str], context: Optional[CommandContext] = None
+    ) -> str:
         if len(args) < 2:
             return _USER_USAGE
         manager = self._manager()
@@ -833,7 +867,9 @@ class LuckPermsCommands:
         usage="lp group <组> <info|permission|parent|meta|setweight|setdisplayname|showtracks|create> ...",
         permission=LP_GROUP,
     )
-    def cmd_group(self, args: List[str], context: Optional[CommandContext] = None) -> str:
+    def cmd_group(
+        self, args: List[str], context: Optional[CommandContext] = None
+    ) -> str:
         if len(args) < 2:
             return _GROUP_USAGE
         manager = self._manager()
@@ -882,7 +918,9 @@ class LuckPermsCommands:
         usage="lp track <轨道> <info|append|insert|remove|clear|create> ...",
         permission=LP_TRACK,
     )
-    def cmd_track(self, args: List[str], context: Optional[CommandContext] = None) -> str:
+    def cmd_track(
+        self, args: List[str], context: Optional[CommandContext] = None
+    ) -> str:
         if len(args) < 2:
             return _TRACK_USAGE
         manager = self._manager()
@@ -1003,7 +1041,11 @@ class LuckPermsCommands:
         return "\n".join(lines)
 
     def _format_meta_info(self, manager: Any, holder_id: str, kind: str) -> str:
-        holder = manager.get_user(holder_id) if kind == "user" else manager.get_group(holder_id)
+        holder = (
+            manager.get_user(holder_id)
+            if kind == "user"
+            else manager.get_group(holder_id)
+        )
         if holder is None:
             noun = "用户" if kind == "user" else "组"
             return f"[lp] {noun} {holder_id}: 未持久化（无 meta）"
@@ -1019,7 +1061,11 @@ class LuckPermsCommands:
         return "\n".join(lines)
 
     def _format_permission_info(self, manager: Any, holder_id: str, kind: str) -> str:
-        holder = manager.get_user(holder_id) if kind == "user" else manager.get_group(holder_id)
+        holder = (
+            manager.get_user(holder_id)
+            if kind == "user"
+            else manager.get_group(holder_id)
+        )
         if holder is None:
             noun = "用户" if kind == "user" else "组"
             return f"[lp] {noun} {holder_id}: 无权限节点"
@@ -1086,7 +1132,9 @@ class LuckPermsCommands:
                 index += 1
             ctx, extra = _parse_context(rest[index:])
             if extra:
-                return f"[lp] 无法识别的参数: {' '.join(extra)}（上下文格式: key=value）"
+                return (
+                    f"[lp] 无法识别的参数: {' '.join(extra)}（上下文格式: key=value）"
+                )
             err = self._authorize(context, f"{base}.{action}", crown=node)
             if err:
                 return err
@@ -1096,7 +1144,9 @@ class LuckPermsCommands:
                 return f"[lp] 组 '{holder_id}' 不存在"
             self._add_node(manager, kind, holder_id, node, value, ctx, duration)
             mark = "允许" if value else "拒绝"
-            suffix = f"（临时 {_fmt_duration(duration)}）" if duration is not None else ""
+            suffix = (
+                f"（临时 {_fmt_duration(duration)}）" if duration is not None else ""
+            )
             return f"[lp] {label}: {node} = {mark}{suffix}"
 
         if action in ("unset", "unsettemp"):
@@ -1146,7 +1196,9 @@ class LuckPermsCommands:
             if err:
                 return err
             holder = (
-                manager.get_user(holder_id) if kind == "user" else manager.get_group(holder_id)
+                manager.get_user(holder_id)
+                if kind == "user"
+                else manager.get_group(holder_id)
             )
             if holder is None:
                 return f"[lp] {noun} {holder_id} 不存在（无节点可清空）"
@@ -1176,7 +1228,9 @@ class LuckPermsCommands:
     ) -> None:
         """写入节点；组临时权限因库缺 duration 参数而使用 Node(expiry) 直写。"""
         if kind == "user":
-            manager.user_add_node(holder_id, node, value, context or None, duration=duration)
+            manager.user_add_node(
+                holder_id, node, value, context or None, duration=duration
+            )
             return
         if duration is None:
             manager.group_add_node(holder_id, node, value, context or None)
@@ -1213,7 +1267,9 @@ class LuckPermsCommands:
         target = rest[0] if rest else ""
 
         holder = (
-            manager.get_user(holder_id) if kind == "user" else manager.get_group(holder_id)
+            manager.get_user(holder_id)
+            if kind == "user"
+            else manager.get_group(holder_id)
         )
 
         if action == "add":
@@ -1310,7 +1366,9 @@ class LuckPermsCommands:
         if kind == "user":
             self._ensure_user(manager, holder_id)
         holder = (
-            manager.get_user(holder_id) if kind == "user" else manager.get_group(holder_id)
+            manager.get_user(holder_id)
+            if kind == "user"
+            else manager.get_group(holder_id)
         )
         if holder is None:
             return f"[lp] 组 '{holder_id}' 不存在"
@@ -1325,7 +1383,9 @@ class LuckPermsCommands:
 
     # ==================== 轨道晋升 ====================
 
-    def _user_track(self, manager: Any, user_id: str, params: List[str], *, up: bool) -> str:
+    def _user_track(
+        self, manager: Any, user_id: str, params: List[str], *, up: bool
+    ) -> str:
         command = "promote" if up else "demote"
         if not params:
             return f"[lp] 用法: lp user {user_id} {command} <轨道>"
@@ -1347,7 +1407,9 @@ class LuckPermsCommands:
 
     def _showtracks(self, manager: Any, holder_id: str, *, kind: str) -> str:
         holder = (
-            manager.get_user(holder_id) if kind == "user" else manager.get_group(holder_id)
+            manager.get_user(holder_id)
+            if kind == "user"
+            else manager.get_group(holder_id)
         )
         if holder is None:
             noun = "用户" if kind == "user" else "组"
@@ -1433,14 +1495,23 @@ class LuckPermsCommands:
         source: str = "check",
     ) -> bool:
         try:
-            result = bool(manager.check(str(user_id), str(node), dict(context) if context else None))
+            result = bool(
+                manager.check(
+                    str(user_id), str(node), dict(context) if context else None
+                )
+            )
         except Exception:
             log.exception("权限检查失败: user=%s node=%s", user_id, node)
             result = False
         if self._verbose.active:
             self._verbose.append(
                 _VerboseRecord(
-                    time.time(), str(user_id), str(node), dict(context or {}), result, source
+                    time.time(),
+                    str(user_id),
+                    str(node),
+                    dict(context or {}),
+                    result,
+                    source,
                 )
             )
         return result
@@ -1456,7 +1527,9 @@ class LuckPermsCommands:
     ) -> bool:
         try:
             result = bool(
-                manager.check_group(str(group_name), str(node), dict(context) if context else None)
+                manager.check_group(
+                    str(group_name), str(node), dict(context) if context else None
+                )
             )
         except Exception:
             log.exception("组权限检查失败: group=%s node=%s", group_name, node)

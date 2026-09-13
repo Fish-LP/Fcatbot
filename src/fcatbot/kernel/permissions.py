@@ -39,6 +39,7 @@ log = logging.getLogger("fcatbot.permissions")
 # 事件翻译协议: 适配器与权限世界之间的桥
 # =====================================================================
 
+
 @runtime_checkable
 class EventTranslator(Protocol):
     """把一个平台事件翻译成权限系统需要的主体与上下文。
@@ -69,6 +70,7 @@ class EventTranslator(Protocol):
 # =====================================================================
 # 后端协议: 一个权限后端必须提供的最小能力
 # =====================================================================
+
 
 class PermissionService(Protocol):
     """权限服务协议。
@@ -103,6 +105,7 @@ class PermissionService(Protocol):
 # 便利基类: 自定义后端只需要实现 has_permission
 # =====================================================================
 
+
 class BasePermissionService:
     """权限服务便利基类。
 
@@ -130,6 +133,7 @@ class BasePermissionService:
 # =====================================================================
 # 内置实现
 # =====================================================================
+
 
 class NullPermissionService(BasePermissionService):
     """全部拒绝。用于显式关闭权限系统的场景。"""
@@ -244,9 +248,7 @@ class LuckPermsAdapter(BasePermissionService):
         if not context:
             return (user_id, node, ())
         # 排序保证不同插入顺序的等价 context 命中同一条目
-        items = tuple(
-            sorted((str(k), repr(v)) for k, v in context.items())
-        )
+        items = tuple(sorted((str(k), repr(v)) for k, v in context.items()))
         return (user_id, node, items)
 
     def _cache_get(self, key: tuple) -> bool | None:
@@ -291,8 +293,7 @@ class LuckPermsAdapter(BasePermissionService):
         if user is None:  # pragma: no cover
             return
         if not any(
-            node.key == "*" and node.value and not node.context
-            for node in user.nodes
+            node.key == "*" and node.value and not node.context for node in user.nodes
         ):
             manager.user_add_node(uid, "*", True, None)
             log.info("luckperms: 已确保控制台用户 '%s' 拥有全部权限（*）", uid)
@@ -376,13 +377,9 @@ class LuckPermsAdapter(BasePermissionService):
             return cached
 
         try:
-            manager = await asyncio.to_thread(
-                lambda: self.manager
-            )
+            manager = await asyncio.to_thread(lambda: self.manager)
             ctx = dict(context) if context else None
-            result = bool(
-                await asyncio.to_thread(manager.check, uid, node_s, ctx)
-            )
+            result = bool(await asyncio.to_thread(manager.check, uid, node_s, ctx))
         except Exception:
             log.exception("luckperms 权限检查失败: user=%s node=%s", uid, node_s)
             # 失败结果不缓存，避免瞬态故障被放大成 TTL 窗口
@@ -517,9 +514,7 @@ class LuckPermsAdapter(BasePermissionService):
         uid = str(user_id)
         async with self._get_write_lock():
             manager = await asyncio.to_thread(lambda: self.manager)
-            await asyncio.to_thread(
-                manager.user_remove_group, uid, str(group_name)
-            )
+            await asyncio.to_thread(manager.user_remove_group, uid, str(group_name))
             self._invalidate_cache()
 
     async def create_user(

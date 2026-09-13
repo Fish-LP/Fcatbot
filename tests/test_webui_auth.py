@@ -1,6 +1,6 @@
 """WebUI 访问凭据: 配置文件密码 + 无密码时随机生成并打印到本地控制台。
 
-覆盖: 
+覆盖:
 
 - ``webui.password`` 缺省 → 随机生成 12 位密码（``WebUI.password_generated``）；
 - 生成的密码经 ``report_access_password()`` 打印到本地可信控制台

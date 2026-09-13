@@ -1,6 +1,6 @@
 """适配器基座层（架构 §2.3 / ADR-0001 / ADR-0003）。
 
-本层提供**适配器插件**（如 OneBot）复用的基座，不包含任何平台协议语义: 
+本层提供**适配器插件**（如 OneBot）复用的基座，不包含任何平台协议语义:
 
 - :mod:`fcatbot.adapter.transports` —— ``Transport`` 协议与内置连接件
   （正向 WebSocket、HTTP 回调）。

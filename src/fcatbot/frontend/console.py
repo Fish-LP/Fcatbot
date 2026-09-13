@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 import logging.handlers
-import sys
 from typing import Callable
 
 from prompt_toolkit import PromptSession
@@ -54,7 +53,7 @@ class ConsoleApp:
         self._prompt = prompt
         self._session = PromptSession(
             completer=CommandCompleter(commands),
-            complete_while_typing=False,   # 只在按 Tab 时补全
+            complete_while_typing=False,  # 只在按 Tab 时补全
         )
         self._running = False
 
@@ -100,9 +99,10 @@ class ConsoleApp:
         # 找到 setup_logging 装的 console StreamHandler
         target = None
         for h in root.handlers:
-            if (
-                type(h) is logging.StreamHandler          # 精确匹配，不误伤子类
-                and not isinstance(h, logging.FileHandler)
+            if type(
+                h
+            ) is logging.StreamHandler and not isinstance(  # 精确匹配，不误伤子类
+                h, logging.FileHandler
             ):
                 target = h
                 break
@@ -110,10 +110,12 @@ class ConsoleApp:
         if target is None:
             # setup_logging 还没跑: 兜底装一个不带颜色的
             handler = _PromptToolkitHandler()
-            handler.setFormatter(logging.Formatter(
-                "[%(asctime)s] %(levelname)-8s %(name)s ➜ %(message)s",
-                datefmt="%H:%M:%S",
-            ))
+            handler.setFormatter(
+                logging.Formatter(
+                    "[%(asctime)s] %(levelname)-8s %(name)s ➜ %(message)s",
+                    datefmt="%H:%M:%S",
+                )
+            )
             setattr(handler, _CONSOLE_HANDLER_TAG, True)
             root.addHandler(handler)
             return
@@ -129,7 +131,8 @@ class ConsoleApp:
         root.removeHandler(target)
         root.addHandler(handler)
 
+
 def console_print(message: str) -> None:
-    from prompt_toolkit import print_formatted_text, ANSI
+    from prompt_toolkit import ANSI, print_formatted_text
 
     print_formatted_text(ANSI(message))

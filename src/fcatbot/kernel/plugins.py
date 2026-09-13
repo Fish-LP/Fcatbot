@@ -414,7 +414,8 @@ class FcatbotPlugin(BasePlugin):
         if translator is None:
             self.log.warning(
                 "事件来源 %r 未注册权限翻译器（期望服务 %r）；本次检查拒绝",
-                event.source, service_name,
+                event.source,
+                service_name,
             )
         return translator
 
@@ -539,9 +540,7 @@ class FcatbotPlugin(BasePlugin):
         """
         return self._services.require(name)
 
-    async def wait_for_service(
-        self, name: str, *, timeout: float | None = None
-    ) -> Any:
+    async def wait_for_service(self, name: str, *, timeout: float | None = None) -> Any:
         """异步等待服务注册。用于无法静态声明依赖的场景。
 
         典型用法：本插件 A 需要插件 B 的服务，但 B 的加载顺序不确定::

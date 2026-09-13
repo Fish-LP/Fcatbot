@@ -1,6 +1,6 @@
 """框架级管理命令。
 
-help 渲染特性: 
+help 渲染特性:
 - 扁平化展开: 子命令独立成行，不再显示 <subcommand> 占位符
 - 分组渲染: 按插件分组，每组有标题和色条
 - 宽度感知: CJK / Emoji 按 wcwidth 计宽，ANSI 码最后注入
@@ -14,7 +14,8 @@ from __future__ import annotations
 import inspect
 import logging
 
-from fcatbot.frontend.term import pad_end, terminal_size, truncate, width as term_width
+from fcatbot.frontend.term import pad_end, terminal_size, truncate
+from fcatbot.frontend.term import width as term_width
 from fcatbot.frontend.theme import Theme
 from fcatbot.kernel.commands import (
     CommandConflict,
@@ -46,6 +47,7 @@ def _build_command_context(event: Event) -> CommandContext:
         group_id=_as_str(metadata.get("group_id")),
         metadata=metadata,
     )
+
 
 # 渲染常量
 _GAP = 2
@@ -169,7 +171,7 @@ class AdminCommands:
         if filter_plugin:
             roots = [r for r in roots if r.plugin == filter_plugin]
         if not roots:
-            return f"[help] 无可用命令"
+            return "[help] 无可用命令"
 
         # 扁平化: 收集所有命令（含子命令），去重
         rows = self._flatten(roots)
@@ -194,18 +196,21 @@ class AdminCommands:
         rule = Theme.dim("─" * columns)
         lines_out: list[str] = [
             rule,
-            " " + Theme.title("帮助")
+            " "
+            + Theme.title("帮助")
             + Theme.dim(f" · 共 {len(rows)} 条 · {p}/{total_pages} 页"),
             rule,
             "",
         ]
         lines_out.extend(pages[p - 1])
-        lines_out.extend([
-            "",
-            rule,
-            Theme.dim(" help <命令> 查看详情 · help <插件> 筛选 · help -p N 翻页"),
-            rule,
-        ])
+        lines_out.extend(
+            [
+                "",
+                rule,
+                Theme.dim(" help <命令> 查看详情 · help <插件> 筛选 · help -p N 翻页"),
+                rule,
+            ]
+        )
         return "\n".join(lines_out)
 
     # ---------- 扁平化 ----------
@@ -220,16 +225,18 @@ class AdminCommands:
             if id(spec) in seen:
                 return
             seen.add(id(spec))
-            rows.append({
-                "spec": spec,
-                "plugin": spec.plugin or "内置",
-                "depth": depth,
-                "usage": spec.usage_text(),
-                "help": spec.help or "",
-                "permission": spec.resolved_permission(),
-                "is_root": depth == 0,
-                "has_subs": bool(spec.subcommands),
-            })
+            rows.append(
+                {
+                    "spec": spec,
+                    "plugin": spec.plugin or "内置",
+                    "depth": depth,
+                    "usage": spec.usage_text(),
+                    "help": spec.help or "",
+                    "permission": spec.resolved_permission(),
+                    "is_root": depth == 0,
+                    "has_subs": bool(spec.subcommands),
+                }
+            )
             for sub in spec.subcommands.values():
                 walk(sub, depth + 1)
 
@@ -271,7 +278,8 @@ class AdminCommands:
         for plugin_name, items in groups.items():
             header = [
                 "",
-                "  " + Theme.plugin(f"▎{plugin_name}")
+                "  "
+                + Theme.plugin(f"▎{plugin_name}")
                 + Theme.dim(f"  {len(items)} 条命令"),
             ]
             # 标题 + 至少一条命令
@@ -298,8 +306,10 @@ class AdminCommands:
         lines: list[str] = [""]
 
         lines.append(
-            "  " + Theme.plugin(f"▎{spec.plugin or '内置'}")
-            + Theme.dim(" / ") + Theme.title(spec.name)
+            "  "
+            + Theme.plugin(f"▎{spec.plugin or '内置'}")
+            + Theme.dim(" / ")
+            + Theme.title(spec.name)
         )
         lines.append("  " + Theme.dim("─" * max(8, columns - 4)))
         lines.append(_detail_row("用法", spec.usage_text(), label_w))
@@ -315,8 +325,10 @@ class AdminCommands:
             for sub in subs:
                 sub_usage = sub.usage_text()
                 lines.append(
-                    "  " + " " * label_w
-                    + Theme.cmd(sub_usage) + "  "
+                    "  "
+                    + " " * label_w
+                    + Theme.cmd(sub_usage)
+                    + "  "
                     + (sub.help or "")
                 )
         return "\n".join(lines)
@@ -330,8 +342,7 @@ class AdminCommands:
 
     def _filter_by_plugin(self, name: str) -> list[CommandSpec]:
         return [
-            r for r in self._registry.all_roots()
-            if name.lower() in r.plugin.lower()
+            r for r in self._registry.all_roots() if name.lower() in r.plugin.lower()
         ]
 
     # ==================== 框架命令 ====================
@@ -360,7 +371,11 @@ class AdminCommands:
         if not targets:
             return "[admin] 无可重载插件"
         results = [await self._reload_one(n) for n in targets]
-        return results[0] if len(targets) == 1 else "[admin] reload all:\n" + "\n".join(results)
+        return (
+            results[0]
+            if len(targets) == 1
+            else "[admin] reload all:\n" + "\n".join(results)
+        )
 
     @console_command("services", help="列出已注册服务")
     def _cmd_services(self, args: list[str]) -> str:
@@ -415,6 +430,7 @@ class AdminCommands:
 
 # ==================== 渲染辅助函数 ====================
 
+
 def _render_item(item: dict, cmd_col: int, columns: int) -> str:
     """渲染单条命令行。权限标签右对齐到行尾。"""
     indent = "  " * (item["depth"] + 1)  # 子命令额外缩进
@@ -444,4 +460,5 @@ def _detail_row(label: str, value: str, label_w: int) -> str:
 
 def _print(msg: str) -> None:
     from fcatbot.frontend.console import console_print
+
     console_print(msg)

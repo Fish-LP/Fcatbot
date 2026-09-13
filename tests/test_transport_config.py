@@ -1,6 +1,6 @@
 """宿主装配: 连接件 / HTTP 客户端的**输入参数**来自 ``config/app.yaml``。
 
-覆盖 ``FcatbotApp._build_transport``  对各配置形态的解析: 
+覆盖 ``FcatbotApp._build_transport``  对各配置形态的解析:
 
 - ``transport.mode: none``（默认）→ 不启用连接件
 - ``transport.mode: forward_ws`` → ``ForwardWebSocketTransport``（url/token/headers/重连/心跳）
@@ -29,6 +29,7 @@ from fcatbot.adapter.transports import (
     HttpTransport,
     Transport,
 )
+
 
 def _make_app(
     tmp_path: Path,
@@ -254,4 +255,3 @@ def test_ws_task_without_transport_returns(tmp_path: Path) -> None:
         await asyncio.wait_for(app._ws_loop(), timeout=1.0)
 
     asyncio.run(scenario())
-

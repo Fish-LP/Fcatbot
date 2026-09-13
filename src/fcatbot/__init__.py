@@ -38,7 +38,7 @@ from fcatbot.kernel.events import (
     Subscription,
 )
 from fcatbot.kernel.integration import IntegrationLayer
-from fcatbot.kernel.loader import PluginLoadError, PluginLoader
+from fcatbot.kernel.loader import PluginLoader, PluginLoadError
 from fcatbot.kernel.permissions import (
     AllowAllPermissionService,
     LuckPermsAdapter,
@@ -60,32 +60,57 @@ setup_logging()
 
 __all__ = [
     # 事件
-    "Event", "EventBus", "on_event",
+    "Event",
+    "EventBus",
+    "on_event",
     # 事件族（M1 内核事件层）
-    "RawEvent", "BotEvent", "MessageEvent", "NoticeEvent",
-    "RequestEvent", "LifecycleEvent",
+    "RawEvent",
+    "BotEvent",
+    "MessageEvent",
+    "NoticeEvent",
+    "RequestEvent",
+    "LifecycleEvent",
     # 事件通道
-    "EventChannel", "Subscription",
+    "EventChannel",
+    "Subscription",
     # 命令
-    "console_command", "CommandRegistry", "CommandSpec", "CommandContext",
-    "accepts_context", "CommandError", "CommandConflict",
+    "console_command",
+    "CommandRegistry",
+    "CommandSpec",
+    "CommandContext",
+    "accepts_context",
+    "CommandError",
+    "CommandConflict",
     # 权限
-    "PermissionService", "NullPermissionService",
-    "AllowAllPermissionService", "LuckPermsAdapter",
+    "PermissionService",
+    "NullPermissionService",
+    "AllowAllPermissionService",
+    "LuckPermsAdapter",
     # 服务
-    "ServiceRegistry", "ServiceInfo", "ServiceError",
-    "ServiceNotFound", "ServiceConflict",
+    "ServiceRegistry",
+    "ServiceInfo",
+    "ServiceError",
+    "ServiceNotFound",
+    "ServiceConflict",
     # 插件基类
     "FcatbotPlugin",
     # 适配器连接件（M4）
-    "Transport", "TransportError", "TransportNotConnected",
-    "ForwardWebSocketTransport", "HttpTransport",
+    "Transport",
+    "TransportError",
+    "TransportNotConnected",
+    "ForwardWebSocketTransport",
+    "HttpTransport",
     # 协议 API 客户端基类（适配器插件用）
-    "APIClient", "ApiRequest",
+    "APIClient",
+    "ApiRequest",
     # 基础设施
-    "AdminCommands", "ConsoleApp", "console_print",
-    "IntegrationLayer", "PluginLoader", "PluginLoadError",
+    "AdminCommands",
+    "ConsoleApp",
+    "console_print",
+    "IntegrationLayer",
+    "PluginLoader",
+    "PluginLoadError",
 ]
 
 __version__ = "4.0.0"
-__api_version__ = '1'
+__api_version__ = "1"

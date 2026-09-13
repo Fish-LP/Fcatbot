@@ -388,9 +388,9 @@ class EventBus:
     """
 
     def __init__(self, *, max_queue: int = 1000, slow_handler_warn: float | None = 0.5):
-        self._queue: asyncio.Queue[tuple[Event, list[Subscription], asyncio.Future | None]] = (
-            asyncio.Queue(maxsize=max_queue)
-        )
+        self._queue: asyncio.Queue[
+            tuple[Event, list[Subscription], asyncio.Future | None]
+        ] = asyncio.Queue(maxsize=max_queue)
         self._subs: list[Subscription] = []
         self._token_map: dict[str, Subscription] = {}
         self._worker: asyncio.Task[None] | None = None

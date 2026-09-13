@@ -11,13 +11,14 @@ import argparse
 import asyncio
 import inspect
 import logging
-import yaml
 import re
 from pathlib import Path
 from typing import Any
 
+import yaml
 from pluginforge import PluginManager
 
+from fcatbot import __api_version__, __version__
 from fcatbot.adapter.transports import (
     ForwardWebSocketTransport,
     HttpTransport,
@@ -27,8 +28,9 @@ from fcatbot.builtin import AdminCommands
 from fcatbot.frontend.console import ConsoleApp
 from fcatbot.frontend.webui import WebUI
 from fcatbot.kernel.commands import CommandRegistry
+
 # Event 同时作为 ``fcatbot.app.Event`` 对外可见（宿主模块沿用旧引用习惯）
-from fcatbot.kernel.events import Event, EventBus
+from fcatbot.kernel.events import EventBus
 from fcatbot.kernel.integration import IntegrationLayer
 from fcatbot.kernel.loader import PluginLoader
 from fcatbot.kernel.permissions import (
@@ -38,7 +40,6 @@ from fcatbot.kernel.permissions import (
     PermissionService,
 )
 from fcatbot.kernel.services import ServiceRegistry
-from fcatbot import __version__, __api_version__
 
 log = logging.getLogger("fcatbot")
 
@@ -51,13 +52,13 @@ DEFAULT_APP_CONFIG: dict[str, Any] = {
         "data_dir": "data",
     },
     "permissions": {
-        "backend": "luckperms",          # allow_all | null | luckperms
+        "backend": "luckperms",  # allow_all | null | luckperms
         "data_dir": "data/permissions",
         "default_group": "default",
         "console_user": "console",
     },
     "transport": {
-        "mode": "forward_ws",                  # none | forward_ws | http
+        "mode": "forward_ws",  # none | forward_ws | http
         "forward_ws": {
             "url": "",
             "token": "",
@@ -78,13 +79,14 @@ DEFAULT_APP_CONFIG: dict[str, Any] = {
         "enabled": True,
         "host": "127.0.0.1",
         "port": 8765,
-        "password": "",                  # 留空 → 启动时随机生成并打到本地控制台
+        "password": "",  # 留空 → 启动时随机生成并打到本地控制台
         "auth_enabled": True,
-        "secret_key": "",                # 留空 → 每次启动随机
+        "secret_key": "",  # 留空 → 每次启动随机
         "session_ttl": 7 * 24 * 3600,
         "cookie_secure": False,
     },
 }
+
 
 def safe_name(name: str, *, max_length: int = 64) -> str:
     # 只允许字母数字下划线连字符，替换其他字符
@@ -121,7 +123,7 @@ class FcatbotApp:
         self._debug = bool(debug)
         if debug:
             logging.getLogger().setLevel(logging.DEBUG)
-        self._ensure_app_config() 
+        self._ensure_app_config()
         self._app_config = self._load_app_config()
         self._plugin_dirs = self._resolve_plugin_dirs(plugin_dirs)
 
@@ -136,9 +138,9 @@ class FcatbotApp:
 
         self._pm = PluginManager(
             str(self._config_path),
-            api_version = __api_version__,
-            app_version = __version__,
-            app_id = 'fcatbot',
+            api_version=__api_version__,
+            app_version=__version__,
+            app_id="fcatbot",
             pre_activate=self._pre_activate,
         )
 
@@ -181,12 +183,12 @@ class FcatbotApp:
         try:
             self._config_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self._config_path, "w", encoding="utf-8") as f:
-                yaml.dump(
-                    DEFAULT_APP_CONFIG, f, allow_unicode=True, sort_keys=False
-                )
+                yaml.dump(DEFAULT_APP_CONFIG, f, allow_unicode=True, sort_keys=False)
             log.info("已生成默认配置文件: %s", self._config_path)
         except Exception:
-            log.exception("生成默认配置文件失败，将使用内置默认值: %s", self._config_path)
+            log.exception(
+                "生成默认配置文件失败，将使用内置默认值: %s", self._config_path
+            )
 
     def _resolve_plugin_dirs(self, plugin_dirs: list[Path] | None) -> list[Path]:
         """插件目录: 显式入参优先，否则读 ``config/app.yaml → plugins.dirs``。
@@ -228,7 +230,7 @@ class FcatbotApp:
     def _build_permissions(self) -> PermissionService:
         """按 ``config/app.yaml`` 的 ``permissions`` 段构建权限后端。
 
-        backend 取值: 
+        backend 取值:
         - ``allow_all``（默认）: 开发模式，全部放行；
         - ``null``: 全部拒绝；
         - ``luckperms``: 接入 luckperms-python（组继承 / 通配符 / 上下文 / 临时权限）。
@@ -265,7 +267,7 @@ class FcatbotApp:
     def _build_transport(self) -> Transport | None:
         """按 ``config/app.yaml`` 的 ``transport`` 段构建连接件（M4）。
 
-        输入参数（``transport.mode`` 选择形态，其余为对应形态的参数）: 
+        输入参数（``transport.mode`` 选择形态，其余为对应形态的参数）:
 
         - ``none``（默认）: 不启用；
         - ``forward_ws``: 正向 WebSocket 客户端，参数见 ``transport.forward_ws``
@@ -323,7 +325,9 @@ class FcatbotApp:
         plugin._services = self._services
         plugin._transport = self._transport
         opts = dict(app_config.get("plugins") or {})
-        plugin._data_dir = Path(opts.get('data_dir', 'data')) / "plugins" / safe_name(plugin.name)
+        plugin._data_dir = (
+            Path(opts.get("data_dir", "data")) / "plugins" / safe_name(plugin.name)
+        )
         plugin._debug = self._debug
         self._services.register_from_plugin(plugin)
         return True
@@ -347,7 +351,7 @@ class FcatbotApp:
     # ==================== 运行时启用 / 停用 ====================
     #
     # 前端（WebUI）与命令统一走这两个入口，**不要**直接调 PluginForge 的
-    # activate_plugin / deactivate_plugin: 
+    # activate_plugin / deactivate_plugin:
     # - pluginforge 只切自己的生命周期与 pluggy 钩子，不碰内核的事件订阅 /
     #   命令注册 / 服务注册（停用后会残留资源）；
     # - 对启动时未加载（未在 plugins.enabled 内 / 后来才发现）的插件，
@@ -439,7 +443,10 @@ class FcatbotApp:
         """
         plugin = self._active_plugin(name)
         if plugin is None:
-            if self._pm.get_plugin(name) is None and name not in self._discovered_plugins:
+            if (
+                self._pm.get_plugin(name) is None
+                and name not in self._discovered_plugins
+            ):
                 return False, f"未发现插件 '{name}'"
             return True, f"插件 {name} 未在运行，无需停用"
 
@@ -584,9 +591,8 @@ class FcatbotApp:
         # 尝试找一个 StreamHandler 作为日志格式模板（不是必须的）
         console_handler: logging.Handler | None = None
         for h in logging.getLogger().handlers:
-            if (
-                isinstance(h, logging.StreamHandler)
-                and not isinstance(h, logging.FileHandler)
+            if isinstance(h, logging.StreamHandler) and not isinstance(
+                h, logging.FileHandler
             ):
                 console_handler = h
                 break
@@ -693,7 +699,7 @@ class FcatbotApp:
         本期仅打通 WS（``transport.mode: forward_ws``）；HTTP 连接件走同一入口，
         M4 适配器插件落地后由插件接管。
 
-        在本协程（``ws_task``）内启停连接件: 
+        在本协程（``ws_task``）内启停连接件:
         - 启动时机晚于 ``integration.start_all()``（此时适配器插件已订阅 ``raw.*``，
           不会丢弃首帧）；
         - 收到停止信号 / 任务被取消时负责 ``stop()``（``_cleanup`` 另有一道幂等兜底）；
@@ -732,15 +738,23 @@ class FcatbotApp:
 
 # ==================== CLI ====================
 
+
 # 除「到哪去找配置文件」外，全部运行参数（webui / transport / api / plugins.dirs）
 # 均来自 config/app.yaml；CLI 不再重复暴露。
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fcatbot", description="Fcatbot CLI")
     parser.add_argument(
-        "-c", "--config", type=Path, default=Path("config/app.yaml"), help="设置框架配置文件路径"
+        "-c",
+        "--config",
+        type=Path,
+        default=Path("config/app.yaml"),
+        help="设置框架配置文件路径",
     )
     parser.add_argument(
-        "-d", "--debug", action="store_true", help="开启调试模式",
+        "-d",
+        "--debug",
+        action="store_true",
+        help="开启调试模式",
     )
     return parser
 

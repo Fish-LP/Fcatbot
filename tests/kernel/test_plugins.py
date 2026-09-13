@@ -11,7 +11,6 @@ from fcatbot.kernel.integration import IntegrationLayer
 from fcatbot.kernel.plugins import FcatbotPlugin
 from fcatbot.kernel.services import ServiceRegistry
 
-
 # ---------------------------------------------------------------------------
 # 测试替身
 # ---------------------------------------------------------------------------
@@ -218,7 +217,9 @@ def test_has_permission_passes_context() -> None:
         layer, bus, _, perms = _build([plugin])
         perms.allowed.add(("42", "probe.use"))
 
-        assert await plugin.has_permission("42", "use", context={"group_id": "9"}) is True
+        assert (
+            await plugin.has_permission("42", "use", context={"group_id": "9"}) is True
+        )
         assert perms.calls[-1] == ("42", "probe.use", {"group_id": "9"})
 
         # 节点已含点: 不再加插件名前缀；无上下文传 None
@@ -252,11 +253,17 @@ def test_has_permission_for_derives_subject_and_context() -> None:
 
         # 适配器覆盖 permission_context → 平台语义上下文
         assert await adapter.has_permission_for(event, "use") is True
-        assert perms.calls[-1] == ("7", "adapter.use", {"contact": "group", "group": "123"})
+        assert perms.calls[-1] == (
+            "7",
+            "adapter.use",
+            {"contact": "group", "group": "123"},
+        )
 
         # extra_context 合并（同键覆盖）
         assert (
-            await adapter.has_permission_for(event, "use", extra_context={"group": "999"})
+            await adapter.has_permission_for(
+                event, "use", extra_context={"group": "999"}
+            )
             is True
         )
         assert perms.calls[-1][2] == {"contact": "group", "group": "999"}

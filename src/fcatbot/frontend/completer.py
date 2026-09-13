@@ -1,6 +1,6 @@
 """基于 CommandRegistry 的 prompt_toolkit 补全器。
 
-用法: 
+用法:
     session = PromptSession(completer=CommandCompleter(registry))
 """
 
@@ -15,7 +15,7 @@ from fcatbot.kernel.commands import CommandRegistry
 class CommandCompleter(Completer):
     """命令补全器。
 
-    补全规则: 
+    补全规则:
     - 输入首词时补全所有顶层命令（含别名）
     - 已输入主命令后，补全其子命令
     - 补全项附带 help 文本作为显示元数据

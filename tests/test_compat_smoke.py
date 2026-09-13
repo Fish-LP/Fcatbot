@@ -1,6 +1,6 @@
 """M1 兼容性冒烟: 真实 IntegrationLayer + @on_event 插件在迁移后的运行。
 
-验证「现有插件不改代码可跑」验收标准的最接近环节: 
+验证「现有插件不改代码可跑」验收标准的最接近环节:
 使用真实的 :class:`fcatbot.kernel.integration.IntegrationLayer`、``@on_event`` 装饰器、
 ``CommandRegistry`` / ``ServiceRegistry``，仅事件总线实现为 M1 新版。
 
@@ -35,7 +35,7 @@ class _EchoStylePlugin:
     async def handle_raw(self, event: Event) -> None:
         data = event.data
         if isinstance(data, str) and data.startswith("!echo "):
-            self.hits.append(data[len("!echo "):])
+            self.hits.append(data[len("!echo ") :])
 
 
 def test_integration_layer_full_lifecycle() -> None:
@@ -44,7 +44,9 @@ def test_integration_layer_full_lifecycle() -> None:
         bus.start()
         commands = CommandRegistry()
         services = ServiceRegistry()
-        integration = IntegrationLayer(None, bus, services, commands)  # pm 仅 attach_all 使用
+        integration = IntegrationLayer(
+            None, bus, services, commands
+        )  # pm 仅 attach_all 使用
 
         plugin = _EchoStylePlugin()
         integration.attach(plugin)

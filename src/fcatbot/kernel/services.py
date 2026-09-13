@@ -1,6 +1,6 @@
 """插件间服务注册表。
 
-设计要点: 
+设计要点:
 - 服务名全局唯一。同名服务重复注册抛 ServiceConflict（可用 force=True 覆盖）。
 - 插件通过类属性 provides 声明自己提供的服务。
 - 消费方通过 require_service(name) 获取服务实例。
@@ -74,7 +74,9 @@ class ServiceRegistry:
         if name in self._services and not force:
             raise ServiceConflict(name, self._services[name].provider)
 
-        info = ServiceInfo(name=name, provider=provider, instance=instance, version=version)
+        info = ServiceInfo(
+            name=name, provider=provider, instance=instance, version=version
+        )
 
         if name in self._services:
             old = self._services[name]
@@ -145,7 +147,7 @@ class ServiceRegistry:
     def register_from_plugin(self, plugin: Any) -> None:
         """读取插件的 provides 类属性，注册所有声明的服务。
 
-        provides 值可以是: 
+        provides 值可以是:
         - None            → 用插件实例自身作为服务
         - "attr_name"     → 用 plugin.attr_name 作为服务
         - SomeType        → 实例化 SomeType 并挂到同名短名属性，再注册
@@ -167,12 +169,14 @@ class ServiceRegistry:
             except ServiceConflict:
                 log.exception(
                     "Service '%s' from plugin '%s' conflicts with existing",
-                    svc_name, plugin.name,
+                    svc_name,
+                    plugin.name,
                 )
             except Exception:
                 log.exception(
                     "Failed to register service '%s' from plugin '%s'",
-                    svc_name, plugin.name,
+                    svc_name,
+                    plugin.name,
                 )
 
     @staticmethod

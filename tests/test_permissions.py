@@ -1,6 +1,6 @@
 """权限服务测试: LuckPermsAdapter 真实接入 + 应用配置装配 + echo 端到端权限链路。
 
-覆盖: 
+覆盖:
 
 - 适配器语义（真实 ``luckperms-python``）: default 组引导、游客继承、组继承与通配符、
   显式拒绝、上下文敏感、临时权限过期、meta/prefix、异常安全；
@@ -103,8 +103,8 @@ def test_adapter_inheritance_wildcard_deny_and_context(tmp_path: Path) -> None:
         m = adapter.manager
         m.create_group("vip", weight=50)
         m.create_group("mod", weight=100)
-        m.group_inherit("mod", "vip")           # mod 继承 vip
-        m.group_add_node("vip", "plugin.*", True)   # 通配符: 全部 plugin 权限
+        m.group_inherit("mod", "vip")  # mod 继承 vip
+        m.group_add_node("vip", "plugin.*", True)  # 通配符: 全部 plugin 权限
         m.group_add_node("mod", "plugin.ban", False)  # 显式拒绝覆盖通配符
         m.create_user("10001", "Alice")
         m.user_add_group("10001", "mod")
@@ -353,7 +353,9 @@ def test_lp_commands_with_luckperms_backend(tmp_path: Path) -> None:
 
         # 10) 轨道与晋升: createtrack → promote × 3（到顶）→ demote
         assert "已创建组 mod" in await run_cmd("lp creategroup mod 100")
-        assert "已创建轨道 stafftrack" in await run_cmd("lp createtrack stafftrack vip mod")
+        assert "已创建轨道 stafftrack" in await run_cmd(
+            "lp createtrack stafftrack vip mod"
+        )
         assert "已晋升到 'vip'" in await run_cmd("lp user 50001 promote stafftrack")
         assert "已晋升到 'mod'" in await run_cmd("lp user 50001 promote stafftrack")
         assert "最高级" in await run_cmd("lp user 50001 promote stafftrack")
@@ -434,7 +436,9 @@ def test_lp_official_and_reference_commands(tmp_path: Path) -> None:
         assert manager.get_group("mod").weight == 100
 
         # group setweight / setdisplayname / create
-        assert "权重已设为 77" in await _run_command(registry, "lp group mod setweight 77")
+        assert "权重已设为 77" in await _run_command(
+            registry, "lp group mod setweight 77"
+        )
         assert "显示名已设为 Mod-2" in await _run_command(
             registry, "lp group mod setdisplayname Mod-2"
         )
@@ -453,11 +457,15 @@ def test_lp_official_and_reference_commands(tmp_path: Path) -> None:
         )
         out = await _run_command(registry, "lp user 70001 permission info")
         assert "echo.use" in out and "temp.node" in out and "临时" in out
-        assert "已清空" in await _run_command(registry, "lp user 70001 permission clear")
+        assert "已清空" in await _run_command(
+            registry, "lp user 70001 permission clear"
+        )
         assert "→ 拒绝" in await _run_command(registry, "lp check 70001 echo.use")
 
         # track clear
-        assert "已清空全部组" in await _run_command(registry, "lp track stafftrack clear")
+        assert "已清空全部组" in await _run_command(
+            registry, "lp track stafftrack clear"
+        )
         assert "(空)" in await _run_command(registry, "lp track stafftrack info")
 
         # root（控制台）: 授予全局 *
@@ -562,9 +570,9 @@ def test_lp_editor_commands(tmp_path: Path) -> None:
             out = await _run_command(registry, "lp editor")
             assert "后台" in out
             await drain()
-            assert any("FAKE123" in message for message in collector.messages), (
-                collector.messages
-            )
+            assert any(
+                "FAKE123" in message for message in collector.messages
+            ), collector.messages
 
             out = await _run_command(registry, "lp applyedits abc123")
             assert "后台" in out
