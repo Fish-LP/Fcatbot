@@ -53,10 +53,8 @@ from fcatbot.kernel.services import (
     ServiceNotFound,
     ServiceRegistry,
 )
+from fcatbot.kernel.stone import PluginConfig, PluginData
 from fcatbot.tools.client import APIClient, ApiRequest
-from fcatbot.utils import setup_logging
-
-setup_logging()
 
 __all__ = [
     # 事件
@@ -110,7 +108,10 @@ __all__ = [
     "IntegrationLayer",
     "PluginLoader",
     "PluginLoadError",
+    # 工具
+    "PluginConfig",
+    "PluginData",
 ]
 
-__version__ = "4.0.0"
+__version__ = "4.1.0"
 __api_version__ = "1"

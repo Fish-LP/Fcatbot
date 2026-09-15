@@ -88,6 +88,40 @@
   查找、启停、重载都以 ``name`` 为准。
 - **运行时启用是全新实例**。每次 ``cls()`` 都重新构造，``init`` 也会重跑，
   不要假设实例字段在停用/启用之间存活。
+
+
+---- 持久化工具 ----
+
+插件不需要自己写 YAML/JSON 读写。两件工具，各管一件事：
+
+* :class:`~src.protocol.data.PluginConfig`
+    —— 用户可编辑的配置（强 schema、禁动态字段、支持版本迁移）。
+    多数情况下**只用它的校验能力**：框架已把 YAML 解析成 dict 通过
+    ``init(app_config, plugin_config)`` 交给你，用
+    ``MyConfig.model_validate(plugin_config or {})`` 变成强类型对象即可，
+    **不要**再 ``bind()`` 到同一份 YAML，否则会出现两份真相。
+
+* :class:`~src.protocol.data.PluginData`
+    —— 运行时状态（声明字段 + 任意动态字段）。绑定到本插件专属目录::
+
+        self.state = (
+            PluginData()
+            .set_backend(JSONBackend())
+            .set_name("state")                # → state.json
+            .bind(self.ensure_data_dir())     # 目录已存在，追加文件名
+        )
+        self.state.tick_count = 0             # 动态字段，随便加
+        self.state.save()                     # 落盘
+
+典型时机::
+
+    init()         → MyConfig.model_validate(plugin_config or {})
+    on_load()      → PluginData().bind(self.ensure_data_dir())
+    on_disable()   → self.state.save()        # 最后能可靠收事件的机会
+    on_unload()    → 最终持久化
+
+注意：``self.data_dir`` **未必存在**；绑定前先 ``self.ensure_data_dir()``，
+否则 ``bind()`` 会把不存在的目录当成文件，生成 ``.../echo.json`` 这种路径。
 """
 
 from __future__ import annotations
@@ -172,7 +206,9 @@ class FcatbotPlugin(BasePlugin):
     # 每次运行时启用都会重跑 init（全新实例），因此可以放心在 init 里做
     # 纯同步的配置解析；异步副作用请放到 on_load / on_enable。
     app_config: dict[str, Any]
-    config: dict[str, Any]
+    config: Any
+    default_config: dict[str, Any]
+    # 如果设置了 `default_config` 而没有 `config_schema` 会自动生成简单的单层模式 `config_schema`
 
     # 目标主机标识：PluginForge 用它区分不同宿主的插件。
     target_application = "fcatbot"
@@ -194,6 +230,11 @@ class FcatbotPlugin(BasePlugin):
     # 这四个钩子可以安全地 await 权限检查 / 服务查询 / 事件发布。
     # 钩子抛异常会被 IntegrationLayer 捕获并记日志，不会中断其他插件。
     # 因此不要依赖"钩子失败会整体回滚"——重要状态收敛请在 on_disable 里做。
+
+    def __init__(self) -> None:
+        super().__init__()
+        if hasattr(self, "default_config") and not hasattr(self, "config_schema"):
+            self.config_schema = {k: type(v) for k, v in self.default_config.items()}
 
     async def on_load(self) -> None:
         """已加载并完成配置注入；此时尚未订阅事件 / 注册命令。

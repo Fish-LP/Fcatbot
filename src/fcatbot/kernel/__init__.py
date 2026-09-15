@@ -13,17 +13,3 @@
 
 依赖规则（ADR-0001）: 内核不依赖 adapter / frontend；跨层共享的抽象在这里定义。
 """
-
-from fcatbot.kernel import entities, events
-
-__all__ = [
-    "commands",
-    "decorators",
-    "entities",
-    "events",
-    "integration",
-    "loader",
-    "permissions",
-    "plugins",
-    "services",
-]
