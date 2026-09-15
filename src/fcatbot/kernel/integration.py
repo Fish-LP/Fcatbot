@@ -7,7 +7,14 @@
 - ``start_all()`` / ``stop_all()``: 应用启动 / 关闭时批量调用（ADR-0007 的过渡实现，
   M3 自研插件内核接管后迁移到 PluginManager/PluginScope）。
 
-单个插件的钩子失败只记日志，不影响其他插件（失败隔离）。
+失败语义与 PluginManager 对齐（per-plugin 隔离 + 失败即中止并回滚）:
+
+- 单插件任一钩子失败 → 该插件加载失败并回滚，不影响其他插件；
+- ``on_load`` 失败 → 不 ``attach``、不跑 ``on_enable``；
+- ``on_enable`` 失败 → ``detach`` 回滚已完成的装配；
+- ``on_disable`` 失败 → 中止拆卸，保留已挂载状态；
+- ``on_unload`` 失败 → 仅记日志（拆卸已执行，无法回滚）；
+- ``start_all`` / ``stop_all`` 收集失败插件名并继续其余插件。
 """
 
 from __future__ import annotations
@@ -80,8 +87,9 @@ class IntegrationLayer:
         """启用单个插件: ``on_load`` → 装配（事件/命令） → ``on_enable``。
 
         与 PluginManager 对齐：任一钩子失败即中止该插件的加载——
-        ``on_load`` 失败不 attach、不跑 ``on_enable``；``on_enable``
-        失败回滚已完成的 attach。失败只记日志，不影响其他插件。
+        ``on_load`` 失败不 ``attach``、不跑 ``on_enable``；``on_enable``
+        失败回滚已完成的 ``attach``。失败只记日志，不影响其他插件
+        （per-plugin 隔离）。
 
         Returns:
             True 表示插件成功启用；False 表示在该插件上中止。
@@ -122,10 +130,13 @@ class IntegrationLayer:
         return True
 
     async def start_all(self) -> list[str]:
-        """异步启用全部活跃插件。返回启用失败的插件名列表。
+        """异步启用全部活跃插件（应用启动装配入口）。
 
         单个插件失败被隔离，不影响其他插件（对齐 PluginManager 的
         per-plugin error 收集语义）。
+
+        Returns:
+            启用失败的插件名列表；全部成功时为空列表。
         """
         failed: list[str] = []
         for plugin in self._pm.get_active_plugins():
@@ -133,27 +144,36 @@ class IntegrationLayer:
                 failed.append(plugin.name)
         if failed:
             log.warning(
-                "start_all: %d plugin(s) failed to enable: %s", len(failed), failed
+                "start_all: %d plugin(s) failed to enable: %s",
+                len(failed),
+                failed,
             )
         return failed
 
     async def stop_all(self) -> list[str]:
+        """异步停用全部活跃插件（关闭/清理入口）。
+
+        Returns:
+            停用失败的插件名列表；全部成功时为空列表。
+        """
         failed: list[str] = []
         for plugin in list(self._pm.get_active_plugins()):
             if not await self.disable(plugin):
                 failed.append(plugin.name)
         if failed:
             log.warning(
-                "stop_all: %d plugin(s) failed to disable: %s", len(failed), failed
+                "stop_all: %d plugin(s) failed to disable: %s",
+                len(failed),
+                failed,
             )
         return failed
 
     async def _run_hook(self, plugin: BasePlugin, hook_name: str) -> bool:
         """调用生命周期钩子，返回是否成功。
 
-        失败只记日志，不抛出（单个插件失败不影响其他插件）。
-        返回值供调用方决定是中止还是继续——与 PluginManager 的
-        ``init_plugin`` / ``activate_plugin`` 返回 bool 的约定一致。
+        失败只记日志，不抛出（单个插件失败不影响其他插件）。返回值供
+        调用方决定是中止还是继续——与 PluginManager 的 ``init_plugin`` /
+        ``activate_plugin`` 返回 bool 的约定一致。
         """
         hook = getattr(plugin, hook_name, None)
         if hook is None:
