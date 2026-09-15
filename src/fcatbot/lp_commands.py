@@ -54,6 +54,15 @@
 
 - 组临时权限（``group permission settemp``）由 ``Node(expiry=...)`` 直写实现（库无 duration 参数）；
 - 任意键 ``meta set/unset`` 未实现（库仅识别 prefix/suffix/displayname/weight 元数据）。
+
+接口说明（与 ``控制台命令的注册与分发`` 对齐）:
+
+- 顶层命令用 ``@console_command(name, ...)`` 声明，得到 ``CommandNode``；
+- 子命令通过父 ``CommandNode`` 的 ``.sub_command(...)`` 挂载（推荐），
+  或在扫描期用字符串 ``parent="lp"`` 声明（兼容，见文件 2 的 ``scan_plugin_commands``）；
+- 处理器声明 ``context: CommandContext | None`` 形参以获得来源感知；
+- 异步处理器（如 ``cmd_editor`` / ``cmd_applyedits``）直接声明 ``async def``，分发器按
+  ``Awaitable`` 调度（见文件 2 的 ``dispatch_command``）。
 """
 
 from __future__ import annotations
@@ -216,7 +225,7 @@ def _normalize_ctx(context: Dict[str, str]) -> Dict[str, List[str]]:
 
 
 def _match_verbose_filter(expr: str, user_id: str, node: str) -> bool:
-    """Verbose 过滤器子集: ``!term`` 取反；``|`` 分隔为“或”；term 按节点/用户前缀匹配。"""
+    """Verbose 过滤器子集: ``!term`` 取反；``|`` 分隔为"或"；term 按节点/用户前缀匹配。"""
     for term in expr.split("|"):
         term = term.strip()
         if not term:
@@ -451,6 +460,9 @@ class LuckPermsCommands:
 
     处理器声明 ``context: CommandContext | None`` 形参以获得来源感知
     （``me`` 解析、``lp root`` 控制台限定、聊天来源动作级门禁）。
+
+    子命令通过 :meth:`CommandNode.sub_command` 挂载到 ``cmd_lp`` 描述符上；
+    注册表由 :func:`scan_plugin_commands` 递归展开。
     """
 
     def __init__(self, app: Any) -> None:
@@ -459,7 +471,7 @@ class LuckPermsCommands:
         self._webeditor_session: Any = None
         self._tasks: set[asyncio.Task] = set()
 
-    # ==================== 顶层入口 ====================
+    # ==================== 顶层入口（根节点） ====================
 
     @console_command(
         "lp",
@@ -471,11 +483,10 @@ class LuckPermsCommands:
     def cmd_lp(self, args: List[str], context: Optional[CommandContext] = None) -> str:
         return self._lp_help()
 
-    # ==================== 通用命令 ====================
+    # ==================== 通用命令（子命令） ====================
 
-    @console_command(
+    @cmd_lp.sub_command(
         "info",
-        parent="lp",
         help="显示统计信息",
         usage="lp info",
         permission=LP_INFO,
@@ -488,9 +499,8 @@ class LuckPermsCommands:
             return self._backend_hint()
         return _PlainFormatter.info(manager)
 
-    @console_command(
+    @cmd_lp.sub_command(
         "sync",
-        parent="lp",
         help="保存数据到磁盘",
         usage="lp sync",
         permission=LP_SYNC,
@@ -504,9 +514,8 @@ class LuckPermsCommands:
         manager.save_all()
         return "[lp] 数据已同步到磁盘"
 
-    @console_command(
+    @cmd_lp.sub_command(
         "check",
-        parent="lp",
         help="检查用户权限",
         usage="lp check <用户|me> <节点> [key=value ...]",
         permission=LP_CHECK,
@@ -528,9 +537,8 @@ class LuckPermsCommands:
         result = self._check_with_verbose(manager, uid, args[1], ctx)
         return _PlainFormatter.check(uid, args[1], ctx, result)
 
-    @console_command(
+    @cmd_lp.sub_command(
         "verbose",
-        parent="lp",
         help="Verbose 调试记录",
         usage="lp verbose [on|record|off|upload] [filter|me]",
         permission=LP_VERBOSE,
@@ -575,9 +583,8 @@ class LuckPermsCommands:
 
         return "[lp] 用法: lp verbose [on|record|off|upload] [filter|me]"
 
-    @console_command(
+    @cmd_lp.sub_command(
         "tree",
-        parent="lp",
         help="查看继承树",
         usage="lp tree <用户|组> [depth]",
         permission=LP_TREE,
@@ -600,9 +607,8 @@ class LuckPermsCommands:
             return self._backend_hint()
         return _PlainFormatter.tree(holder, manager, depth)
 
-    @console_command(
+    @cmd_lp.sub_command(
         "root",
-        parent="lp",
         help="设置根管理员（仅控制台）",
         usage="lp root <用户ID>",
         permission=LP_ENTRY,
@@ -635,9 +641,8 @@ class LuckPermsCommands:
             "  提示: 该命令仅控制台可用；根管理员无法通过聊天把 * 授予他人"
         )
 
-    @console_command(
+    @cmd_lp.sub_command(
         "editor",
-        parent="lp",
         help="打开 Web Editor 会话（后台执行）",
         usage="lp editor [type] [filter]",
         permission=LP_EDITOR,
@@ -666,9 +671,8 @@ class LuckPermsCommands:
             "[lp] 在浏览器中编辑并 Save 后，在控制台执行 lp applyedits <code> 应用更改"
         )
 
-    @console_command(
+    @cmd_lp.sub_command(
         "applyedits",
-        parent="lp",
         help="应用 Web Editor 更改（后台执行）",
         usage="lp applyedits <code>",
         permission=LP_APPLYEDITS,
@@ -693,11 +697,10 @@ class LuckPermsCommands:
             return
         log.info("[lp] 已应用 edits: %s", code)
 
-    # ==================== 组 / 轨道管理（顶层） ====================
+    # ==================== 组 / 轨道管理（顶层子命令） ====================
 
-    @console_command(
+    @cmd_lp.sub_command(
         "creategroup",
-        parent="lp",
         help="创建组",
         usage="lp creategroup <名称> [权重] [显示名]",
         permission=LP_CREATEGROUP,
@@ -709,9 +712,8 @@ class LuckPermsCommands:
             return "[lp] 用法: lp creategroup <名称> [权重] [显示名]"
         return self._create_group(args[0], args[1:])
 
-    @console_command(
+    @cmd_lp.sub_command(
         "deletegroup",
-        parent="lp",
         help="删除组",
         usage="lp deletegroup <名称>",
         permission=LP_DELETEGROUP,
@@ -730,9 +732,8 @@ class LuckPermsCommands:
         manager.delete_group(name)
         return f"[lp] 已删除组 {name}（引用已清理）"
 
-    @console_command(
+    @cmd_lp.sub_command(
         "listgroups",
-        parent="lp",
         help="列出全部组",
         usage="lp listgroups",
         permission=LP_LISTGROUPS,
@@ -755,9 +756,8 @@ class LuckPermsCommands:
             )
         return "\n".join(lines)
 
-    @console_command(
+    @cmd_lp.sub_command(
         "createtrack",
-        parent="lp",
         help="创建晋升轨道",
         usage="lp createtrack <名称> [组...]",
         permission=LP_CREATETRACK,
@@ -769,9 +769,8 @@ class LuckPermsCommands:
             return "[lp] 用法: lp createtrack <名称> [组...]"
         return self._create_track(args[0], args[1:])
 
-    @console_command(
+    @cmd_lp.sub_command(
         "deletetrack",
-        parent="lp",
         help="删除轨道",
         usage="lp deletetrack <名称>",
         permission=LP_DELETETRACK,
@@ -790,9 +789,8 @@ class LuckPermsCommands:
         manager.delete_track(name)
         return f"[lp] 已删除轨道 {name}"
 
-    @console_command(
+    @cmd_lp.sub_command(
         "listtracks",
-        parent="lp",
         help="列出全部轨道",
         usage="lp listtracks",
         permission=LP_LISTTRACKS,
@@ -813,9 +811,8 @@ class LuckPermsCommands:
 
     # ==================== 用户 ====================
 
-    @console_command(
+    @cmd_lp.sub_command(
         "user",
-        parent="lp",
         help="用户管理",
         usage="lp user <用户|me> <info|permission|parent|meta|promote|demote|showtracks> ...",
         permission=LP_USER,
@@ -860,9 +857,8 @@ class LuckPermsCommands:
 
     # ==================== 组 ====================
 
-    @console_command(
+    @cmd_lp.sub_command(
         "group",
-        parent="lp",
         help="组管理",
         usage="lp group <组> <info|permission|parent|meta|setweight|setdisplayname|showtracks|create> ...",
         permission=LP_GROUP,
@@ -911,9 +907,8 @@ class LuckPermsCommands:
 
     # ==================== 轨道 ====================
 
-    @console_command(
+    @cmd_lp.sub_command(
         "track",
-        parent="lp",
         help="轨道管理",
         usage="lp track <轨道> <info|append|insert|remove|clear|create> ...",
         permission=LP_TRACK,

@@ -6,11 +6,30 @@
 - 命令权限自动派生为 {plugin}:command.{name}
 - Tab 补全从注册表动态生成
 
-插件声明示例:
+声明示例::
+
     class WeatherPlugin(FcatbotPlugin):
-        @console_command("weather", help="查天气", permission="weather.query")
-        async def cmd_weather(self, args):
-            ...
+
+        @console_command("weather", help="查天气")
+        def cmd_weather(self, args): ...
+
+        @cmd_weather.sub_command("query", help="查询", usage="weather query <city>")
+        def cmd_query(self, args): ...
+
+        @cmd_weather.sub_command("set", aliases=["config"])   # 名字从方法名推导
+        def set_city(self, args): ...
+
+父级声明的两种方式:
+
+- **推荐**: ``@parent.sub_command(...)`` —— 声明期即 ``_attach``，重名冲突在类定义阶段抛错；
+- **兼容**: ``@console_command(..., parent="lp")`` —— 声明期父节点可能尚未定义，
+  由 :func:`scan_plugin_commands` 在扫描期按名字解析并补 ``_attach``。
+
+分发约定:
+
+- 处理器可同步或异步（``CommandHandler`` 已声明 ``Awaitable``）；
+- 声明 ``context`` 形参的处理器由分发器注入 :class:`CommandContext`（见 :func:`accepts_context`）；
+- 命令级门禁走 ``spec.resolved_permission()``，动作级门禁由处理器内部自行校验。
 """
 
 from __future__ import annotations
@@ -18,11 +37,10 @@ from __future__ import annotations
 import inspect
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Mapping
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Mapping
 
 log = logging.getLogger("fcatbot.commands")
 
-# 处理器形态: ``(args)`` 或 ``(args, context)``（声明 ``context`` 形参时接收上下文）
 CommandHandler = Callable[..., Any | Awaitable[Any]]
 
 
@@ -39,17 +57,7 @@ class CommandConflict(CommandError):
 
 @dataclass(frozen=True)
 class CommandContext:
-    """命令执行上下文（过渡桥）。
-
-    在 M3 的 ``CommandSender`` 落地前，为命令处理器提供**来源感知**能力:
-
-    - ``source``: 命令来源（``console`` / 未来的 ``chat``、``web`` 等）；
-    - ``user_id`` / ``group_id``: 来源身份（聊天适配器在事件 ``metadata`` 中提供）；
-    - ``metadata``: 原始事件元数据（供扩展字段使用）。
-
-    约定: 处理器通过声明 ``context`` 形参选择性接收（见 :func:`accepts_context`）；
-    未提供上下文（``None``）视为**本地控制台**（兼容直接调用与测试）。
-    """
+    """命令执行上下文（过渡桥）。"""
 
     source: str = "console"
     user_id: str | None = None
@@ -58,7 +66,6 @@ class CommandContext:
 
     @property
     def is_console(self) -> bool:
-        """是否来自本地控制台。"""
         return self.source == "console"
 
 
@@ -73,12 +80,7 @@ def accepts_context(handler: Any) -> bool:
 
 @dataclass
 class CommandSpec:
-    """单个命令的元数据。
-
-    权限节点命名规则（参考 Mirai）:
-    - 显式指定 permission 时用它
-    - 否则自动派生为 {plugin}:command.{name}
-    """
+    """单个命令的运行时元数据（供 CommandRegistry 使用）。"""
 
     name: str
     help: str = ""
@@ -91,7 +93,6 @@ class CommandSpec:
     subcommands: dict[str, "CommandSpec"] = field(default_factory=dict)
 
     def resolved_permission(self) -> str:
-        """返回最终权限节点。"""
         if self.permission:
             return self.permission
         if self.plugin and self.plugin != "__framework__":
@@ -99,7 +100,6 @@ class CommandSpec:
         return f"console:command.{self.name}"
 
     def full_name(self) -> str:
-        """返回从根到当前节点的完整命令路径，如 'weather query'。"""
         parts: list[str] = [self.name]
         p = self.parent
         while p is not None:
@@ -116,59 +116,153 @@ class CommandSpec:
         return self.plugin or "framework"
 
 
-def console_command(
-    name: str | None = None,
-    *,
-    help: str = "",
-    usage: str = "",
-    aliases: list[str] | None = None,
-    permission: str = "",
-    parent: str = "",
-):
-    """声明一个控制台命令。
+# ---------- 声明期 API ----------
 
-    Args:
-        name: 命令名。为 None 时从函数名推导（去掉 cmd_ 前缀）。
-        help: 一句话说明。
-        usage: 完整用法，如 "weather <city>"。
-        aliases: 别名列表。
-        permission: 权限节点。为空时自动派生为 {plugin}:command.{name}。
-        parent: 父命令名，用于声明子命令。空表示顶层命令。
+
+def _derive_name(func_name: str) -> str:
+    if func_name.startswith("cmd_"):
+        return func_name[4:]
+    if func_name.startswith("_"):
+        return func_name[1:]
+    return func_name
+
+
+class CommandNode:
+    """命令声明节点（描述符 + 子命令挂载点）。
+
+    作为**描述符**：类访问返回自身（保留元数据），实例访问返回绑定方法，
+    这样注册表拿到的永远是可直接调用的协程。
+
+    作为**挂载点**：``node.sub_command`` 在类定义阶段就把子节点挂上，
+    避免运行时再做"父名 → 子 spec"的字符串解析。
+
+    ``parent`` 字段支持两种取值：
+
+    - ``CommandNode | None``：由 ``sub_command`` 声明期注入；
+    - ``str``：老式 ``parent="lp"`` 写法，由 :func:`scan_plugin_commands` 扫描期解析。
     """
 
-    def decorator(func):
-        cmd_name = name
-        if cmd_name is None:
-            cmd_name = func.__name__
-            if cmd_name.startswith("cmd_"):
-                cmd_name = cmd_name[4:]
-            elif cmd_name.startswith("_"):
-                cmd_name = cmd_name[1:]
+    __slots__ = (
+        "func",
+        "name",
+        "help",
+        "usage",
+        "aliases",
+        "permission",
+        "parent",
+        "subcommands",
+        "_children",
+        "_attr_name",
+    )
 
-        func.__console_command__ = {
-            "name": cmd_name,
-            "help": help,
-            "usage": usage,
-            "aliases": list(aliases or []),
-            "permission": permission,
-            "parent": parent,
-        }
-        return func
+    def __init__(
+        self,
+        func: Callable[..., Any],
+        *,
+        name: str | None = None,
+        help: str = "",
+        usage: str = "",
+        aliases: list[str] | None = None,
+        permission: str = "",
+        parent: "CommandNode | str | None" = None,
+    ) -> None:
+        self.func = func
+        self.name = name or _derive_name(getattr(func, "__name__", "cmd"))
+        self.help = help
+        self.usage = usage
+        self.aliases = list(aliases or [])
+        self.permission = permission
+        self.parent: "CommandNode | str | None" = parent
+        self.subcommands: dict[str, CommandNode] = {}
+        self._children: list[CommandNode] = []
+        self._attr_name: str | None = None
 
-    return decorator
+    # ---- 描述符协议 ----
+    def __set_name__(self, owner: type, name: str) -> None:
+        self._attr_name = name
+
+    def __get__(self, instance: Any, owner: type | None = None) -> Any:
+        if instance is None:
+            return self
+        return self.func.__get__(instance, owner)
+
+    if TYPE_CHECKING:
+
+        def __call__(self, *args, **kwargs):
+            return self.func(*args, **kwargs)
+
+    # ---- 子命令声明 ----
+    def sub_command(self, func=None, **kwargs):
+        """声明子命令。支持三种形态::
+
+        @parent.sub_command                       # 无参
+        def child(self, args): ...
+
+        @parent.sub_command("child", aliases=["c"])   # 位置名
+        @parent.sub_command(name="child", ...)        # 关键字名
+        """
+
+        def deco(f):
+            child = CommandNode(f, parent=self, **kwargs)
+            self._attach(child)
+            return child
+
+        if callable(func):
+            return deco(func)
+        if func is not None:
+            kwargs["name"] = func
+        return deco
+
+    def _attach(self, child: "CommandNode") -> None:
+        if child.name in self.subcommands:
+            raise CommandConflict(child.name, "<subcommand>")
+        for alias in child.aliases:
+            if alias in self.subcommands:
+                raise CommandConflict(alias, "<subcommand>")
+        self._children.append(child)
+        self.subcommands[child.name] = child
+        for alias in child.aliases:
+            self.subcommands[alias] = child
+
+    # ---- 便捷 ----
+    def full_name(self) -> str:
+        parts = [self.name]
+        p = self.parent
+        while p is not None and not isinstance(p, str):
+            parts.append(p.name)
+            p = p.parent
+        if isinstance(p, str):
+            parts.append(p)
+        return " ".join(reversed(parts))
+
+
+def console_command(func=None, *, name: str | None = None, **kwargs):
+    """把一个方法声明为控制台命令。"""
+
+    if callable(func):
+        return CommandNode(func, name=name, **kwargs)
+    if func is not None:
+        name = func
+
+    def deco(f):
+        return CommandNode(f, name=name, **kwargs)
+
+    return deco
+
+
+# ---------- 注册表 ----------
 
 
 class CommandRegistry:
     """命令注册表。支持层级结构（子命令）和别名。"""
 
     def __init__(self) -> None:
-        self._roots: dict[str, CommandSpec] = {}  # 主名 → spec
-        self._aliases: dict[str, CommandSpec] = {}  # 别名 → spec
-        self._by_plugin: dict[str, set[str]] = {}  # 插件 → 根命令名集合
+        self._roots: dict[str, CommandSpec] = {}
+        self._aliases: dict[str, CommandSpec] = {}
+        self._by_plugin: dict[str, set[str]] = {}
 
     # ---------- 注册 ----------
     def register(self, spec: CommandSpec) -> None:
-        """注册一个顶层命令及其子命令树。"""
         if spec.name in self._roots:
             existing = self._roots[spec.name]
             raise CommandConflict(spec.name, existing.plugin or "framework")
@@ -185,7 +279,6 @@ class CommandRegistry:
         self._by_plugin.setdefault(spec.plugin, set()).add(spec.name)
 
     def register_subcommand(self, parent: CommandSpec, spec: CommandSpec) -> None:
-        """注册子命令到已存在的父命令。"""
         spec.parent = parent
         if spec.name in parent.subcommands:
             raise CommandConflict(
@@ -210,13 +303,6 @@ class CommandRegistry:
 
     # ---------- 查询 ----------
     def find(self, tokens: list[str]) -> tuple[CommandSpec | None, list[str]]:
-        """按 tokens 查找命令。
-
-        Returns:
-            (匹配到的 spec, 剩余参数)。
-            未匹配返回 (None, tokens)。
-            匹配到中间节点（有子命令但 tokens 已用尽）返回 (spec, [])。
-        """
         if not tokens:
             return None, []
 
@@ -226,7 +312,6 @@ class CommandRegistry:
             return None, tokens
 
         idx = 1
-        # 逐层匹配子命令
         while idx < len(tokens):
             next_key = tokens[idx]
             child = spec.subcommands.get(next_key)
@@ -241,12 +326,10 @@ class CommandRegistry:
         return sorted(self._roots.values(), key=lambda s: (s.plugin, s.name))
 
     def complete(self, prefix: str) -> list[str]:
-        """返回匹配 prefix 的命令名（含别名和子命令路径）。"""
         prefix = prefix.strip()
         results: list[str] = []
 
         if not prefix or " " not in prefix:
-            # 补全顶层命令
             for name in self._roots:
                 if name.startswith(prefix):
                     results.append(name)
@@ -255,7 +338,6 @@ class CommandRegistry:
                     results.append(alias)
             return sorted(results)
 
-        # 补全子命令: "weather q" → 找 weather 的子命令以 q 开头的
         parts = prefix.split()
         head = parts[0]
         spec = self._roots.get(head) or self._aliases.get(head)
@@ -278,51 +360,132 @@ class CommandRegistry:
 
 
 def scan_plugin_commands(plugin: Any, plugin_name: str) -> list[CommandSpec]:
-    """扫描实例上所有 @console_command 方法，返回顶层 spec 列表。
+    """扫描实例上的所有 ``CommandNode``，转换为顶层 ``CommandSpec`` 树。
 
-    子命令（parent 非空）先暂存，待父命令注册后挂载。
+    支持两种父级声明：
+
+    - ``@parent.sub_command(...)`` —— 声明期已 ``_attach``，这里直接复用；
+    - ``@console_command(..., parent="lp")`` —— 声明期父节点可能尚未定义，
+      这里在扫描期按名字解析并补 ``_attach``（向后兼容）。
     """
+    # 1) 收集全部节点
+    nodes: dict[int, CommandNode] = {}
+    for attr_name in dir(type(plugin)):
+        attr = getattr(type(plugin), attr_name, None)
+        if isinstance(attr, CommandNode):
+            nodes[id(attr)] = attr
+
+    # 2) 字符串父级 → 节点引用（向后兼容）
+    by_name: dict[str, CommandNode] = {}
+    for node in nodes.values():
+        by_name.setdefault(node.name, node)
+    for node in nodes.values():
+        parent_ref = node.parent
+        if not isinstance(parent_ref, str):
+            continue
+        parent = by_name.get(parent_ref)
+        if parent is None:
+            raise CommandError(f"Command '{node.name}': unknown parent '{parent_ref}'")
+        node.parent = parent
+        if node not in parent._children:
+            parent._attach(node)
+
+    # 3) 展开根节点
     top_level: list[CommandSpec] = []
-    children: list[tuple[str, CommandSpec]] = []
+    seen: set[int] = set()
 
     for attr_name in dir(type(plugin)):
         attr = getattr(type(plugin), attr_name, None)
-        if attr is None:
+        if not isinstance(attr, CommandNode):
             continue
-        marker = getattr(attr, "__console_command__", None)
-        if marker is None:
+        if attr.parent is not None:
+            continue  # 非根节点，由父节点递归处理
+        if id(attr) in seen:
             continue
+        seen.add(id(attr))
+        top_level.append(_node_to_spec(attr, plugin, plugin_name))
 
-        bound = getattr(plugin, attr_name)
-        spec = CommandSpec(
-            name=marker["name"],
-            help=marker["help"],
-            usage=marker["usage"],
-            aliases=list(marker["aliases"]),
-            plugin=plugin_name,
-            handler=bound,
-            permission=marker["permission"],
-        )
-        if marker["parent"]:
-            children.append((marker["parent"], spec))
-        else:
-            top_level.append(spec)
-
-    # 挂载子命令
-    by_name = {s.name: s for s in top_level}
-    for parent_name, child in children:
-        parent = by_name.get(parent_name)
-        if parent is None:
-            log.error(
-                "Subcommand '%s' of plugin '%s' has unknown parent '%s'",
-                child.name,
-                plugin_name,
-                parent_name,
-            )
-            continue
-        child.parent = parent
-        parent.subcommands[child.name] = child
-        for alias in child.aliases:
-            parent.subcommands[alias] = child
-
+    top_level.sort(key=lambda s: s.name)
     return top_level
+
+
+def _node_to_spec(node: CommandNode, plugin: Any, plugin_name: str) -> CommandSpec:
+    attr_name = node._attr_name or node.name
+    bound = getattr(plugin, attr_name)
+    spec = CommandSpec(
+        name=node.name,
+        help=node.help,
+        usage=node.usage,
+        aliases=list(node.aliases),
+        plugin=plugin_name,
+        handler=bound,
+        permission=node.permission,
+    )
+    for child in node._children:
+        child_spec = _node_to_spec(child, plugin, plugin_name)
+        child_spec.parent = spec
+        spec.subcommands[child_spec.name] = child_spec
+        for alias in child_spec.aliases:
+            spec.subcommands[alias] = child_spec
+    return spec
+
+
+# ---------- 分发 ----------
+
+
+async def dispatch_command(
+    registry: CommandRegistry,
+    tokens: list[str],
+    *,
+    context: CommandContext,
+    is_allowed: Callable[[CommandContext, str], bool],
+) -> str | None:
+    """解析、鉴权、调度一条命令。返回 None 表示未命中。
+
+    - **命令级门禁**走 ``spec.resolved_permission()``；控制台放行由 ``is_allowed`` 决定；
+    - **动作级门禁**（如 ``luckperms.user.permission.set``）由处理器内部 ``_authorize`` 负责；
+    - 处理器同步返回透传；协程（如 ``cmd_editor`` / ``cmd_applyedits``）在这里被 await。
+    """
+    spec, args = registry.find(tokens)
+    if spec is None:
+        return None
+
+    node = spec.resolved_permission()
+    if not is_allowed(context, node):
+        return f"[命令] 权限不足: 需要 {node}"
+
+    handler = spec.handler
+    if handler is None:
+        return f"[命令] {spec.full_name()} 未绑定处理器"
+
+    if accepts_context(handler):
+        result = handler(args, context=context)
+    else:
+        result = handler(args)
+
+    if inspect.isawaitable(result):
+        result = await result
+    return result
+
+
+def make_is_allowed(manager_provider: Callable[[], Any | None]):
+    """构造 :func:`dispatch_command` 的 ``is_allowed`` 回调。
+
+    控制台来源一律放行（本地操作员语义）；聊天来源按 ``manager.check`` 校验节点。
+    """
+
+    def is_allowed(context: CommandContext, node: str) -> bool:
+        if context.is_console:
+            return True
+        if not context.user_id:
+            return False
+        manager = manager_provider()
+        if manager is None:
+            return False
+        try:
+            return bool(manager.check(str(context.user_id), node, None))
+        except Exception:
+            log.exception("授权检查失败: executor=%s node=%s", context.user_id, node)
+            return False
+
+    return is_allowed
