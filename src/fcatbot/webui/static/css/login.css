@@ -1,0 +1,134 @@
+/* =========================================================
+   Fcatbot 控制台 · 登录页样式
+   依赖 base.css 中定义的主题变量
+   ========================================================= */
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-card {
+  width: 340px;
+  padding: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-2);
+  position: relative;
+  overflow: hidden;
+}
+
+.login-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+}
+
+.login-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 22px 22px 18px;
+}
+
+.login-body {
+  padding: 0 22px 22px;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.field-input {
+  width: 100%;
+  padding: 9px 11px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent);
+  outline: none;
+  transition: border-color .12s ease, background-color .12s ease;
+}
+
+.field-input:focus {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.field-input.error {
+  border-color: var(--danger);
+  border-left-color: var(--danger);
+}
+
+.submit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px 15px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: .4px;
+  color: var(--accent-fg);
+  background: var(--accent);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color .12s ease, opacity .12s ease;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.submit-btn:active:not(:disabled) {
+  background: var(--accent);
+  opacity: .9;
+}
+
+.submit-btn:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
+.submit-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.msg {
+  margin-top: 12px;
+  min-height: 16px;
+  font-size: 11.5px;
+  letter-spacing: .2px;
+  color: var(--danger);
+  text-align: center;
+}
+
+.msg.info {
+  color: var(--text-2);
+}
+
+.footnote {
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 10.5px;
+  color: var(--text-3);
+  text-align: center;
+  letter-spacing: .2px;
+}

@@ -21,6 +21,7 @@
   GET  /api/auth/status               查询当前登录状态
   GET  /static/*                      静态资源
   GET  /api/plugins                   插件列表
+  POST /api/plugins/rescan            重扫描插件目录
   POST /api/plugins/{name}/toggle     切换启用状态
   GET  /api/plugins/{name}/config     读取 YAML
   PUT  /api/plugins/{name}/config     保存 YAML
@@ -51,7 +52,7 @@ if sys.platform == "win32":
 
 log = logging.getLogger("fcatbot.webui")
 
-STATIC_DIR = Path(__file__).parent / "webui_static"
+STATIC_DIR = Path(__file__).parent / "static"
 
 # 自动生成访问密码: 12 位，字符集剔除易混淆字符（O/o/l/I）
 _GENERATED_PASSWORD_LENGTH = 12
@@ -66,227 +67,54 @@ _LOGIN_MAX_ATTEMPTS = 10
 _LOGIN_WINDOW_SECONDS = 60
 
 
-# ==================== 登录页（内联，无需额外静态资源） ====================
+# ==================== 路由表 ====================
+# 格式: (method, path, handler_method_name)
+# - path 支持 aiohttp 原生 ``{name}`` 路径参数（会被传给 handler 的 match_info）。
+# - handler_method_name 必须是 WebUI 实例上的方法名。
+# - 新增 / 调整接口，只改这一个表。
+_ROUTES: tuple[tuple[str, str, str], ...] = (
+    ("GET", "/", "_serve_index"),
+    ("GET", "/login", "_serve_login"),
+    ("POST", "/api/login", "_api_login"),
+    ("POST", "/api/logout", "_api_logout"),
+    ("GET", "/api/auth/status", "_api_auth_status"),
+    ("GET", "/api/plugins", "_api_plugins"),
+    ("POST", "/api/plugins/rescan", "_api_rescan"),
+    ("POST", "/api/plugins/{name}/toggle", "_api_toggle"),
+    ("GET", "/api/plugins/{name}/config", "_api_get_config"),
+    ("PUT", "/api/plugins/{name}/config", "_api_put_config"),
+    ("POST", "/api/plugins/{name}/reload", "_api_reload"),
+    ("GET", "/api/commands", "_api_commands"),
+    ("GET", "/api/console", "_ws_console"),
+)
 
-LOGIN_PAGE_HTML = """<!DOCTYPE html>
-<html lang="zh">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fcatbot 控制台 · 登录</title>
-<script>
-(function () {
-  try {
-    var t = localStorage.getItem('fcatbot.theme');
-    if (t !== 'light' && t !== 'dark') {
-      t = (window.matchMedia &&
-        window.matchMedia('(prefers-color-scheme: light)').matches)
-        ? 'light' : 'dark';
-    }
-    document.documentElement.setAttribute('data-theme', t);
-  } catch (e) {
-    document.documentElement.setAttribute('data-theme', 'dark');
-  }
-})();
-</script>
-<style>
-  :root, :root[data-theme="dark"] {
-    color-scheme: dark;
-    --bg: #141418; --surface: #1b1b21; --surface-2: #22222a;
-    --hover: #282830; --line: #33333d; --line-soft: #26262d;
-    --line-strong: #3d3d49;
-    --text: #e9e9ef; --text-2: #9d9dab; --text-3: #6a6a78;
-    --accent: #7d99ff; --accent-hover: #93aaff; --accent-fg: #12121a;
-    --accent-soft: rgba(125,153,255,.14);
-    --accent-line: rgba(125,153,255,.55);
-    --danger: #ff6b62; --danger-line: rgba(255,107,98,.35);
-    --shadow-2: 0 12px 32px rgba(0,0,0,.5);
-    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-      "Liberation Mono", monospace;
-  }
-  :root[data-theme="light"] {
-    color-scheme: light;
-    --bg: #f5f6f9; --surface: #ffffff; --surface-2: #f0f1f5;
-    --hover: #eceef3; --line: #dcdee6; --line-soft: #e9eaf0;
-    --line-strong: #c7c9d4;
-    --text: #1a1a21; --text-2: #5a5a6a; --text-3: #8a8a99;
-    --accent: #3f63e0; --accent-hover: #3355cc; --accent-fg: #ffffff;
-    --accent-soft: rgba(63,99,224,.10);
-    --accent-line: rgba(63,99,224,.45);
-    --danger: #cf3a30; --danger-line: rgba(207,58,48,.30);
-    --shadow-2: 0 12px 32px rgba(0,0,0,.22);
-    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-      "Liberation Mono", monospace;
-  }
-  * { box-sizing: border-box; border-radius: 0; }
-  html, body { height: 100%; margin: 0; }
-  body {
-    display: flex; align-items: center; justify-content: center;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-      "Microsoft YaHei", system-ui, sans-serif;
-    font-size: 13px; color: var(--text); background: var(--bg);
-    -webkit-font-smoothing: antialiased;
-  }
-  .login-card {
-    width: 340px; padding: 0;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    box-shadow: var(--shadow-2);
-    position: relative;
-    overflow: hidden;
-  }
-  .login-card::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0;
-    height: 2px; background: var(--accent);
-  }
-  .login-head {
-    display: flex; align-items: center; gap: 11px;
-    padding: 22px 22px 18px;
-  }
-  .brand-mark {
-    width: 26px; height: 26px; flex-shrink: 0;
-    display: grid; place-items: center;
-    background: var(--accent);
-    clip-path: polygon(0 0, 100% 0, 100% 68%, 68% 100%, 0 100%);
-    color: var(--accent-fg);
-    font-size: 11px; font-weight: 800; letter-spacing: -.5px;
-    padding-bottom: 1px;
-  }
-  .brand-name { font-size: 13px; font-weight: 600; letter-spacing: .4px; line-height: 1.3; }
-  .brand-meta { font-size: 10.5px; letter-spacing: .9px;
-    text-transform: uppercase; color: var(--text-3); line-height: 1.3; }
-  .login-body { padding: 0 22px 22px; }
-  .field-label {
-    display: block; margin-bottom: 7px;
-    font-size: 10px; font-weight: 600; letter-spacing: 1.4px;
-    text-transform: uppercase; color: var(--text-3);
-  }
-  .field-input {
-    width: 100%; padding: 9px 11px;
-    font: inherit; font-size: 13px;
-    color: var(--text); background: var(--bg);
-    border: 1px solid var(--line);
-    border-left: 2px solid var(--accent);
-    outline: none;
-    transition: border-color .12s ease, background-color .12s ease;
-  }
-  .field-input:focus {
-    border-color: var(--accent);
-    background: var(--surface-2);
-  }
-  .field-input.error {
-    border-color: var(--danger);
-    border-left-color: var(--danger);
-  }
-  .submit-btn {
-    display: flex; align-items: center; justify-content: center;
-    width: 100%; margin-top: 14px; padding: 10px 15px;
-    font: inherit; font-size: 12.5px; font-weight: 600;
-    letter-spacing: .4px;
-    color: var(--accent-fg); background: var(--accent);
-    border: 1px solid transparent; cursor: pointer;
-    transition: background-color .12s ease, opacity .12s ease;
-  }
-  .submit-btn:hover:not(:disabled) { background: var(--accent-hover); }
-  .submit-btn:active:not(:disabled) { background: var(--accent); opacity: .9; }
-  .submit-btn:disabled { opacity: .4; cursor: not-allowed; }
-  .submit-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .msg {
-    margin-top: 12px; min-height: 16px;
-    font-size: 11.5px; letter-spacing: .2px;
-    color: var(--danger); text-align: center;
-  }
-  .msg.info { color: var(--text-2); }
-  .footnote {
-    margin-top: 6px; padding-top: 14px;
-    border-top: 1px solid var(--line-soft);
-    font-size: 10.5px; color: var(--text-3); text-align: center;
-    letter-spacing: .2px;
-  }
-</style>
-</head>
-<body>
-  <form class="login-card" id="login-form" autocomplete="on">
-    <div class="login-head">
-      <div class="brand-mark">F</div>
-      <div>
-        <div class="brand-name">FCATBOT</div>
-        <div class="brand-meta">Console · Login</div>
-      </div>
-    </div>
-    <div class="login-body">
-      <label class="field-label" for="password">访问密码</label>
-      <input class="field-input" type="password" id="password"
-             placeholder="请输入访问密码" autocomplete="current-password"
-             spellcheck="false" autofocus>
-      <button class="submit-btn" type="submit" id="submit-btn">登 录</button>
-      <div class="msg" id="msg"></div>
-      <div class="footnote">Fcatbot 控制台 · 仅限授权用户</div>
-    </div>
-  </form>
 
-<script>
-(function () {
-  'use strict';
-  var form = document.getElementById('login-form');
-  var input = document.getElementById('password');
-  var btn = document.getElementById('submit-btn');
-  var msg = document.getElementById('msg');
-
-  function setMsg(text, isError) {
-    msg.textContent = text || '';
-    msg.classList.toggle('info', !isError && !!text);
-  }
-
-  form.addEventListener('submit', async function (e) {
-    e.preventDefault();
-    var pwd = input.value;
-    if (!pwd) {
-      input.classList.add('error');
-      setMsg('请输入密码', true);
-      input.focus();
-      return;
-    }
-    input.classList.remove('error');
-    btn.disabled = true;
-    setMsg('正在验证…', false);
-
-    try {
-      var res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: pwd }),
-      });
-      var data = {};
-      try { data = await res.json(); } catch (_) {}
-      if (res.ok && data.ok) {
-        setMsg('登录成功，正在跳转…', false);
-        var next = new URLSearchParams(location.search).get('next') || '/';
-        location.replace(next);
-      } else {
-        input.classList.add('error');
-        setMsg(data.message || '密码错误', true);
-        btn.disabled = false;
-        input.select();
-      }
-    } catch (err) {
-      input.classList.add('error');
-      setMsg('请求失败: ' + (err.message || err), true);
-      btn.disabled = false;
-    }
-  });
-
-  input.addEventListener('input', function () {
-    if (input.classList.contains('error') && input.value) {
-      input.classList.remove('error');
-      setMsg('', false);
-    }
-  });
-})();
-</script>
-</body>
-</html>
-"""
+# ==================== 未登录放行路径 ====================
+# 每条模式支持三种写法:
+#   1) "re:..."         → 直接作为正则编译（"re:" 之后的部分）
+#   2) 含 * / ** / {x}  → 通配符展开
+#        *   单段内匹配（不含 /）
+#        **  跨段匹配（含 /）
+#        {x} 与 * 等价，仅作可读性占位
+#   3) 其它             → 精确匹配
+#
+# 说明: 登录页外链 CSS 后，浏览器请求 /static/css/*.css 时尚未携带有效 Cookie，
+# 若仍走鉴权，会被重定向回 /login?next=/static/... → 死循环。
+# 因此登录页依赖的最小样式集必须放行。用通配符一条覆盖所有 CSS，
+# 后续新增样式文件无需再改这里。
+_PUBLIC_PATTERNS: tuple[str, ...] = (
+    "/login",
+    "/api/login",
+    "/api/auth/status",
+    # 登录页依赖的样式: static/css/*.css
+    "/static/css/*.css",
+    # 若以后需要放行登录页依赖的 JS，取消下面这行的注释即可:
+    # "/static/js/login*.js",
+    # 示例: 放行整目录
+    # "/static/login/**",
+    # 示例: 需要精细约束时用正则
+    # r"re:^/static/(?:css|js)/login[-_.\w]*\.(?:css|js)$",
+)
 
 
 class WebUI:
@@ -348,6 +176,54 @@ class WebUI:
         # -------- 登录限速（per-remote） --------
         # remote_ip -> [失败时间戳, ...]，滑动窗口，惰性清理
         self._login_attempts: dict[str, list[float]] = {}
+
+        # -------- 预编译公开路径匹配器 --------
+        self._public_matchers: tuple[re.Pattern[str], ...] = tuple(
+            self._compile_path_matcher(p) for p in _PUBLIC_PATTERNS
+        )
+
+    # ==================== 路径模式编译 ====================
+
+    @staticmethod
+    def _compile_path_matcher(pattern: str) -> re.Pattern[str]:
+        """把路径模式编译为正则。
+
+        - ``re:`` 前缀       → 直接按正则编译剩余部分
+        - ``**``             → 跨段通配（含 ``/``）
+        - ``*``              → 单段内通配（不含 ``/``）
+        - ``{x}``            → 单段匹配，与 ``*`` 等价
+        - 其它字符           → 原样转义（精确匹配）
+        """
+        if pattern.startswith("re:"):
+            return re.compile(pattern[3:])
+
+        parts: list[str] = []
+        i, n = 0, len(pattern)
+        while i < n:
+            ch = pattern[i]
+            if ch == "*":
+                if i + 1 < n and pattern[i + 1] == "*":
+                    parts.append(".*")
+                    i += 2
+                else:
+                    parts.append("[^/]*")
+                    i += 1
+            elif ch == "{":
+                end = pattern.find("}", i)
+                if end == -1:
+                    parts.append(re.escape(ch))
+                    i += 1
+                else:
+                    parts.append("[^/]+")
+                    i = end + 1
+            else:
+                parts.append(re.escape(ch))
+                i += 1
+        return re.compile("^" + "".join(parts) + "$")
+
+    def _is_public_path(self, path: str) -> bool:
+        """路径是否命中未登录放行集合。"""
+        return any(m.match(path) for m in self._public_matchers)
 
     # ==================== 访问凭据 ====================
 
@@ -424,19 +300,13 @@ class WebUI:
             return await self._dispatch_with_auth(request, handler)
 
         web_app = web.Application(middlewares=[auth_middleware])
-        web_app.router.add_get("/", self._serve_index)
-        web_app.router.add_get("/login", self._serve_login)
-        web_app.router.add_post("/api/login", self._api_login)
-        web_app.router.add_post("/api/logout", self._api_logout)
-        web_app.router.add_get("/api/auth/status", self._api_auth_status)
+
+        # ---- 从声明表批量注册普通路由 ----
+        for method, pattern, handler_name in _ROUTES:
+            web_app.router.add_route(method, pattern, getattr(self, handler_name))
+
+        # ---- 静态资源（static/css/*.css 等） ----
         web_app.router.add_static("/static", STATIC_DIR, name="static")
-        web_app.router.add_get("/api/plugins", self._api_plugins)
-        web_app.router.add_post("/api/plugins/{name}/toggle", self._api_toggle)
-        web_app.router.add_get("/api/plugins/{name}/config", self._api_get_config)
-        web_app.router.add_put("/api/plugins/{name}/config", self._api_put_config)
-        web_app.router.add_post("/api/plugins/{name}/reload", self._api_reload)
-        web_app.router.add_get("/api/commands", self._api_commands)
-        web_app.router.add_get("/api/console", self._ws_console)
 
         self._runner = web.AppRunner(web_app)
         await self._runner.setup()
@@ -557,17 +427,13 @@ class WebUI:
         if not self._auth_enabled:
             return await handler(request)
 
-        # 认证始终启用（未配置密码时见 __init__ 的随机生成）
         path = request.path
 
-        # 登录页与登录接口永远开放
-        if path == "/login":
-            if self._is_authed(request):
+        # 公开路径：登录页、登录接口、auth 状态查询、登录页依赖的静态资源……
+        if self._is_public_path(path):
+            # 已登录再访问 /login → 直接回首页
+            if path == "/login" and self._is_authed(request):
                 raise web.HTTPFound("/")
-            return await handler(request)
-        if path == "/api/login":
-            return await handler(request)
-        if path == "/api/auth/status":
             return await handler(request)
 
         # 其余全部需要登录
@@ -583,13 +449,8 @@ class WebUI:
 
     # ---------- 认证相关路由 ----------
 
-    async def _serve_login(self, request: web.Request) -> web.Response:
-        return web.Response(
-            text=LOGIN_PAGE_HTML,
-            content_type="text/html",
-            charset="utf-8",
-            headers={"Cache-Control": "no-store"},
-        )
+    async def _serve_login(self, request: web.Request) -> web.FileResponse:
+        return web.FileResponse(STATIC_DIR / "login.html")
 
     async def _api_login(self, request: web.Request) -> web.Response:
         if not self._auth_enabled:
@@ -747,8 +608,8 @@ class WebUI:
                     "name": name,
                     "version": getattr(meta, "version", "-") if meta else "-",
                     "description": getattr(meta, "description", "") if meta else "",
-                    "activated": name in active,
-                    "enabled": name in enabled,
+                    "activated": name in active,  # 运行中实例
+                    "enabled": name in enabled,  # app.yaml 白名单
                     "has_config": (self._config_dir / f"{name}.yaml").exists(),
                     "error": errors.get(name, ""),
                     "dependencies": deps,
@@ -757,6 +618,87 @@ class WebUI:
             )
 
         return web.json_response({"plugins": plugins_data})
+
+    # ---------- 重扫描宿主接口的探测 ----------
+    def _resolve_rescan_callable(self):
+        """只查宿主 FcatbotApp 上的重扫描方法。
+
+        刻意不 fallback 到 PluginManager：
+          - discover_plugins() / rediscover() 会连带激活插件，
+            不符合「先发现、用户再决定」的语义
+          - 且 PluginManager 不允许改动，不依赖其内部实现
+        找不到 → 返回 None → 接口 501，不做任何猜测。
+        """
+        for attr in ("rescan_plugins", "scan_plugins"):
+            fn = getattr(self._app, attr, None)
+            if callable(fn):
+                return fn
+        return None
+
+    async def _api_rescan(self, request: web.Request) -> web.Response:
+        """重新扫描插件目录，动态加载新增/移除插件。
+
+        - 只重扫「已发现插件」列表，不做任何 enable/disable 副作用；
+          实际启用仍走 /toggle。
+        - 前后做 diff，把新增/移除结果返回给前端。
+        - 扫描成功后会清掉已消失插件的忽略标记，避免残留脏状态。
+        """
+        rescan = self._resolve_rescan_callable()
+        if rescan is None:
+            return web.json_response(
+                {
+                    "ok": False,
+                    "message": (
+                        "宿主未提供插件扫描接口。"
+                        "请在 FcatbotApp / PluginManager 上暴露 "
+                        "rescan_plugins() / scan_plugins() / discover_plugins() 之一。"
+                    ),
+                },
+                status=501,
+            )
+
+        # 记录扫描前的插件集合（读一次快照，避免边扫边变）
+        before = set(self._app.discovered_plugins.keys())
+
+        try:
+            result = rescan()
+            if inspect.isawaitable(result):
+                result = await result
+        except Exception as exc:
+            log.exception("重扫描插件失败")
+            return web.json_response(
+                {"ok": False, "message": f"重扫描失败: {exc}"},
+                status=500,
+            )
+
+        # 重新读取（扫描可能替换了字典对象）
+        after = set(self._app.discovered_plugins.keys())
+        added = sorted(after - before)
+        removed = sorted(before - after)
+
+        # 消失的插件：清掉它的忽略标记 & 历史错误缓存
+        for name in removed:
+            self._dismissed_errors.discard(name)
+
+        if added and removed:
+            msg = f"重扫描完成：新增 {len(added)} 个（{', '.join(added)}），移除 {len(removed)} 个（{', '.join(removed)}）"
+        elif added:
+            msg = f"重扫描完成：新增 {len(added)} 个（{', '.join(added)}）"
+        elif removed:
+            msg = f"重扫描完成：移除 {len(removed)} 个（{', '.join(removed)}）"
+        else:
+            msg = "重扫描完成：未发现变化"
+
+        log.info("WebUI 重扫描插件 -> %s", msg)
+        return web.json_response(
+            {
+                "ok": True,
+                "message": msg,
+                "added": added,
+                "removed": removed,
+                "total": len(after),
+            }
+        )
 
     async def _api_toggle(self, request: web.Request) -> web.Response:
         name = request.match_info["name"]

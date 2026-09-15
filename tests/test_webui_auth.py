@@ -20,7 +20,7 @@ import pytest
 import yaml
 
 from fcatbot import app as host_app
-from fcatbot.frontend.webui import _PASSWORD_ALPHABET, WebUI
+from fcatbot.webui.server import _PASSWORD_ALPHABET, WebUI
 
 
 class _StubApp:

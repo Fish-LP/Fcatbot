@@ -18,8 +18,8 @@ from pathlib import Path
 import yaml
 
 from fcatbot import app as host_app
-from fcatbot.frontend.webui import WebUI
 from fcatbot.kernel.events import Event
+from fcatbot.webui.server import WebUI
 
 ALPHA_SOURCE = """
 from fcatbot import FcatbotPlugin, console_command, on_event

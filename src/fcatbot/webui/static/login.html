@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fcatbot 控制台 · 登录</title>
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('fcatbot.theme');
+    if (t !== 'light' && t !== 'dark') {
+      t = (window.matchMedia &&
+        window.matchMedia('(prefers-color-scheme: light)').matches)
+        ? 'light' : 'dark';
+    }
+    document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+})();
+</script>
+<style>
+  :root, :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #141418; --surface: #1b1b21; --surface-2: #22222a;
+    --hover: #282830; --line: #33333d; --line-soft: #26262d;
+    --line-strong: #3d3d49;
+    --text: #e9e9ef; --text-2: #9d9dab; --text-3: #6a6a78;
+    --accent: #7d99ff; --accent-hover: #93aaff; --accent-fg: #12121a;
+    --accent-soft: rgba(125,153,255,.14);
+    --accent-line: rgba(125,153,255,.55);
+    --danger: #ff6b62; --danger-line: rgba(255,107,98,.35);
+    --shadow-2: 0 12px 32px rgba(0,0,0,.5);
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+      "Liberation Mono", monospace;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f5f6f9; --surface: #ffffff; --surface-2: #f0f1f5;
+    --hover: #eceef3; --line: #dcdee6; --line-soft: #e9eaf0;
+    --line-strong: #c7c9d4;
+    --text: #1a1a21; --text-2: #5a5a6a; --text-3: #8a8a99;
+    --accent: #3f63e0; --accent-hover: #3355cc; --accent-fg: #ffffff;
+    --accent-soft: rgba(63,99,224,.10);
+    --accent-line: rgba(63,99,224,.45);
+    --danger: #cf3a30; --danger-line: rgba(207,58,48,.30);
+    --shadow-2: 0 12px 32px rgba(0,0,0,.22);
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+      "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; border-radius: 0; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+      "Microsoft YaHei", system-ui, sans-serif;
+    font-size: 13px; color: var(--text); background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  .login-card {
+    width: 340px; padding: 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-2);
+    position: relative;
+    overflow: hidden;
+  }
+  .login-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 2px; background: var(--accent);
+  }
+  .login-head {
+    display: flex; align-items: center; gap: 11px;
+    padding: 22px 22px 18px;
+  }
+  .brand-mark {
+    width: 26px; height: 26px; flex-shrink: 0;
+    display: grid; place-items: center;
+    background: var(--accent);
+    clip-path: polygon(0 0, 100% 0, 100% 68%, 68% 100%, 0 100%);
+    color: var(--accent-fg);
+    font-size: 11px; font-weight: 800; letter-spacing: -.5px;
+    padding-bottom: 1px;
+  }
+  .brand-name { font-size: 13px; font-weight: 600; letter-spacing: .4px; line-height: 1.3; }
+  .brand-meta { font-size: 10.5px; letter-spacing: .9px;
+    text-transform: uppercase; color: var(--text-3); line-height: 1.3; }
+  .login-body { padding: 0 22px 22px; }
+  .field-label {
+    display: block; margin-bottom: 7px;
+    font-size: 10px; font-weight: 600; letter-spacing: 1.4px;
+    text-transform: uppercase; color: var(--text-3);
+  }
+  .field-input {
+    width: 100%; padding: 9px 11px;
+    font: inherit; font-size: 13px;
+    color: var(--text); background: var(--bg);
+    border: 1px solid var(--line);
+    border-left: 2px solid var(--accent);
+    outline: none;
+    transition: border-color .12s ease, background-color .12s ease;
+  }
+  .field-input:focus {
+    border-color: var(--accent);
+    background: var(--surface-2);
+  }
+  .field-input.error {
+    border-color: var(--danger);
+    border-left-color: var(--danger);
+  }
+  .submit-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; margin-top: 14px; padding: 10px 15px;
+    font: inherit; font-size: 12.5px; font-weight: 600;
+    letter-spacing: .4px;
+    color: var(--accent-fg); background: var(--accent);
+    border: 1px solid transparent; cursor: pointer;
+    transition: background-color .12s ease, opacity .12s ease;
+  }
+  .submit-btn:hover:not(:disabled) { background: var(--accent-hover); }
+  .submit-btn:active:not(:disabled) { background: var(--accent); opacity: .9; }
+  .submit-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .submit-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .msg {
+    margin-top: 12px; min-height: 16px;
+    font-size: 11.5px; letter-spacing: .2px;
+    color: var(--danger); text-align: center;
+  }
+  .msg.info { color: var(--text-2); }
+  .footnote {
+    margin-top: 6px; padding-top: 14px;
+    border-top: 1px solid var(--line-soft);
+    font-size: 10.5px; color: var(--text-3); text-align: center;
+    letter-spacing: .2px;
+  }
+</style>
+</head>
+<body>
+  <form class="login-card" id="login-form" autocomplete="on">
+    <div class="login-head">
+      <div class="brand-mark">F</div>
+      <div>
+        <div class="brand-name">FCATBOT</div>
+        <div class="brand-meta">Console · Login</div>
+      </div>
+    </div>
+    <div class="login-body">
+      <label class="field-label" for="password">访问密码</label>
+      <input class="field-input" type="password" id="password"
+             placeholder="请输入访问密码" autocomplete="current-password"
+             spellcheck="false" autofocus>
+      <button class="submit-btn" type="submit" id="submit-btn">登 录</button>
+      <div class="msg" id="msg"></div>
+      <div class="footnote">Fcatbot 控制台 · 仅限授权用户</div>
+    </div>
+  </form>
+
+<script>
+(function () {
+  'use strict';
+
+  var form = document.getElementById('login-form');
+  var input = document.getElementById('password');
+  var btn = document.getElementById('submit-btn');
+  var msg = document.getElementById('msg');
+
+  var BTN_TEXT = btn.textContent;
+  var redirectTimer = null;
+
+  function setMsg(text, isError) {
+    msg.textContent = text || '';
+    msg.classList.toggle('info', !isError && !!text);
+  }
+
+  function setLoading(on) {
+    btn.disabled = !!on;
+    btn.textContent = on ? '验证中…' : BTN_TEXT;
+  }
+
+  /**
+   * 校验 next 参数，只允许同源相对路径，防止开放重定向。
+   * 拒绝：
+   *   - 空 / 非字符串
+   *   - 以 "//" 或 "/\" 开头（协议相对 / 反斜杠绕过）
+   *   - 绝对 URL（http://、javascript:、data: 等）
+   *   - 解析后 origin 与当前站点不一致
+   */
+  function safeNext(raw) {
+    if (!raw || typeof raw !== 'string') return '/';
+    // 必须以单个 '/' 开头，且第二个字符不能是 '/' 或 '\'
+    if (raw.charAt(0) !== '/' || raw.charAt(1) === '/' || raw.charAt(1) === '\\') {
+      return '/';
+    }
+    try {
+      var u = new URL(raw, location.origin);
+      if (u.origin !== location.origin) return '/';
+      return u.pathname + u.search + u.hash;
+    } catch (_) {
+      return '/';
+    }
+  }
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    var pwd = input.value;
+    if (!pwd) {
+      input.classList.add('error');
+      setMsg('请输入密码', true);
+      input.focus();
+      return;
+    }
+
+    input.classList.remove('error');
+    setLoading(true);
+    setMsg('正在验证…', false);
+
+    try {
+      var res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pwd }),
+      });
+
+      var data = {};
+      try { data = await res.json(); } catch (_) { }
+
+      if (res.ok && data.ok) {
+        setMsg('登录成功，正在跳转…', false);
+
+        var next = safeNext(new URLSearchParams(location.search).get('next'));
+
+        // 兜底：若 2 秒后仍未跳转（CSP / 扩展拦截等），恢复按钮
+        redirectTimer = setTimeout(function () {
+          setLoading(false);
+          setMsg('跳转被拦截，请手动访问 ' + next, true);
+        }, 2000);
+
+        location.replace(next);
+        return;
+      }
+
+      // 区分"密码错误"与"服务端响应异常"
+      if (!res.ok) {
+        input.classList.add('error');
+        setMsg(data.message || '密码错误', true);
+        input.select();
+      } else {
+        input.classList.add('error');
+        setMsg(data.message || '服务端响应异常，请稍后重试', true);
+        input.select();
+      }
+
+      setLoading(false);
+    } catch (err) {
+      input.classList.add('error');
+      setMsg('请求失败: ' + (err && err.message ? err.message : err), true);
+      setLoading(false);
+    }
+  });
+
+  input.addEventListener('input', function () {
+    if (input.classList.contains('error') && input.value) {
+      input.classList.remove('error');
+      setMsg('', false);
+    }
+  });
+
+  // 页面卸载时清掉兜底计时器，避免无意义触发
+  window.addEventListener('pagehide', function () {
+    if (redirectTimer) {
+      clearTimeout(redirectTimer);
+      redirectTimer = null;
+    }
+  });
+})();
+</script>
+</body>
+</html>

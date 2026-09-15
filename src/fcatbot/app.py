@@ -26,7 +26,6 @@ from fcatbot.adapter.transports import (
 )
 from fcatbot.builtin import AdminCommands
 from fcatbot.frontend.console import ConsoleApp
-from fcatbot.frontend.webui import WebUI
 from fcatbot.kernel.commands import CommandRegistry
 
 # Event 同时作为 ``fcatbot.app.Event`` 对外可见（宿主模块沿用旧引用习惯）
@@ -40,6 +39,8 @@ from fcatbot.kernel.permissions import (
     PermissionService,
 )
 from fcatbot.kernel.services import ServiceRegistry
+from fcatbot.utils import LogConfig, setup_logging
+from fcatbot.webui.server import WebUI
 
 log = logging.getLogger("fcatbot")
 
@@ -170,6 +171,33 @@ class FcatbotApp:
         except Exception:
             log.exception("读取配置失败，使用内置默认值: %s", self._config_path)
             return {}
+
+    def rescan_plugins(self) -> dict[str, list[str]]:
+        """重新扫描插件目录，只刷新 discovered 缓存，不激活任何插件。
+
+        与启动装配保持同一套发现机制：都是 PluginLoader.discover()。
+        与 PluginManager.rediscover() / discover_plugins() 的区别：
+        - 那两个走 entry points，与本宿主使用的目录扫描不是一回事
+        - 且会连带激活/停用插件，不符合「先发现、用户再决定」的语义
+        """
+        before = set(self._discovered_plugins.keys())
+
+        plugin_classes = self._loader.discover()
+        self._discovered_plugins = {
+            cls.name: cls for cls in plugin_classes if getattr(cls, "name", None)
+        }
+
+        # 新发现的插件也要落一份默认配置，与 run() 里的做法一致
+        try:
+            self._ensure_plugin_configs(plugin_classes)
+        except Exception:
+            log.exception("重扫描后生成默认配置失败")
+
+        after = set(self._discovered_plugins.keys())
+        return {
+            "added": sorted(after - before),
+            "removed": sorted(before - after),
+        }
 
     def _ensure_app_config(self) -> None:
         """配置文件缺失时落一份带默认值的 ``config/app.yaml``。
@@ -608,6 +636,7 @@ class FcatbotApp:
                 session_ttl=self._webui_config["session_ttl"],
                 cookie_secure=self._webui_config["cookie_secure"],
                 log_handler=console_handler,
+                access_log_level=logging.DEBUG if self._debug else logging.WARN,
             )
             # 在 WebUI 启动**前**打印（可能自动生成的）访问密码到本地可信控制台。
             # 必须走 console_print 直写终端而非 logging: WebUI 的日志处理器会把
@@ -763,6 +792,9 @@ def main() -> None:
 
     parser = _build_parser()
     args = parser.parse_args()
+    setup_logging(
+        LogConfig(console_level=logging.DEBUG if args.debug else logging.INFO)
+    )
 
     app = FcatbotApp(args.config, debug=args.debug)
     try:

@@ -1,0 +1,201 @@
+/* =========================================================
+   Fcatbot 控制台 · 共享基础样式
+   包含：主题变量 / 全局重置 / 滚动条 / 品牌标识 / kbd
+   ========================================================= */
+
+/* ---------------------------------------------------------
+   主题变量
+   --------------------------------------------------------- */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #141418;
+  --surface: #1b1b21;
+  --surface-2: #22222a;
+  --hover: #282830;
+  --line: #33333d;
+  --line-soft: #26262d;
+  --line-strong: #3d3d49;
+
+  --text: #e9e9ef;
+  --text-2: #9d9dab;
+  --text-3: #6a6a78;
+
+  --accent: #7d99ff;
+  --accent-hover: #93aaff;
+  --accent-active: #6b8bf5;
+  --accent-fg: #12121a;
+  --accent-soft: rgba(125, 153, 255, .14);
+  --accent-line: rgba(125, 153, 255, .55);
+  --accent-glow: rgba(125, 153, 255, .85);
+
+  --danger: #ff6b62;
+  --danger-line: rgba(255, 107, 98, .35);
+  --warning: #e8b06a;
+  --success: #6cc98a;
+
+  --scrollbar: #35353f;
+  --scrollbar-hover: #474753;
+
+  --grid-line: rgba(255, 255, 255, .022);
+  --selection: rgba(125, 153, 255, .22);
+  --highlight: rgba(125, 153, 255, .32);
+
+  --prompt: #4ec9b0;
+  --editor-fg: #cfd6dc;
+  --activeline: rgba(255, 255, 255, .022);
+
+  --shadow-1: 0 4px 16px rgba(0, 0, 0, .28);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, .5);
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+    Consolas, "Liberation Mono", monospace;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #f5f6f9;
+  --surface: #ffffff;
+  --surface-2: #f0f1f5;
+  --hover: #eceef3;
+  --line: #dcdee6;
+  --line-soft: #e9eaf0;
+  --line-strong: #c7c9d4;
+
+  --text: #1a1a21;
+  --text-2: #5a5a6a;
+  --text-3: #8a8a99;
+
+  --accent: #3f63e0;
+  --accent-hover: #3355cc;
+  --accent-active: #2b49b4;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(63, 99, 224, .10);
+  --accent-line: rgba(63, 99, 224, .45);
+  --accent-glow: rgba(63, 99, 224, .45);
+
+  --danger: #cf3a30;
+  --danger-line: rgba(207, 58, 48, .30);
+  --warning: #a9701c;
+  --success: #2e8b57;
+
+  --scrollbar: #c9cbd6;
+  --scrollbar-hover: #b0b2c0;
+
+  --grid-line: rgba(0, 0, 0, .028);
+  --selection: rgba(63, 99, 224, .16);
+  --highlight: rgba(63, 99, 224, .22);
+
+  --prompt: #0d8a73;
+  --editor-fg: #2b2b38;
+  --activeline: rgba(0, 0, 0, .022);
+
+  --shadow-1: 0 4px 16px rgba(0, 0, 0, .10);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, .22);
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+    Consolas, "Liberation Mono", monospace;
+}
+
+/* ---------------------------------------------------------
+   全局重置
+   --------------------------------------------------------- */
+* {
+  box-sizing: border-box;
+  border-radius: 0;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Microsoft YaHei", system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---------------------------------------------------------
+   滚动条
+   --------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-hover);
+  background-clip: content-box;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+
+/* ---------------------------------------------------------
+   品牌标识
+   --------------------------------------------------------- */
+.brand-mark {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  clip-path: polygon(0 0, 100% 0, 100% 68%, 68% 100%, 0 100%);
+  color: var(--accent-fg);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: -.5px;
+  padding-bottom: 1px;
+  transition: background-color .18s ease, color .18s ease;
+}
+
+.brand-name {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .4px;
+  line-height: 1.3;
+}
+
+.brand-meta {
+  font-size: 10.5px;
+  letter-spacing: .9px;
+  text-transform: uppercase;
+  color: var(--text-3);
+  line-height: 1.3;
+}
+
+/* ---------------------------------------------------------
+   键盘按键
+   --------------------------------------------------------- */
+kbd {
+  display: inline-block;
+  padding: 0 4px;
+  margin: 0 1px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+}

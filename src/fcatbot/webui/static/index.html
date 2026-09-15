@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Fcatbot 控制台</title>
 
-  <!-- 主题预设 -->
+  <!-- 主题预设（需在渲染前同步执行，避免闪白） -->
   <script>
     (function () {
       try {
@@ -23,1234 +23,16 @@
     })();
   </script>
 
+  <link rel="stylesheet" href="/static/css/base.css">
+
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/theme/material-darker.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/theme/eclipse.css">
 
+  <link rel="stylesheet" href="/static/css/index.css">
+
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/yaml/yaml.js"></script>
-
-  <style>
-    /* =========================================================
-       主题变量
-       ========================================================= */
-    :root,
-    :root[data-theme="dark"] {
-      color-scheme: dark;
-
-      --bg: #141418;
-      --surface: #1b1b21;
-      --surface-2: #22222a;
-      --hover: #282830;
-      --line: #33333d;
-      --line-soft: #26262d;
-      --line-strong: #3d3d49;
-
-      --text: #e9e9ef;
-      --text-2: #9d9dab;
-      --text-3: #6a6a78;
-
-      --accent: #7d99ff;
-      --accent-hover: #93aaff;
-      --accent-active: #6b8bf5;
-      --accent-fg: #12121a;
-      --accent-soft: rgba(125, 153, 255, .14);
-      --accent-line: rgba(125, 153, 255, .55);
-      --accent-glow: rgba(125, 153, 255, .85);
-
-      --danger: #ff6b62;
-      --danger-line: rgba(255, 107, 98, .35);
-      --warning: #e8b06a;
-      --success: #6cc98a;
-
-      --scrollbar: #35353f;
-      --scrollbar-hover: #474753;
-
-      --grid-line: rgba(255, 255, 255, .022);
-      --selection: rgba(125, 153, 255, .22);
-      --highlight: rgba(125, 153, 255, .32);
-
-      --prompt: #4ec9b0;
-      --editor-fg: #cfd6dc;
-      --activeline: rgba(255, 255, 255, .022);
-
-      --shadow-1: 0 4px 16px rgba(0, 0, 0, .28);
-      --shadow-2: 0 12px 32px rgba(0, 0, 0, .5);
-
-      --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo,
-        Consolas, "Liberation Mono", monospace;
-    }
-
-    :root[data-theme="light"] {
-      color-scheme: light;
-
-      --bg: #f5f6f9;
-      --surface: #ffffff;
-      --surface-2: #f0f1f5;
-      --hover: #eceef3;
-      --line: #dcdee6;
-      --line-soft: #e9eaf0;
-      --line-strong: #c7c9d4;
-
-      --text: #1a1a21;
-      --text-2: #5a5a6a;
-      --text-3: #8a8a99;
-
-      --accent: #3f63e0;
-      --accent-hover: #3355cc;
-      --accent-active: #2b49b4;
-      --accent-fg: #ffffff;
-      --accent-soft: rgba(63, 99, 224, .10);
-      --accent-line: rgba(63, 99, 224, .45);
-      --accent-glow: rgba(63, 99, 224, .45);
-
-      --danger: #cf3a30;
-      --danger-line: rgba(207, 58, 48, .30);
-      --warning: #a9701c;
-      --success: #2e8b57;
-
-      --scrollbar: #c9cbd6;
-      --scrollbar-hover: #b0b2c0;
-
-      --grid-line: rgba(0, 0, 0, .028);
-      --selection: rgba(63, 99, 224, .16);
-      --highlight: rgba(63, 99, 224, .22);
-
-      --prompt: #0d8a73;
-      --editor-fg: #2b2b38;
-      --activeline: rgba(0, 0, 0, .022);
-
-      --shadow-1: 0 4px 16px rgba(0, 0, 0, .10);
-      --shadow-2: 0 12px 32px rgba(0, 0, 0, .22);
-
-      --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo,
-        Consolas, "Liberation Mono", monospace;
-    }
-
-    * {
-      box-sizing: border-box;
-      border-radius: 0;
-    }
-
-    html,
-    body {
-      height: 100%;
-      margin: 0;
-    }
-
-    body {
-      display: flex;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-        "Microsoft YaHei", system-ui, sans-serif;
-      font-size: 13px;
-      color: var(--text);
-      background: var(--bg);
-      overflow: hidden;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-
-    body,
-    .sidebar,
-    .tabs,
-    .toolbar,
-    .console-bar,
-    .console-output,
-    .console-input-wrap,
-    .editor-wrap,
-    .CodeMirror {
-      transition: background-color .18s ease,
-        border-color .18s ease,
-        color .18s ease;
-    }
-
-    ::-webkit-scrollbar {
-      width: 10px;
-      height: 10px;
-    }
-
-    ::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: var(--scrollbar);
-      border: 3px solid transparent;
-      background-clip: content-box;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-      background: var(--scrollbar-hover);
-      background-clip: content-box;
-    }
-
-    * {
-      scrollbar-width: thin;
-      scrollbar-color: var(--scrollbar) transparent;
-    }
-
-    /* ========== Sidebar ========== */
-    .sidebar {
-      width: 248px;
-      flex-shrink: 0;
-      display: flex;
-      flex-direction: column;
-      background: var(--surface);
-      border-right: 1px solid var(--line);
-      overflow: hidden;
-      position: relative;
-    }
-
-    .sidebar::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: var(--accent);
-      opacity: .85;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 11px;
-      padding: 18px 16px 16px;
-      flex-shrink: 0;
-    }
-
-    .brand-mark {
-      width: 26px;
-      height: 26px;
-      flex-shrink: 0;
-      display: grid;
-      place-items: center;
-      background: var(--accent);
-      clip-path: polygon(0 0, 100% 0, 100% 68%, 68% 100%, 0 100%);
-      color: var(--accent-fg);
-      font-size: 11px;
-      font-weight: 800;
-      letter-spacing: -.5px;
-      padding-bottom: 1px;
-      transition: background-color .18s ease, color .18s ease;
-    }
-
-    .brand-name {
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: .4px;
-      line-height: 1.3;
-    }
-
-    .brand-meta {
-      font-size: 10.5px;
-      letter-spacing: .9px;
-      text-transform: uppercase;
-      color: var(--text-3);
-      line-height: 1.3;
-    }
-
-    .side-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 16px 10px;
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 1.4px;
-      text-transform: uppercase;
-      color: var(--text-3);
-      flex-shrink: 0;
-      position: relative;
-    }
-
-    .side-head .count {
-      font-family: var(--mono);
-      font-size: 10.5px;
-      font-weight: 500;
-      letter-spacing: 0;
-      font-variant-numeric: tabular-nums;
-      padding: 1px 5px;
-      border: 1px solid var(--line);
-      color: var(--text-2);
-    }
-
-    .side-head::after {
-      content: '';
-      position: absolute;
-      left: 16px;
-      right: 16px;
-      height: 1px;
-      background: var(--line-soft);
-      margin-top: 32px;
-      pointer-events: none;
-    }
-
-    .plugin-list {
-      flex: 1;
-      overflow-y: auto;
-      padding: 6px 0 12px;
-    }
-
-    .plugin-item {
-      position: relative;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 16px;
-      cursor: pointer;
-      user-select: none;
-      transition: background-color .1s linear;
-    }
-
-    .plugin-item:hover {
-      background: var(--hover);
-    }
-
-    .plugin-item.active {
-      background: var(--surface-2);
-    }
-
-    .plugin-item.active::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: 2px;
-      background: var(--accent);
-    }
-
-    .plugin-item.dim {
-      opacity: .48;
-    }
-
-    .plugin-item .name {
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-size: 13px;
-      letter-spacing: .1px;
-    }
-
-    .plugin-item.active .name {
-      font-weight: 500;
-    }
-
-    .plugin-item .version {
-      font-family: var(--mono);
-      font-size: 10.5px;
-      color: var(--text-3);
-      flex-shrink: 0;
-    }
-
-    .err-dot {
-      display: grid;
-      place-items: center;
-      width: 13px;
-      height: 13px;
-      flex-shrink: 0;
-      border: 1px solid var(--danger);
-      color: var(--danger);
-      font-size: 9px;
-      font-weight: 700;
-      line-height: 1;
-      cursor: pointer;
-      transition: background-color .12s ease, color .12s ease;
-    }
-
-    .err-dot:hover {
-      background: var(--danger);
-      color: var(--surface);
-    }
-
-    .dep-dot {
-      display: grid;
-      place-items: center;
-      width: 13px;
-      height: 13px;
-      flex-shrink: 0;
-      border: 1px solid var(--warning);
-      color: var(--warning);
-      font-size: 9px;
-      font-weight: 700;
-      line-height: 1;
-      cursor: pointer;
-      transition: background-color .12s ease, color .12s ease;
-    }
-
-    .dep-dot:hover {
-      background: var(--warning);
-      color: var(--surface);
-    }
-
-    .plugin-toggle {
-      width: 28px;
-      height: 15px;
-      flex-shrink: 0;
-      position: relative;
-      cursor: pointer;
-      background: var(--surface-2);
-      border: 1px solid var(--line);
-      transition: background-color .22s ease, border-color .22s ease;
-    }
-
-    .plugin-toggle::after {
-      content: '';
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 9px;
-      height: 9px;
-      background: var(--text-3);
-      transition: transform .3s cubic-bezier(.34, 1.45, .64, 1),
-        background-color .22s ease,
-        box-shadow .22s ease;
-    }
-
-    .plugin-toggle:hover::after {
-      background: var(--text-2);
-    }
-
-    .plugin-toggle.on {
-      background: var(--accent-soft);
-      border-color: var(--accent-line);
-    }
-
-    .plugin-toggle.on::after {
-      transform: translateX(13px);
-      background: var(--accent);
-      box-shadow: 0 0 7px var(--accent-glow);
-    }
-
-    .plugin-toggle.on:hover::after {
-      background: var(--accent-hover);
-      box-shadow: 0 0 9px var(--accent-glow);
-    }
-
-    /* ---------- 侧栏底部：主题切换 + 退出登录 ---------- */
-    .side-foot {
-      margin-top: auto;
-      flex-shrink: 0;
-      padding: 10px 12px 12px;
-      border-top: 1px solid var(--line-soft);
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .theme-switch {
-      display: flex;
-      border: 1px solid var(--line);
-      background: var(--bg);
-    }
-
-    .theme-opt {
-      flex: 1;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      padding: 7px 0;
-      font: inherit;
-      font-size: 11.5px;
-      letter-spacing: .3px;
-      color: var(--text-3);
-      background: transparent;
-      border: none;
-      cursor: pointer;
-      transition: background-color .12s ease, color .12s ease;
-    }
-
-    .theme-opt+.theme-opt {
-      border-left: 1px solid var(--line);
-    }
-
-    .theme-opt:hover {
-      background: var(--hover);
-      color: var(--text-2);
-    }
-
-    .theme-opt.active {
-      background: var(--accent-soft);
-      color: var(--accent);
-      font-weight: 500;
-    }
-
-    .theme-opt:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: -2px;
-    }
-
-    .theme-opt svg {
-      flex-shrink: 0;
-    }
-
-    .logout-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      padding: 7px 0;
-      font: inherit;
-      font-size: 11.5px;
-      letter-spacing: .3px;
-      color: var(--text-3);
-      background: var(--bg);
-      border: 1px solid var(--line);
-      cursor: pointer;
-      transition: background-color .12s ease, color .12s ease,
-        border-color .12s ease, opacity .12s ease;
-    }
-
-    .logout-btn[hidden] {
-      display: none;
-    }
-
-    .logout-btn:hover:not(:disabled) {
-      background: var(--hover);
-      color: var(--danger);
-      border-color: var(--danger-line);
-    }
-
-    .logout-btn:disabled {
-      opacity: .4;
-      cursor: not-allowed;
-    }
-
-    .logout-btn:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 1px;
-    }
-
-    /* ========== Main ========== */
-    .main {
-      flex: 1;
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    .tabs {
-      display: flex;
-      gap: 0;
-      padding: 0 12px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--line);
-      flex-shrink: 0;
-    }
-
-    .tab {
-      padding: 13px 14px 11px;
-      font-size: 12.5px;
-      letter-spacing: .3px;
-      color: var(--text-3);
-      cursor: pointer;
-      user-select: none;
-      border-bottom: 2px solid transparent;
-      margin-bottom: -1px;
-      transition: color .12s ease, border-color .12s ease;
-    }
-
-    .tab:hover {
-      color: var(--text-2);
-    }
-
-    .tab.active {
-      color: var(--text);
-      border-bottom-color: var(--accent);
-    }
-
-    .panel {
-      flex: 1;
-      overflow: hidden;
-      display: none;
-      flex-direction: column;
-    }
-
-    .panel.active {
-      display: flex;
-    }
-
-    #panel-console {
-      position: relative;
-    }
-
-    /* ---------- Config ---------- */
-    .toolbar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 9px 12px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--line);
-      flex-shrink: 0;
-    }
-
-    .toolbar .path {
-      flex: 1;
-      min-width: 0;
-      padding: 6px 10px;
-      font-family: var(--mono);
-      font-size: 11.5px;
-      color: var(--text-3);
-      background: var(--bg);
-      border: 1px solid var(--line-soft);
-      border-left: 2px solid var(--accent);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 7px 15px;
-      font: inherit;
-      font-size: 12px;
-      font-weight: 500;
-      letter-spacing: .3px;
-      border: 1px solid transparent;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: background-color .12s ease, border-color .12s ease,
-        color .12s ease, opacity .12s ease;
-    }
-
-    .btn-primary {
-      background: var(--accent);
-      color: var(--accent-fg);
-    }
-
-    .btn-primary:hover:not(:disabled) {
-      background: var(--accent-hover);
-    }
-
-    .btn-primary:active:not(:disabled) {
-      background: var(--accent-active);
-    }
-
-    .btn-ghost {
-      background: transparent;
-      border-color: var(--line);
-      color: var(--text-2);
-    }
-
-    .btn-ghost:hover:not(:disabled) {
-      background: var(--hover);
-      border-color: var(--line-strong);
-      color: var(--text);
-    }
-
-    .btn:disabled {
-      opacity: .3;
-      cursor: not-allowed;
-    }
-
-    .btn:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 2px;
-    }
-
-    .editor-wrap {
-      flex: 1;
-      overflow: hidden;
-      position: relative;
-    }
-
-    /* ---------- CodeMirror ---------- */
-    .CodeMirror {
-      height: 100%;
-      font-family: var(--mono);
-      font-size: 13px;
-      line-height: 1.65;
-    }
-
-    .cm-s-material-darker.CodeMirror {
-      background: var(--bg);
-      color: var(--editor-fg);
-    }
-
-    .cm-s-material-darker .CodeMirror-gutters {
-      background: var(--bg);
-      border-right: 1px solid var(--line-soft);
-    }
-
-    .cm-s-material-darker .CodeMirror-linenumber {
-      color: var(--text-3);
-    }
-
-    .cm-s-material-darker .CodeMirror-cursor {
-      border-left: 2px solid var(--accent);
-    }
-
-    .cm-s-material-darker .CodeMirror-selected {
-      background: var(--selection) !important;
-    }
-
-    .cm-s-material-darker .CodeMirror-activeline-background {
-      background: var(--activeline);
-    }
-
-    .cm-s-eclipse.CodeMirror {
-      background: var(--bg);
-      color: var(--editor-fg);
-    }
-
-    .cm-s-eclipse .CodeMirror-gutters {
-      background: var(--bg);
-      border-right: 1px solid var(--line-soft);
-    }
-
-    .cm-s-eclipse .CodeMirror-linenumber {
-      color: var(--text-3);
-    }
-
-    .cm-s-eclipse .CodeMirror-cursor {
-      border-left: 2px solid var(--accent);
-    }
-
-    .cm-s-eclipse .CodeMirror-selected {
-      background: var(--selection) !important;
-    }
-
-    .cm-s-eclipse .CodeMirror-activeline-background {
-      background: var(--activeline);
-    }
-
-    /* ---------- Console ---------- */
-    .console-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 8px 12px 8px 16px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--line-soft);
-      flex-shrink: 0;
-    }
-
-    .console-bar-title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 1.4px;
-      text-transform: uppercase;
-      color: var(--text-3);
-    }
-
-    .console-bar-title::before {
-      content: '';
-      width: 7px;
-      height: 7px;
-      background: var(--accent);
-      flex-shrink: 0;
-    }
-
-    .console-actions {
-      display: flex;
-      align-items: center;
-      gap: 2px;
-    }
-
-    .ghost-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 5px 10px;
-      font: inherit;
-      font-size: 11.5px;
-      letter-spacing: .3px;
-      color: var(--text-3);
-      background: transparent;
-      border: 1px solid transparent;
-      cursor: pointer;
-      transition: background-color .12s ease, color .12s ease,
-        border-color .12s ease, opacity .12s ease;
-    }
-
-    .ghost-btn:hover:not(:disabled) {
-      background: var(--hover);
-      border-color: var(--line);
-      color: var(--text-2);
-    }
-
-    .ghost-btn:active:not(:disabled) {
-      background: var(--surface-2);
-    }
-
-    .ghost-btn:disabled {
-      opacity: .3;
-      cursor: not-allowed;
-    }
-
-    .ghost-btn:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 2px;
-    }
-
-    .ghost-btn.icon-only {
-      padding: 5px;
-      min-width: 26px;
-      justify-content: center;
-    }
-
-    .search-bar {
-      display: none;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 12px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--line-soft);
-      flex-shrink: 0;
-    }
-
-    .search-bar.open {
-      display: flex;
-    }
-
-    .search-bar input {
-      flex: 1;
-      min-width: 0;
-      padding: 6px 10px;
-      font: inherit;
-      font-size: 12.5px;
-      color: var(--text);
-      background: var(--bg);
-      border: 1px solid var(--line);
-      border-left: 2px solid var(--accent);
-      outline: none;
-      transition: border-color .12s ease, background-color .12s ease;
-    }
-
-    .search-bar input::placeholder {
-      color: var(--text-3);
-    }
-
-    .search-bar input:focus {
-      border-color: var(--accent);
-      background: var(--surface-2);
-    }
-
-    .search-count {
-      font-family: var(--mono);
-      font-size: 11.5px;
-      color: var(--text-3);
-      font-variant-numeric: tabular-nums;
-      min-width: 56px;
-      text-align: right;
-      flex-shrink: 0;
-    }
-
-    .search-opts {
-      display: flex;
-      flex-shrink: 0;
-    }
-
-    .opt-btn {
-      display: grid;
-      place-items: center;
-      min-width: 28px;
-      height: 28px;
-      padding: 0 7px;
-      font: inherit;
-      font-family: var(--mono);
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: -.2px;
-      color: var(--text-3);
-      background: var(--bg);
-      border: 1px solid var(--line);
-      margin-left: -1px;
-      cursor: pointer;
-      transition: background-color .12s ease, color .12s ease,
-        border-color .12s ease, opacity .12s ease;
-    }
-
-    .opt-btn:first-child {
-      margin-left: 0;
-    }
-
-    .opt-btn:hover:not(:disabled) {
-      background: var(--hover);
-      color: var(--text-2);
-    }
-
-    .opt-btn.active {
-      background: var(--accent-soft);
-      color: var(--accent);
-      border-color: var(--accent-line);
-      position: relative;
-      z-index: 1;
-    }
-
-    .opt-btn:disabled {
-      opacity: .32;
-      cursor: not-allowed;
-    }
-
-    .opt-btn:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 1px;
-    }
-
-    .search-bar input.invalid {
-      border-color: var(--danger);
-      border-left-color: var(--danger);
-    }
-
-    .icon-btn {
-      display: grid;
-      place-items: center;
-      width: 26px;
-      height: 26px;
-      padding: 0;
-      flex-shrink: 0;
-      font: inherit;
-      font-size: 12px;
-      line-height: 1;
-      color: var(--text-3);
-      background: transparent;
-      border: 1px solid transparent;
-      cursor: pointer;
-      transition: background-color .12s ease, color .12s ease,
-        border-color .12s ease, opacity .12s ease;
-    }
-
-    .icon-btn:hover:not(:disabled) {
-      background: var(--hover);
-      border-color: var(--line);
-      color: var(--text);
-    }
-
-    .icon-btn:disabled {
-      opacity: .28;
-      cursor: default;
-    }
-
-    .icon-btn:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 1px;
-    }
-
-    .console-output {
-      flex: 1;
-      overflow-y: auto;
-      padding: 14px 16px;
-      font-family: var(--mono);
-      font-size: 12.5px;
-      line-height: 1.65;
-      background-color: var(--bg);
-      background-image:
-        linear-gradient(var(--grid-line) 1px, transparent 1px),
-        linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-      background-size: 24px 24px;
-      position: relative;
-      overscroll-behavior: contain;
-    }
-
-    .console-output .line {
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
-      margin: 1px 0;
-    }
-
-    .console-output .line.prompt {
-      color: var(--prompt);
-    }
-
-    .console-output .line.error {
-      color: var(--danger);
-      border-left: 2px solid var(--danger);
-      padding-left: 8px;
-      margin-left: -10px;
-    }
-
-    .console-output .line.info {
-      color: var(--text-2);
-      font-style: italic;
-    }
-
-    .console-output .line.log {
-      color: var(--text-3);
-      font-size: 12px;
-    }
-
-    .console-output .line.flash {
-      background: var(--accent-soft);
-      box-shadow: 0 0 0 1px var(--accent-line);
-      transition: background .2s ease, box-shadow .2s ease;
-    }
-
-    .console-output:empty::before {
-      content: '暂无输出';
-      display: block;
-      padding: 48px 0 40px;
-      text-align: center;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-        "Microsoft YaHei", system-ui, sans-serif;
-      font-size: 11px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--text-3);
-      opacity: .7;
-    }
-
-    .console-output .log-link {
-      color: var(--accent);
-      text-decoration: underline;
-      text-decoration-color: var(--accent-line);
-      text-decoration-thickness: 1px;
-      text-underline-offset: 3px;
-      cursor: pointer;
-      transition: color .12s ease, text-decoration-color .12s ease;
-      word-break: break-all;
-    }
-
-    .console-output .log-link:hover {
-      color: var(--accent-hover);
-      text-decoration-color: var(--accent);
-    }
-
-    .console-output .log-link:active {
-      color: var(--accent-active);
-    }
-
-    .console-output .log-link:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 1px;
-    }
-
-    mark.search-hit {
-      background: var(--highlight);
-      color: inherit;
-      padding: 0 1px;
-    }
-
-    mark.search-hit.active {
-      background: var(--accent);
-      color: var(--accent-fg);
-    }
-
-    .scroll-bottom-btn {
-      position: absolute;
-      right: 20px;
-      bottom: 74px;
-      z-index: 20;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      width: 34px;
-      height: 34px;
-      padding: 0;
-      color: var(--accent);
-      background: var(--surface);
-      border: 1px solid var(--accent-line);
-      cursor: pointer;
-      box-shadow: var(--shadow-1);
-      transition: background-color .14s ease, border-color .14s ease,
-        color .14s ease, transform .14s ease;
-    }
-
-    .scroll-bottom-btn.show {
-      display: flex;
-      animation: sb-in .18s ease;
-    }
-
-    .scroll-bottom-btn:hover {
-      background: var(--accent-soft);
-      border-color: var(--accent);
-      color: var(--accent-hover);
-    }
-
-    .scroll-bottom-btn:active {
-      transform: translateY(1px);
-    }
-
-    .scroll-bottom-btn:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 2px;
-    }
-
-    @keyframes sb-in {
-      from {
-        opacity: 0;
-        transform: translateY(6px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .console-input-wrap {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 11px 16px;
-      background: var(--surface);
-      border-top: 1px solid var(--line);
-      flex-shrink: 0;
-    }
-
-    .console-input-wrap::before {
-      content: '';
-      width: 2px;
-      height: 18px;
-      background: var(--accent);
-      flex-shrink: 0;
-    }
-
-    .prompt-sign {
-      font-family: var(--mono);
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--accent);
-      user-select: none;
-      flex-shrink: 0;
-    }
-
-    .console-input {
-      flex: 1;
-      min-width: 0;
-      padding: 5px 0;
-      font-family: var(--mono);
-      font-size: 13px;
-      color: var(--text);
-      background: transparent;
-      border: none;
-      outline: none;
-    }
-
-    .console-input::placeholder {
-      color: var(--text-3);
-    }
-
-    /* ---------- 悬浮提示 ---------- */
-    .err-tooltip {
-      position: fixed;
-      z-index: 200;
-      max-width: 400px;
-      padding: 10px 12px 11px;
-      font-family: var(--mono);
-      font-size: 11.5px;
-      line-height: 1.6;
-      color: var(--text);
-      background: var(--surface-2);
-      border: 1px solid var(--line);
-      border-left: 2px solid var(--danger);
-      box-shadow: var(--shadow-2);
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity .12s ease;
-    }
-
-    .err-tooltip.show {
-      opacity: 1;
-    }
-
-    .err-tooltip.warning {
-      border-left-color: var(--warning);
-    }
-
-    .err-tooltip.info {
-      border-left-color: var(--accent);
-    }
-
-    .err-tooltip-head {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-        "Microsoft YaHei", system-ui, sans-serif;
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 1.4px;
-      text-transform: uppercase;
-      color: var(--danger);
-      margin-bottom: 6px;
-    }
-
-    .err-tooltip.warning .err-tooltip-head {
-      color: var(--warning);
-    }
-
-    .err-tooltip.info .err-tooltip-head {
-      color: var(--accent);
-    }
-
-    .err-tooltip-body {
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
-    }
-
-    /* ---------- Status ---------- */
-    .status {
-      position: fixed;
-      right: 16px;
-      bottom: 16px;
-      z-index: 100;
-      padding: 9px 15px;
-      font-size: 12px;
-      letter-spacing: .2px;
-      color: var(--text-2);
-      background: var(--surface-2);
-      border: 1px solid var(--line);
-      border-left: 2px solid var(--accent);
-      box-shadow: var(--shadow-2);
-      pointer-events: none;
-      opacity: 0;
-      transform: translateY(6px);
-      transition: opacity .16s ease, transform .16s ease;
-    }
-
-    .status.show {
-      opacity: 1;
-      transform: none;
-    }
-
-    .status.error {
-      color: var(--danger);
-      border-left-color: var(--danger);
-      border-color: var(--danger-line);
-    }
-
-    kbd {
-      display: inline-block;
-      padding: 0 4px;
-      margin: 0 1px;
-      font-family: var(--mono);
-      font-size: 10.5px;
-      line-height: 1.5;
-      color: var(--text-2);
-      background: var(--surface);
-      border: 1px solid var(--line-strong);
-    }
-
-    @media (max-width: 720px) {
-      .sidebar {
-        width: 200px;
-      }
-
-      .brand-meta {
-        display: none;
-      }
-
-      .ghost-btn span:not(.keep) {
-        display: none;
-      }
-
-      .scroll-bottom-btn {
-        bottom: 68px;
-        right: 12px;
-      }
-    }
-  </style>
 </head>
 
 <body>
@@ -1263,10 +45,28 @@
         <div class="brand-meta">Console</div>
       </div>
     </div>
+
     <div class="side-head">
       <span>插件</span>
-      <span class="count" id="plugin-count">0</span>
+      <span class="side-head-tools">
+        <button class="head-btn" id="rescan-btn" type="button" title="重新扫描插件目录" aria-label="重新扫描插件目录">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"
+            stroke-linecap="square" stroke-linejoin="miter">
+            <path d="M13.4 7A5.4 5.4 0 0 0 3.6 5.2" />
+            <path d="M2.6 9A5.4 5.4 0 0 0 12.4 10.8" />
+            <path d="M13.4 3.4V7H9.8" />
+            <path d="M2.6 12.6V9h3.6" />
+          </svg>
+        </button>
+        <span class="count" id="plugin-count">0</span>
+      </span>
     </div>
+
+    <!-- 新增：插件筛选 -->
+    <div class="side-filter">
+      <input type="text" id="plugin-filter" placeholder="筛选插件…" autocomplete="off" spellcheck="false">
+    </div>
+
     <div class="plugin-list" id="plugin-list"></div>
 
     <div class="side-foot">
@@ -1320,8 +120,7 @@
       <div class="console-bar">
         <span class="console-bar-title">输出</span>
         <div class="console-actions">
-          <button class="ghost-btn icon-only" id="clear-btn" type="button" title="清空输出" disabled
-            aria-label="清空输出">
+          <button class="ghost-btn icon-only" id="clear-btn" type="button" title="清空输出" disabled aria-label="清空输出">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"
               stroke-linecap="square" stroke-linejoin="miter">
               <path d="M3 4.5h10" />
@@ -1329,8 +128,7 @@
               <path d="M4.5 4.5l.6 8.5h5.8l.6-8.5" />
             </svg>
           </button>
-          <button class="ghost-btn icon-only" id="copy-btn" type="button" title="复制全部输出" disabled
-            aria-label="复制全部输出">
+          <button class="ghost-btn icon-only" id="copy-btn" type="button" title="复制全部输出" disabled aria-label="复制全部输出">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"
               stroke-linejoin="miter">
               <rect x="5.5" y="5.5" width="8" height="8" />
@@ -1358,8 +156,7 @@
         <span class="search-count" id="search-count"></span>
         <button class="icon-btn" id="search-prev" type="button" title="上一个匹配 (Shift+Enter)"
           aria-label="上一个匹配">↑</button>
-        <button class="icon-btn" id="search-next" type="button" title="下一个匹配 (Enter)"
-          aria-label="下一个匹配">↓</button>
+        <button class="icon-btn" id="search-next" type="button" title="下一个匹配 (Enter)" aria-label="下一个匹配">↓</button>
         <button class="icon-btn" id="search-close" type="button" title="关闭 (Esc)" aria-label="关闭搜索">✕</button>
       </div>
 
@@ -1374,8 +171,11 @@
 
       <div class="console-input-wrap">
         <span class="prompt-sign">›</span>
-        <input type="text" class="console-input" id="console-input" placeholder="输入命令（help 查看帮助，↑↓ 翻阅历史）..."
-          autocomplete="off" spellcheck="false">
+        <div class="console-input-field">
+          <input type="text" class="console-input" id="console-input" placeholder="输入命令（help 查看帮助，Tab 补全，↑↓ 翻阅历史）..."
+            autocomplete="off" spellcheck="false">
+          <div class="cmd-suggest" id="cmd-suggest" hidden></div>
+        </div>
       </div>
     </section>
   </main>
@@ -1390,6 +190,13 @@
   <script>
     (() => {
       'use strict';
+
+      /* =========================================================
+         常量
+         ========================================================= */
+      const MAX_CONSOLE_LINES = 5000;
+      const HISTORY_KEY = 'fcatbot.cmd.history';
+      const MAX_HISTORY = 100;
 
       /* =========================================================
          认证：统一 fetch 包装，401 → 跳转登录页
@@ -1424,18 +231,23 @@
         editor: null,
         ws: null,
         theme: 'dark',
+        pluginFilter: '',
+        configBaseline: '',
       };
 
       const $pluginList = document.getElementById('plugin-list');
       const $pluginCount = document.getElementById('plugin-count');
+      const $pluginFilter = document.getElementById('plugin-filter');
       const $configPath = document.getElementById('config-path');
       const $saveBtn = document.getElementById('save-btn');
       const $reloadBtn = document.getElementById('reload-btn');
       const $configEditor = document.getElementById('config-editor');
       const $consoleOut = document.getElementById('console-output');
       const $consoleInput = document.getElementById('console-input');
+      const $cmdSuggest = document.getElementById('cmd-suggest');
       const $status = document.getElementById('status');
       const $logoutBtn = document.getElementById('logout-btn');
+      const $rescanBtn = document.getElementById('rescan-btn');
 
       const $searchBar = document.getElementById('search-bar');
       const $searchInput = document.getElementById('search-input');
@@ -1865,20 +677,21 @@
          退出登录
          ========================================================= */
       $logoutBtn.addEventListener('click', async () => {
+        if (isConfigDirty()) {
+          const ok = window.confirm('编辑器中有未保存的修改，退出登录将丢弃这些改动。\n\n确定继续？');
+          if (!ok) return;
+        }
         $logoutBtn.disabled = true;
         try {
-          // 用原生 fetch：即便会话已失效，也希望流程走完
           await fetch('/api/logout', { method: 'POST' });
-        } catch (_) { /* 忽略网络错误，照样跳转 */ }
+        } catch (_) { }
         location.replace('/login');
       });
 
-      // 异步探测认证状态，用于决定是否显示「退出登录」
       (async () => {
         try {
           const res = await fetch('/api/auth/status');
           if (!res.ok) {
-            // 401 → 未登录，直接跳转
             if (res.status === 401) { redirectToLogin(); return; }
             return;
           }
@@ -1886,7 +699,7 @@
           if (data.auth_required) {
             $logoutBtn.hidden = false;
           }
-        } catch (_) { /* 忽略，保持默认隐藏 */ }
+        } catch (_) { }
       })();
 
       /* =========================================================
@@ -1926,11 +739,30 @@
       function renderPlugins() {
         hideErrTooltip();
 
-        $pluginCount.textContent = state.plugins.length;
+        const filter = state.pluginFilter;
+        const visible = filter
+          ? state.plugins.filter(p => p.name.toLowerCase().includes(filter))
+          : state.plugins;
+
+        if (filter) {
+          $pluginCount.textContent = `${visible.length}/${state.plugins.length}`;
+        } else {
+          $pluginCount.textContent = state.plugins.length;
+        }
+
         $pluginList.innerHTML = '';
         const frag = document.createDocumentFragment();
 
-        for (const p of state.plugins) {
+        if (!visible.length) {
+          const empty = document.createElement('div');
+          empty.className = 'plugin-empty';
+          empty.textContent = filter ? '无匹配插件' : '暂无插件';
+          frag.appendChild(empty);
+          $pluginList.appendChild(frag);
+          return;
+        }
+
+        for (const p of visible) {
           const item = document.createElement('div');
           item.className = 'plugin-item';
           if (state.currentPlugin === p.name) item.classList.add('active');
@@ -1992,6 +824,26 @@
         $pluginList.appendChild(frag);
       }
 
+      /* 插件筛选 */
+      $pluginFilter.addEventListener('input', () => {
+        state.pluginFilter = $pluginFilter.value.trim().toLowerCase();
+        renderPlugins();
+      });
+      $pluginFilter.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          $pluginFilter.value = '';
+          state.pluginFilter = '';
+          renderPlugins();
+          $pluginFilter.blur();
+        }
+      });
+      bindHoverTip(
+        $pluginFilter,
+        '筛选插件',
+        '按名称筛选插件列表，支持子串匹配。\n快捷键：Esc 清空',
+        'info'
+      );
+
       async function togglePlugin(name, enabled, toggleEl) {
         if (toggleEl) toggleEl.classList.toggle('on', enabled);
         try {
@@ -2019,12 +871,25 @@
       }
 
       async function selectPlugin(name) {
+        if (state.currentPlugin === name) return;
+
+        // 有未保存修改 → 提醒用户
+        if (isConfigDirty()) {
+          const ok = window.confirm(
+            '编辑器中有未保存的修改。\n' +
+            '切换插件会重新加载配置，未保存的改动将被丢弃。\n\n确定继续？'
+          );
+          if (!ok) return;
+        }
+
         state.currentPlugin = name;
         renderPlugins();
         try {
           const res = await apiFetch(`/api/plugins/${encodeURIComponent(name)}/config`);
           const data = await res.json();
-          state.editor.setValue(data.content || '');
+          const content = data.content || '';
+          state.editor.setValue(content);
+          state.configBaseline = content;
           $configPath.textContent = data.path || name;
           $saveBtn.disabled = false;
           $reloadBtn.disabled = false;
@@ -2036,10 +901,79 @@
       }
 
       /* =========================================================
-         保存 / 重载
+         重扫描插件目录
          ========================================================= */
+      $rescanBtn.addEventListener('click', async () => {
+        if ($rescanBtn.disabled) return;
+        $rescanBtn.disabled = true;
+        $rescanBtn.classList.add('spin');
+        try {
+          const res = await apiFetch('/api/plugins/rescan', { method: 'POST' });
+          const data = await res.json();
+          setStatus(
+            data.message || (data.ok ? '重扫描完成' : '重扫描失败'),
+            !data.ok
+          );
+          state.pluginSig = '';
+          await loadPlugins();
+        } catch (e) {
+          if (authRedirectInFlight) return;
+          setStatus('重扫描失败: ' + e.message, true);
+        } finally {
+          $rescanBtn.disabled = false;
+          $rescanBtn.classList.remove('spin');
+        }
+      });
+
+      bindHoverTip(
+        $rescanBtn,
+        '重新扫描插件',
+        '扫描 plugins/ 目录，加载新增插件、移除已删除插件。\n不会改变任何插件的启用状态。',
+        'info'
+      );
+
+      /* =========================================================
+         配置同步 / 脏检查 / 按钮加载态
+         ========================================================= */
+      async function syncConfigToEditor(name) {
+        try {
+          const res = await apiFetch(`/api/plugins/${encodeURIComponent(name)}/config`);
+          const data = await res.json();
+          const content = data.content || '';
+          const cursor = state.editor.getCursor();
+          const scroll = state.editor.getScrollInfo();
+          state.editor.setValue(content);
+          state.configBaseline = content;
+          try {
+            state.editor.setCursor(cursor);
+            state.editor.scrollTo(scroll.left, scroll.top);
+          } catch (_) { }
+          $configPath.textContent = data.path || name;
+          return true;
+        } catch (e) {
+          if (authRedirectInFlight) return false;
+          setStatus('同步配置失败: ' + e.message, true);
+          return false;
+        }
+      }
+
+      function isConfigDirty() {
+        if (!state.currentPlugin || !state.editor) return false;
+        return state.editor.getValue() !== state.configBaseline;
+      }
+
+      function setBtnLoading(btn, on) {
+        if (!btn) return;
+        btn.classList.toggle('loading', !!on);
+        btn.disabled = !!on;
+      }
+
+      /* ---------- 保存 ---------- */
       $saveBtn.addEventListener('click', async () => {
-        if (!state.currentPlugin) return;
+        if (!state.currentPlugin || $saveBtn.disabled) return;
+        const original = $saveBtn.textContent;
+        $saveBtn.textContent = '保存中…';
+        setBtnLoading($saveBtn, true);
         try {
           const res = await apiFetch(
             `/api/plugins/${encodeURIComponent(state.currentPlugin)}/config`,
@@ -2052,14 +986,35 @@
           const data = await res.json();
           setStatus(data.ok ? (data.message || '已保存') : (data.message || '保存失败'),
             !data.ok);
+          if (data.ok) state.configBaseline = state.editor.getValue();
         } catch (e) {
           if (authRedirectInFlight) return;
           setStatus('保存失败: ' + e.message, true);
+        } finally {
+          $saveBtn.textContent = original;
+          setBtnLoading($saveBtn, false);
+          $saveBtn.disabled = !state.currentPlugin;
         }
       });
 
+      /* ---------- 重载插件 ---------- */
       $reloadBtn.addEventListener('click', async () => {
-        if (!state.currentPlugin) return;
+        if (!state.currentPlugin || $reloadBtn.disabled) return;
+
+        // 有未保存修改 → 提醒用户
+        if (isConfigDirty()) {
+          const ok = window.confirm(
+            '编辑器中有未保存的修改。\n' +
+            '重载会从磁盘重新读取配置，未保存的改动将被丢弃。\n\n确定继续？'
+          );
+          if (!ok) return;
+        }
+
+        const original = $reloadBtn.textContent;
+        $reloadBtn.textContent = '重载中…';
+        setBtnLoading($saveBtn, true);
+        setBtnLoading($reloadBtn, true);
+
         try {
           const res = await apiFetch(
             `/api/plugins/${encodeURIComponent(state.currentPlugin)}/reload`,
@@ -2067,12 +1022,51 @@
           );
           const data = await res.json();
           setStatus(data.message || (data.ok ? '已重载' : '重载失败'), !data.ok);
+
           state.pluginSig = '';
           await loadPlugins();
+
+          // 重载成功 → 同步磁盘配置到编辑器（保留光标/滚动位置）
+          if (data.ok) {
+            await syncConfigToEditor(state.currentPlugin);
+          }
         } catch (e) {
           if (authRedirectInFlight) return;
           setStatus('重载失败: ' + e.message, true);
+        } finally {
+          $reloadBtn.textContent = original;
+          // 先清除两个按钮的加载态（含 .loading 类），再按当前状态决定是否禁用
+          setBtnLoading($saveBtn, false);
+          setBtnLoading($reloadBtn, false);
+          const has = !!state.currentPlugin;
+          $saveBtn.disabled = !has;
+          $reloadBtn.disabled = !has;
         }
+      });
+
+      /* ---------- 给两个按钮加 tooltip ---------- */
+      bindHoverTip(
+        $saveBtn,
+        '保存配置',
+        '将当前编辑器内容写入插件的 YAML 文件。\n快捷键：Ctrl + S',
+        'info'
+      );
+      bindHoverTip(
+        $reloadBtn,
+        '重载插件',
+        '停用 → 重新加载模块 → 激活。\n会从磁盘重新读取配置，编辑器中未保存的修改将丢失。\n快捷键：Ctrl + R',
+        'info'
+      );
+
+      /* =========================================================
+         离开页面前保护未保存的配置
+         ========================================================= */
+      window.addEventListener('beforeunload', (e) => {
+        if (!isConfigDirty()) return;
+        e.preventDefault();
+        // Chrome 需要 returnValue 被赋值才会弹出确认
+        e.returnValue = '';
+        return '';
       });
 
       /* =========================================================
@@ -2090,7 +1084,7 @@
             redirectToLogin();
             return false;
           }
-        } catch (_) { /* 网络异常 → 允许重试 */ }
+        } catch (_) { }
         return true;
       }
 
@@ -2107,16 +1101,17 @@
         state.ws = ws;
 
         ws.onopen = () => {
-          clearStatus('连接断开，3 秒后重连…');
-          clearStatus('连接错误');
+          // 无条件清除所有连接相关的状态提示
+          clearStatus();
           if (wsEverConnected) setStatus('已连接');
           wsEverConnected = true;
+          // 连接成功时刷新命令列表
+          loadCommands();
         };
 
         ws.onclose = () => {
           if (authRedirectInFlight) return;
           if (!wsEverConnected) {
-            // 首次连接即失败：可能是会话过期
             checkAuthBeforeReconnect().then(ok => {
               if (ok) setTimeout(connectWs, 3000);
             });
@@ -2344,8 +1339,17 @@
       });
 
       /* =========================================================
-         追加输出
+         追加输出（带行数上限）
          ========================================================= */
+      function trimConsoleIfNeeded() {
+        const lines = $consoleOut.children;
+        if (lines.length <= MAX_CONSOLE_LINES) return;
+        const excess = lines.length - MAX_CONSOLE_LINES;
+        for (let i = 0; i < excess; i++) {
+          if (lines[0]) lines[0].remove();
+        }
+      }
+
       function appendConsole(type, text) {
         const wasAtBottom = isConsoleAtBottom();
 
@@ -2363,6 +1367,7 @@
         linkifyLogElement(div);
 
         $consoleOut.appendChild(div);
+        trimConsoleIfNeeded();
 
         if (wasAtBottom) {
           $consoleOut.scrollTop = $consoleOut.scrollHeight;
@@ -2382,12 +1387,28 @@
       }
 
       /* =========================================================
-         命令历史记录
+         命令历史记录（持久化到 localStorage）
          ========================================================= */
       const history = [];
-      const MAX_HISTORY = 100;
       let histIndex = -1;
       let histDraft = '';
+
+      function loadHistory() {
+        try {
+          const raw = localStorage.getItem(HISTORY_KEY);
+          if (!raw) return;
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) {
+            history.push(...arr.slice(-MAX_HISTORY));
+          }
+        } catch (_) { }
+      }
+
+      function saveHistory() {
+        try {
+          localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+        } catch (_) { }
+      }
 
       function pushHistory(cmd) {
         if (!cmd) return;
@@ -2396,6 +1417,7 @@
         if (history.length > MAX_HISTORY) history.shift();
         histIndex = -1;
         histDraft = '';
+        saveHistory();
       }
 
       function moveCaretToEnd(el) {
@@ -2415,6 +1437,7 @@
         }
         $consoleInput.value = history[histIndex];
         moveCaretToEnd($consoleInput);
+        hideSuggestions();
       }
 
       function histNext() {
@@ -2427,9 +1450,121 @@
           $consoleInput.value = histDraft;
         }
         moveCaretToEnd($consoleInput);
+        hideSuggestions();
       }
 
+      /* =========================================================
+         命令自动补全（Tab）
+         ========================================================= */
+      let commandSpecs = [];
+      let suggestItems = [];
+      let suggestIndex = -1;
+
+      async function loadCommands() {
+        try {
+          const res = await apiFetch('/api/commands');
+          if (!res.ok) return;
+          const data = await res.json();
+          commandSpecs = Array.isArray(data.commands) ? data.commands : [];
+        } catch (_) { }
+      }
+
+      function hideSuggestions() {
+        suggestItems = [];
+        suggestIndex = -1;
+        $cmdSuggest.hidden = true;
+        $cmdSuggest.innerHTML = '';
+      }
+
+      function renderSuggestions() {
+        if (!suggestItems.length) { hideSuggestions(); return; }
+        $cmdSuggest.innerHTML = '';
+        suggestItems.forEach((item, i) => {
+          const el = document.createElement('div');
+          el.className = 'cmd-item' + (i === suggestIndex ? ' active' : '');
+          el.innerHTML =
+            `<span class="cmd-name">${escapeHtml(item.name)}</span>` +
+            `<span class="cmd-help">${escapeHtml(item.help || '')}</span>`;
+          el.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            acceptSuggestion(i);
+          });
+          $cmdSuggest.appendChild(el);
+        });
+        $cmdSuggest.hidden = false;
+      }
+
+      function updateSuggestions() {
+        const text = $consoleInput.value;
+        // 只在输入第一个 token 时提示
+        if (!text || /\s/.test(text) || !commandSpecs.length) {
+          hideSuggestions();
+          return;
+        }
+        const q = text.toLowerCase();
+        const matches = commandSpecs.filter(
+          c => (c.name || '').toLowerCase().startsWith(q)
+        );
+        if (!matches.length) { hideSuggestions(); return; }
+        // 精确命中唯一一个 → 不再提示
+        if (matches.length === 1 &&
+          (matches[0].name || '').toLowerCase() === q) {
+          hideSuggestions();
+          return;
+        }
+        suggestItems = matches.slice(0, 12);
+        suggestIndex = 0;
+        renderSuggestions();
+      }
+
+      function acceptSuggestion(i) {
+        if (i < 0 || i >= suggestItems.length) return;
+        const item = suggestItems[i];
+        $consoleInput.value = item.name + ' ';
+        moveCaretToEnd($consoleInput);
+        hideSuggestions();
+      }
+
+      /* =========================================================
+         控制台输入框：补全 / 历史 / 提交
+         ========================================================= */
+      $consoleInput.addEventListener('input', () => {
+        updateSuggestions();
+      });
+
+      $consoleInput.addEventListener('blur', () => {
+        // 延迟关闭，给 mousedown 处理留时间
+        setTimeout(hideSuggestions, 120);
+      });
+
       $consoleInput.addEventListener('keydown', (e) => {
+        // Tab：补全到当前候选（默认第一个）
+        if (e.key === 'Tab' && suggestItems.length) {
+          e.preventDefault();
+          acceptSuggestion(suggestIndex >= 0 ? suggestIndex : 0);
+          return;
+        }
+
+        if (e.key === 'Escape' && suggestItems.length) {
+          e.preventDefault();
+          hideSuggestions();
+          return;
+        }
+
+        // 有候选时，用 ↑↓ 在候选里切换（避免与历史冲突）
+        if (e.key === 'ArrowUp' && suggestItems.length) {
+          e.preventDefault();
+          suggestIndex = (suggestIndex - 1 + suggestItems.length) % suggestItems.length;
+          renderSuggestions();
+          return;
+        }
+        if (e.key === 'ArrowDown' && suggestItems.length) {
+          e.preventDefault();
+          suggestIndex = (suggestIndex + 1) % suggestItems.length;
+          renderSuggestions();
+          return;
+        }
+
         if (e.key === 'Enter') {
           const text = $consoleInput.value.trim();
           if (!text) return;
@@ -2437,6 +1572,7 @@
           $consoleInput.value = '';
           histIndex = -1;
           histDraft = '';
+          hideSuggestions();
           sendCommand(text);
         } else if (e.key === 'ArrowUp') {
           if (!history.length) return;
@@ -2481,7 +1617,14 @@
 
         let pattern = escaped;
         if (opts.wholeWord) {
-          pattern = '(?<!\\w)' + escaped + '(?!\\w)';
+          // 优先使用 lookbehind（更精确），旧环境（Safari < 16.4 等）
+          // 不支持时回退到 \b，避免误报"无效正则"。
+          try {
+            new RegExp('(?<!\\w)' + escaped + '(?!\\w)');
+            pattern = '(?<!\\w)' + escaped + '(?!\\w)';
+          } catch (_) {
+            pattern = '\\b' + escaped + '\\b';
+          }
         }
 
         try {
@@ -2611,12 +1754,15 @@
       function clearHighlights(line) {
         const marks = line.querySelectorAll('mark.search-hit');
         if (!marks.length) return;
+        const parents = new Set();
         for (const m of marks) {
           const parent = m.parentNode;
           if (!parent) continue;
           parent.replaceChild(document.createTextNode(m.textContent), m);
-          parent.normalize();
+          parents.add(parent);
         }
+        // 循环结束后统一 normalize，避免中间态反复合并文本节点
+        parents.forEach(p => p.normalize());
       }
 
       function updateSearchCount() {
@@ -2711,7 +1857,20 @@
         }
       });
 
+      /* =========================================================
+         全局快捷键
+         注意：所有快捷键监听器都在顶层注册一次，禁止嵌套注册。
+         ========================================================= */
       document.addEventListener('keydown', (e) => {
+        /* ---- 搜索面板内：Alt + C/W/R 切换选项 ---- */
+        if (search.open && e.altKey && !e.ctrlKey && !e.metaKey) {
+          const k = e.key.toLowerCase();
+          if (k === 'c') { e.preventDefault(); $optCase.click(); return; }
+          if (k === 'w') { e.preventDefault(); if (!$optWord.disabled) $optWord.click(); return; }
+          if (k === 'r') { e.preventDefault(); $optRegex.click(); return; }
+        }
+
+        /* ---- Ctrl/Cmd + F：仅控制台 Tab 下打开搜索 ---- */
         if ((e.ctrlKey || e.metaKey) && !e.altKey &&
           (e.key === 'f' || e.key === 'F')) {
           const consoleActive = document
@@ -2724,13 +1883,23 @@
           return;
         }
 
-        if (search.open && e.altKey && !e.ctrlKey && !e.metaKey) {
+        /* ---- 配置面板：Ctrl/Cmd + S 保存、Ctrl/Cmd + R 重载 ---- */
+        if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
           const k = e.key.toLowerCase();
-          if (k === 'c') { e.preventDefault(); $optCase.click(); }
-          else if (k === 'w') { e.preventDefault(); if (!$optWord.disabled) $optWord.click(); }
-          else if (k === 'r') { e.preventDefault(); $optRegex.click(); }
+          if (k === 's' || k === 'r') {
+            const configActive = document
+              .querySelector('.tab[data-tab="config"]')
+              .classList.contains('active');
+            if (!configActive || !state.currentPlugin) return;
+
+            e.preventDefault();
+            if (k === 's' && !$saveBtn.disabled) $saveBtn.click();
+            else if (k === 'r' && !$reloadBtn.disabled) $reloadBtn.click();
+            return;
+          }
         }
 
+        /* ---- Esc 关闭搜索 ---- */
         if (e.key === 'Escape' && search.open) {
           e.preventDefault();
           closeSearch();
@@ -2751,6 +1920,8 @@
       /* =========================================================
          启动
          ========================================================= */
+      loadHistory();
+      loadCommands();
       loadPlugins();
       connectWs();
       setInterval(loadPlugins, 10000);
