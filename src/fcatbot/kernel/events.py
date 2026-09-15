@@ -49,7 +49,7 @@ _in_dispatch: contextvars.ContextVar[bool] = contextvars.ContextVar(
 )
 
 
-class Event:
+class Event[T]:
     """所有事件的基类。
 
     - **可变对象**: 广播过程中允许被监听器修改（mirai ``broadcast`` 同款语义）。
@@ -60,7 +60,7 @@ class Event:
     """
 
     name: ClassVar[str] = ""
-    data: Any = None
+    data: T
     source: str = ""
     metadata: Mapping[str, Any] = _EMPTY_METADATA
     _cancelled: bool = False
@@ -68,7 +68,7 @@ class Event:
     def __init__(
         self,
         name: str | None = None,
-        data: Any = None,
+        data: T = None,
         source: str = "",
         metadata: Mapping[str, Any] | None = None,
     ) -> None:

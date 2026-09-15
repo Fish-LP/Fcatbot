@@ -13,7 +13,7 @@ name = "fcatbot"
 dynamic = ["version"]
 description = "Fcatbot —— 一个可插拔、多平台的聊天机器人框架。"
 readme = { file = "README.md", content-type = "text/markdown" }
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 
 [tool.hatch.version]
 path = "src/fcatbot/__init__.py"
