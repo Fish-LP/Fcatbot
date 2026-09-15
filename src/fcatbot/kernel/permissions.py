@@ -25,7 +25,7 @@ import asyncio
 import logging
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Mapping, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Iterable, Mapping, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from luckperms import LuckPermsManager
@@ -150,59 +150,36 @@ class AllowAllPermissionService(BasePermissionService):
 
 
 class LuckPermsAdapter(BasePermissionService):
-    """luckperms-python 权限服务适配器（真实接入）。
+    """luckperms-python 权限服务适配器（对齐真实后端 API）。
 
-    对接 `luckperms-python <https://github.com/Fish-LP/LuckPerms-Python>`_
-    （``luckperms`` 包，**同步实现**）；本类提供 async 门面以符合
-    :class:`PermissionService` 协议。
+    适配对象是本仓库内嵌的 :class:`luckperms.LuckPermsManager`（同步实现）。
+    本类只做三件事：丢线程池、串行化写、TTL 缓存。
 
-    **线程模型**（重点）
-    -------------------
-    ``luckperms-python`` 的每次写操作末尾都会触发 ``_save_all()``——全量序列化
-    + 磁盘写。因此：
+    **线程模型**
+    - 所有 manager 调用走 :func:`asyncio.to_thread`，不阻塞事件循环；
+    - 所有写操作（含缓存失效）经 :attr:`_write_lock` 串行化；
+    - 读操作并发执行（底层 ``check`` 会创建临时 User，纯内存）。
 
-    - 所有对底层 ``manager`` 的调用都通过 :func:`asyncio.to_thread` 丢进线程池，
-      绝不阻塞事件循环；
-    - 所有**写操作**（以及缓存失效）通过 :attr:`_write_lock` 串行化，
-      避免 ``_save_all`` 期间的内存快照互相踩；
-    - 读操作并发执行，但底层 ``check`` 会创建临时 ``User`` 对象，属于纯内存操作，
-      不加锁也安全。
+    **缓存**：``has_permission`` 按 ``(user_id, node, frozenset(context))`` 做 TTL
+    缓存；任何写操作清空缓存。
 
-    **缓存**
-    --------
-    ``has_permission`` 结果按 ``(user_id, node, frozenset(context))`` 做 TTL 缓存
-    （默认 5 秒）。任何写操作会清空缓存。高频消息路径下收益显著。
+    **与后端的对应关系**
+    - 用户节点：``user_add_node`` / ``user_remove_node``（后者返回是否删除）
+    - 组节点：``group_add_node`` / ``group_remove_node``（**无 duration**）
+    - 组继承：``group_inherit`` / ``group_remove_inherit``
+    - 轨道：``promote`` / ``demote``
+    - Web Editor：``to_webeditor_payload`` / ``apply_webeditor_changes``
 
-    **启动期预检**
-    --------------
-    :meth:`preflight` 会强制触发底层加载。调用方（``FcatbotApp._build_permissions``）
-    应在启动时调用它，让"库没装 / 数据目录不可写"在启动期就暴露，而不是第一次
-    权限检查时静默全拒。
-
-    语义要点（与底层库一致）:
-
-    - **游客继承**: 未持久化的用户自动继承 ``default`` 组权限（适合"未注册用户"场景）；
-    - **通配符**: ``plugin.*``（单段）/ ``server.**``（多段），显式拒绝可覆盖通配；
-    - **上下文敏感**: ``context={"group_id": "123456"}`` 等维度；
-    - **用户唯一 ID**: 直接使用聊天平台用户 ID 字符串（如 QQ 号），无需映射。
-
-    工程约定:
-
-    - ``luckperms`` 为**软依赖**（延迟导入）: 未安装时仅影响本适配器；
-    - 所有查询异常转为日志 + 安全默认值（False / 空），权限故障不击穿业务；
-    - **控制台身份**: ``console_user``（默认 ``console``）在引导时自动创建并保留 ``*``
-      节点；:meth:`has_permission` 对该身份直接放行——本地控制台拥有全部权限
-      （ADR-0013 语义）；
-    - :attr:`manager` 暴露底层 ``LuckPermsManager``，供管理命令 / WebUI 做 CRUD
-      （授予节点、加组、上下文、临时权限、轨道晋升等）。**这些 CRUD 是同步的**，
-      调用方若在 async 上下文里使用，请自行 ``to_thread`` + 复用 :attr:`write_lock`；
-      或者优先使用本类提供的 :meth:`grant_node` / :meth:`revoke_node` /
-      :meth:`add_group` / :meth:`remove_group` 等 async 包装方法。
+    **后端没有的能力**（本类不提供空壳接口）
+    - meta 写入（无 ``user_set_meta`` / ``group_set_meta``）——只有模型层的
+      ``get_meta`` 可读；
+    - 组节点的 ``duration``；
+    - 批量事务。
     """
 
-    #: 缓存条目存活秒数；<= 0 表示禁用缓存
+    #: 缓存条目存活秒数；<= 0 表示禁用
     CACHE_TTL: float = 5.0
-    #: 缓存条目数上限（粗粒度保护，避免内存无界增长）
+    #: 缓存条目数上限
     CACHE_MAXSIZE: int = 4096
 
     def __init__(
@@ -220,23 +197,20 @@ class LuckPermsAdapter(BasePermissionService):
         self._bootstrap = bootstrap
         self._manager: "LuckPermsManager | None" = None
 
-        # 写操作串行锁（懒创建，绑定到当前事件循环）
         self._write_lock: asyncio.Lock | None = None
-        # 缓存: key -> (expire_ts, value)
         self._cache: dict[tuple, tuple[float, bool]] = {}
         self._cache_ttl = self.CACHE_TTL if cache_ttl is None else float(cache_ttl)
 
     # ---------- 内部辅助 ----------
 
     def _get_write_lock(self) -> asyncio.Lock:
-        """懒创建写锁（必须在事件循环内调用）。"""
         if self._write_lock is None:
             self._write_lock = asyncio.Lock()
         return self._write_lock
 
     @property
     def write_lock(self) -> asyncio.Lock:
-        """暴露给外部管理命令使用的写锁（保证与适配器内部串行化一致）。"""
+        """暴露给外部管理命令复用的写锁。"""
         return self._get_write_lock()
 
     @staticmethod
@@ -247,7 +221,6 @@ class LuckPermsAdapter(BasePermissionService):
     ) -> tuple:
         if not context:
             return (user_id, node, ())
-        # 排序保证不同插入顺序的等价 context 命中同一条目
         items = tuple(sorted((str(k), repr(v)) for k, v in context.items()))
         return (user_id, node, items)
 
@@ -267,11 +240,9 @@ class LuckPermsAdapter(BasePermissionService):
         if self._cache_ttl <= 0:
             return
         if len(self._cache) >= self.CACHE_MAXSIZE:
-            # 粗粒度淘汰：清空最旧的一半
             now = time.monotonic()
             alive = {k: v for k, v in self._cache.items() if v[0] >= now}
             if len(alive) >= self.CACHE_MAXSIZE:
-                # 全都没过期，直接清掉一半
                 self._cache.clear()
             else:
                 self._cache = alive
@@ -281,7 +252,6 @@ class LuckPermsAdapter(BasePermissionService):
         self._cache.clear()
 
     def _ensure_console_identity(self, manager: "LuckPermsManager") -> None:
-        """同步实现：确保控制台用户存在且持有 ``*``。"""
         uid = self._console_user
         if not uid:
             return
@@ -298,8 +268,14 @@ class LuckPermsAdapter(BasePermissionService):
             manager.user_add_node(uid, "*", True, None)
             log.info("luckperms: 已确保控制台用户 '%s' 拥有全部权限（*）", uid)
 
+    def _ensure_default_group(self, manager: "LuckPermsManager") -> None:
+        name = self._default_group
+        if not name or manager.get_group(name) is not None:
+            return
+        manager.create_group(name, "默认组", weight=0)
+        log.info("luckperms: 已创建默认组 '%s'（%s）", name, self._data_dir)
+
     def _load_manager_sync(self) -> "LuckPermsManager":
-        """同步实现：导入 + 构造 + 引导。只在 to_thread 里调用。"""
         try:
             from luckperms import LuckPermsManager
         except ImportError as exc:  # pragma: no cover
@@ -313,10 +289,11 @@ class LuckPermsAdapter(BasePermissionService):
             self._ensure_default_group(manager)
             self._ensure_console_identity(manager)
         log.info(
-            "luckperms 已加载: data_dir=%s users=%d groups=%d",
+            "luckperms 已加载: data_dir=%s users=%d groups=%d tracks=%d",
             self._data_dir,
             len(manager.list_users()),
             len(manager.list_groups()),
+            len(manager.list_tracks()),
         )
         return manager
 
@@ -324,36 +301,20 @@ class LuckPermsAdapter(BasePermissionService):
 
     @property
     def manager(self) -> "LuckPermsManager":
-        """底层 ``LuckPermsManager``（懒加载；首次访问时引导 default 组与控制台身份）。
-
-        注意：底层 API 是**同步的**。在 async 代码里请优先使用本类提供的
-        async 包装方法，或自行 ``await asyncio.to_thread(...)``。
-        """
+        """底层 ``LuckPermsManager``（懒加载 + 引导）。同步对象，async 里请用包装方法。"""
         if self._manager is None:
             self._manager = self._load_manager_sync()
         return self._manager
 
     async def preflight(self) -> None:
-        """启动期预检：强制触发底层加载与引导。
-
-        推荐在 ``FcatbotApp._build_permissions`` 中调用，让配置错误在启动期
-        暴露。若底层不可用，本方法会抛出异常，由调用方决定是否降级。
-        """
+        """启动期预检：强制加载底层，让配置 / 依赖问题在启动期暴露。"""
         async with self._get_write_lock():
             if self._manager is None:
                 self._manager = await asyncio.to_thread(self._load_manager_sync)
 
     @property
     def console_user(self) -> str | None:
-        """控制台身份的用户 ID（None 表示未启用）。"""
         return self._console_user
-
-    def _ensure_default_group(self, manager: "LuckPermsManager") -> None:
-        name = self._default_group
-        if not name or manager.get_group(name) is not None:
-            return
-        manager.create_group(name, "默认组", weight=0)
-        log.info("luckperms: 已创建默认组 '%s'（%s）", name, self._data_dir)
 
     # ---------- PermissionService ----------
 
@@ -382,8 +343,7 @@ class LuckPermsAdapter(BasePermissionService):
             result = bool(await asyncio.to_thread(manager.check, uid, node_s, ctx))
         except Exception:
             log.exception("luckperms 权限检查失败: user=%s node=%s", uid, node_s)
-            # 失败结果不缓存，避免瞬态故障被放大成 TTL 窗口
-            return False
+            return False  # 失败结果不缓存
 
         self._cache_put(key, result)
         return result
@@ -395,23 +355,18 @@ class LuckPermsAdapter(BasePermissionService):
             user = await asyncio.to_thread(manager.get_user, uid)
             if user is not None:
                 return sorted(user.parents)
-            # 与 has_permission 语义一致: 游客继承 default 组
-            default = self._default_group
-            if default:
-                group = await asyncio.to_thread(manager.get_group, default)
+            # 游客继承 default 组（与 check 语义一致）
+            if self._default_group:
+                group = await asyncio.to_thread(manager.get_group, self._default_group)
                 if group is not None:
-                    return [default]
+                    return [self._default_group]
             return []
         except Exception:
             log.exception("luckperms get_groups 失败: user=%s", uid)
             return []
 
     async def get_meta(self, user_id: str, key: str) -> str | None:
-        """返回用户元数据，**沿父组继承展开**（与 ``check`` 语义一致）。
-
-        查找顺序：用户自身 → 深度优先遍历 ``parents``（用户组 + 组的组）。
-        第一个命中的值返回；都没有则 None。
-        """
+        """用户元数据，沿父组 BFS 展开。"""
         uid = str(user_id)
         key_s = str(key)
 
@@ -419,20 +374,15 @@ class LuckPermsAdapter(BasePermissionService):
             manager = self.manager
             user = manager.get_user(uid)
             if user is None:
-                # 游客：只能从 default 组继承
                 if not self._default_group:
                     return None
                 group = manager.get_group(self._default_group)
-                if group is None:
-                    return None
-                return group.get_meta(key_s)
+                return group.get_meta(key_s) if group is not None else None
 
-            # 1. 用户自身
             value = user.get_meta(key_s)
             if value is not None:
                 return value
 
-            # 2. BFS 遍历父组
             visited: set[str] = set()
             queue = list(user.parents)
             while queue:
@@ -455,8 +405,7 @@ class LuckPermsAdapter(BasePermissionService):
             log.exception("luckperms get_meta 失败: user=%s key=%s", uid, key_s)
             return None
 
-    # ---------- 写操作 async 包装（供管理命令 / WebUI 使用） ----------
-    # 这些方法统一: to_thread + write_lock + 缓存失效。
+    # ---------- 用户节点写操作 ----------
 
     async def grant_node(
         self,
@@ -467,7 +416,7 @@ class LuckPermsAdapter(BasePermissionService):
         context: Mapping[str, Any] | None = None,
         duration: int | None = None,
     ) -> None:
-        """给用户授予（或显式拒绝）一个节点。``duration`` 为秒。"""
+        """给用户授予（或显式拒绝）一个节点。``duration`` 为秒；``None`` 表示永久。"""
         uid = str(user_id)
         async with self._get_write_lock():
             manager = await asyncio.to_thread(lambda: self.manager)
@@ -479,6 +428,29 @@ class LuckPermsAdapter(BasePermissionService):
                 dict(context) if context else None,
                 duration,
             )
+            self._invalidate_cache()
+
+    async def grant_nodes(
+        self,
+        user_id: str,
+        nodes: Iterable[str],
+        value: bool = True,
+        *,
+        context: Mapping[str, Any] | None = None,
+        duration: int | None = None,
+    ) -> None:
+        """批量授予多个节点。单次写锁内完成；后端每次 add 仍会触发 ``_save_all``。"""
+        uid = str(user_id)
+        node_list = [str(n) for n in nodes]
+        if not node_list:
+            return
+        ctx = dict(context) if context else None
+        async with self._get_write_lock():
+            manager = await asyncio.to_thread(lambda: self.manager)
+            for n in node_list:
+                await asyncio.to_thread(
+                    manager.user_add_node, uid, n, bool(value), ctx, duration
+                )
             self._invalidate_cache()
 
     async def revoke_node(
@@ -501,30 +473,299 @@ class LuckPermsAdapter(BasePermissionService):
             self._invalidate_cache()
             return bool(removed)
 
+    # ---------- 用户 / 组归属 ----------
+
     async def add_group(self, user_id: str, group_name: str) -> None:
-        """把用户加入一个组。"""
+        """把用户加入一个组。后端要求组存在，否则 ``KeyError``。"""
         uid = str(user_id)
+        gname = str(group_name)
         async with self._get_write_lock():
             manager = await asyncio.to_thread(lambda: self.manager)
-            await asyncio.to_thread(manager.user_add_group, uid, str(group_name))
+            await asyncio.to_thread(manager.user_add_group, uid, gname)
             self._invalidate_cache()
 
     async def remove_group(self, user_id: str, group_name: str) -> None:
         """把用户从一个组移除。"""
         uid = str(user_id)
+        gname = str(group_name)
         async with self._get_write_lock():
             manager = await asyncio.to_thread(lambda: self.manager)
-            await asyncio.to_thread(manager.user_remove_group, uid, str(group_name))
+            await asyncio.to_thread(manager.user_remove_group, uid, gname)
             self._invalidate_cache()
+
+    # ---------- 用户 CRUD ----------
 
     async def create_user(
         self,
         user_id: str,
         display_name: str | None = None,
     ) -> None:
-        """显式创建一个持久化用户（会带上 default 组）。"""
+        """创建一个持久化用户（自动带 default 组）。已存在时静默返回。"""
+        uid = str(user_id)
+
+        def _do(manager: "LuckPermsManager") -> None:
+            if manager.get_user(uid) is not None:
+                return
+            manager.create_user(uid, display_name)
+
+        async with self._get_write_lock():
+            manager = await asyncio.to_thread(lambda: self.manager)
+            await asyncio.to_thread(_do, manager)
+            self._invalidate_cache()
+
+    async def delete_user(self, user_id: str) -> bool:
+        """删除一个持久化用户。返回是否确实删除了。"""
         uid = str(user_id)
         async with self._get_write_lock():
             manager = await asyncio.to_thread(lambda: self.manager)
-            await asyncio.to_thread(manager.create_user, uid, display_name)
+            removed = await asyncio.to_thread(manager.delete_user, uid)
+            self._invalidate_cache()
+            return bool(removed)
+
+    async def list_user_nodes(self, user_id: str) -> list[dict[str, Any]]:
+        """列出用户**自身**持有的节点（不含继承，不展开通配，不含过期）。"""
+        uid = str(user_id)
+
+        def _collect() -> list[dict[str, Any]]:
+            user = self.manager.get_user(uid)
+            if user is None:
+                return []
+            return [
+                {
+                    "node": n.key,
+                    "value": bool(n.value),
+                    "context": dict(n.context) if n.context else None,
+                    "expiry": n.expiry,
+                }
+                for n in user.nodes
+                if not n.is_expired()
+            ]
+
+        try:
+            return await asyncio.to_thread(_collect)
+        except Exception:
+            log.exception("luckperms list_user_nodes 失败: user=%s", uid)
+            return []
+
+    # ---------- 组 CRUD ----------
+
+    async def create_group(
+        self,
+        name: str,
+        display_name: str | None = None,
+        *,
+        weight: int = 0,
+    ) -> None:
+        """创建一个组。已存在时静默返回。"""
+        gname = str(name)
+
+        def _do(manager: "LuckPermsManager") -> None:
+            if manager.get_group(gname) is not None:
+                return
+            manager.create_group(gname, display_name or gname, weight=int(weight))
+
+        async with self._get_write_lock():
+            manager = await asyncio.to_thread(lambda: self.manager)
+            await asyncio.to_thread(_do, manager)
+            self._invalidate_cache()
+
+    async def delete_group(self, name: str) -> bool:
+        """删除一个组。后端会自动清理用户/组/轨道对它的引用。"""
+        gname = str(name)
+        async with self._get_write_lock():
+            manager = await asyncio.to_thread(lambda: self.manager)
+            removed = await asyncio.to_thread(manager.delete_group, gname)
+            self._invalidate_cache()
+            return bool(removed)
+
+    # ---------- 组节点写操作 ----------
+
+    async def grant_group_node(
+        self,
+        group_name: str,
+        node: str,
+        value: bool = True,
+        *,
+        context: Mapping[str, Any] | None = None,
+    ) -> None:
+        """给组授予（或显式拒绝）一个节点。
+
+        .. note:: 后端 ``group_add_node`` **不支持 duration**——组节点永久有效。
+        """
+        gname = str(group_name)
+        async with self._get_write_lock():
+            manager = await asyncio.to_thread(lambda: self.manager)
+            await asyncio.to_thread(
+                manager.group_add_node,
+                gname,
+                str(node),
+                bool(value),
+                dict(context) if context else None,
+            )
+            self._invalidate_cache()
+
+    async def revoke_group_node(
+        self,
+        group_name: str,
+        node: str,
+        *,
+        context: Mapping[str, Any] | None = None,
+    ) -> bool:
+        """移除组上的节点。返回是否确实删除了某条。"""
+        gname = str(group_name)
+        async with self._get_write_lock():
+            manager = await asyncio.to_thread(lambda: self.manager)
+            removed = await asyncio.to_thread(
+                manager.group_remove_node,
+                gname,
+                str(node),
+                dict(context) if context else None,
+            )
+            self._invalidate_cache()
+            return bool(removed)
+
+    async def list_group_nodes(self, group_name: str) -> list[dict[str, Any]]:
+        """列出组**自身**持有的节点（不含继承，不展开通配，不含过期）。"""
+        gname = str(group_name)
+
+        def _collect() -> list[dict[str, Any]]:
+            group = self.manager.get_group(gname)
+            if group is None:
+                return []
+            return [
+                {
+                    "node": n.key,
+                    "value": bool(n.value),
+                    "context": dict(n.context) if n.context else None,
+                    "expiry": n.expiry,
+                }
+                for n in group.nodes
+                if not n.is_expired()
+            ]
+
+        try:
+            return await asyncio.to_thread(_collect)
+        except Exception:
+            log.exception("luckperms list_group_nodes 失败: group=%s", gname)
+            return []
+
+    # ---------- 组继承（后端命名: group_inherit / group_remove_inherit） ----------
+
+    async def group_inherit(self, group_name: str, parent_name: str) -> None:
+        """让组继承另一个组。后端会做循环检测，成环抛 ``ValueError``。"""
+        gname = str(group_name)
+        pname = str(parent_name)
+        async with self._get_write_lock():
+            manager = await asyncio.to_thread(lambda: self.manager)
+            await asyncio.to_thread(manager.group_inherit, gname, pname)
+            self._invalidate_cache()
+
+    async def group_uninherit(self, group_name: str, parent_name: str) -> None:
+        """解除组的父级继承。后端不检查存在性，重复解除是安全的。"""
+        gname = str(group_name)
+        pname = str(parent_name)
+        async with self._get_write_lock():
+            manager = await asyncio.to_thread(lambda: self.manager)
+            await asyncio.to_thread(manager.group_remove_inherit, gname, pname)
+            self._invalidate_cache()
+
+    # ---------- 只读清单（注意后端返回对象，不是字符串） ----------
+
+    async def list_users(self) -> list[str]:
+        """返回所有持久化用户 ID（不含隐式游客）。"""
+        try:
+            manager = await asyncio.to_thread(lambda: self.manager)
+            users = await asyncio.to_thread(manager.list_users)
+            return [u.unique_id for u in users]
+        except Exception:
+            log.exception("luckperms list_users 失败")
+            return []
+
+    async def list_groups(self) -> list[str]:
+        """返回所有组名。"""
+        try:
+            manager = await asyncio.to_thread(lambda: self.manager)
+            groups = await asyncio.to_thread(manager.list_groups)
+            return [g.name for g in groups]
+        except Exception:
+            log.exception("luckperms list_groups 失败")
+            return []
+
+    async def list_tracks(self) -> list[str]:
+        """返回所有轨道名。"""
+        try:
+            manager = await asyncio.to_thread(lambda: self.manager)
+            tracks = await asyncio.to_thread(manager.list_tracks)
+            return [t.name for t in tracks]
+        except Exception:
+            log.exception("luckperms list_tracks 失败")
+            return []
+
+    # ---------- Track（晋升轨道） ----------
+
+    async def create_track(
+        self,
+        name: str,
+        groups: Iterable[str] | None = None,
+    ) -> None:
+        """创建一条轨道。已存在时静默返回。"""
+        tname = str(name)
+        glist = [str(g) for g in (groups or [])]
+
+        def _do(manager: "LuckPermsManager") -> None:
+            if manager.get_track(tname) is not None:
+                return
+            manager.create_track(tname, glist)
+
+        async with self._get_write_lock():
+            manager = await asyncio.to_thread(lambda: self.manager)
+            await asyncio.to_thread(_do, manager)
+            self._invalidate_cache()
+
+    async def delete_track(self, name: str) -> bool:
+        """删除一条轨道。返回是否确实删除了。"""
+        tname = str(name)
+        async with self._get_write_lock():
+            manager = await asyncio.to_thread(lambda: self.manager)
+            removed = await asyncio.to_thread(manager.delete_track, tname)
+            self._invalidate_cache()
+            return bool(removed)
+
+    async def promote(self, user_id: str, track_name: str) -> str | None:
+        """沿轨道晋升一级。返回新组名；无法晋升返回 None。"""
+        uid = str(user_id)
+        tname = str(track_name)
+        async with self._get_write_lock():
+            manager = await asyncio.to_thread(lambda: self.manager)
+            result = await asyncio.to_thread(manager.promote, uid, tname)
+            self._invalidate_cache()
+            return result
+
+    async def demote(self, user_id: str, track_name: str) -> str | None:
+        """沿轨道降一级。返回新组名；无法降级返回 None。"""
+        uid = str(user_id)
+        tname = str(track_name)
+        async with self._get_write_lock():
+            manager = await asyncio.to_thread(lambda: self.manager)
+            result = await asyncio.to_thread(manager.demote, uid, tname)
+            self._invalidate_cache()
+            return result
+
+    # ---------- Web Editor ----------
+
+    async def export_webeditor_payload(self) -> dict[str, Any]:
+        """导出官方 Web Editor 兼容 payload。"""
+        try:
+            manager = await asyncio.to_thread(lambda: self.manager)
+            return await asyncio.to_thread(manager.to_webeditor_payload)
+        except Exception:
+            log.exception("luckperms export_webeditor_payload 失败")
+            return {}
+
+    async def apply_webeditor_payload(self, payload: Mapping[str, Any]) -> None:
+        """应用 Web Editor 返回的 payload（全量或增量格式均可）。"""
+        data = dict(payload)
+        async with self._get_write_lock():
+            manager = await asyncio.to_thread(lambda: self.manager)
+            await asyncio.to_thread(manager.apply_webeditor_changes, data)
             self._invalidate_cache()
