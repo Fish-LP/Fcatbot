@@ -347,11 +347,11 @@ def create_plugin(
 # ---------------------------------------------------------------------------
 
 
-def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="fcatbot-new-plugin",
-        description="生成 Fcatbot 插件骨架（包 / 单文件两种形态）",
-    )
+def add_cli_arguments(parser: argparse.ArgumentParser) -> None:
+    """向 ``parser`` 注册 new-plugin 子命令的全部参数。
+
+    供统一 CLI（:mod:`fcatbot.app`）与独立入口 ``fcatbot-new-plugin`` 复用。
+    """
     parser.add_argument("name", help="插件名（小写字母开头，如 my_plugin）")
     parser.add_argument(
         "-d",
@@ -380,12 +380,14 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", default="1.0.0", help="插件版本（默认 1.0.0）")
     parser.add_argument("--prefix", default="", help="聊天触发前缀（默认 !<name>）")
     parser.add_argument("--force", action="store_true", help="覆盖已存在的目标")
-    return parser
 
 
-def main(argv: list[str] | None = None) -> int:
-    """CLI 入口。返回退出码（0 成功 / 1 失败）。"""
-    args = _build_parser().parse_args(argv)
+def run_cli(args: argparse.Namespace) -> int:
+    """执行生成，返回退出码（0 成功 / 1 失败）。
+
+    Args:
+        args: 由 :func:`add_cli_arguments` 注册参数后解析得到的命名空间。
+    """
     raw_spec = PluginSpec(
         name=args.name,
         description=args.description,
@@ -411,9 +413,24 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  + {path}")
     print("\n下一步:")
     print(f"  1. 在 config/app.yaml 的 plugins.enabled 中加入 '{spec.name}'")
-    print("  2. 启动宿主: python main.py")
+    print("  2. 启动宿主: fcatbot")
     print(f"  3. 控制台执行 '{spec.name}' 验证命令；聊天触发前缀 '{spec.prefix}'")
     return 0
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="fcatbot-new-plugin",
+        description="生成 Fcatbot 插件骨架（包 / 单文件两种形态）",
+    )
+    add_cli_arguments(parser)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    """独立 CLI 入口（``fcatbot-new-plugin``）。返回退出码。"""
+    args = _build_parser().parse_args(argv)
+    return run_cli(args)
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI 自测

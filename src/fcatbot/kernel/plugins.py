@@ -195,6 +195,7 @@ class FcatbotPlugin(BasePlugin):
     _services: ServiceRegistry
     _transport: Transport | None
     _data_dir: Path
+    _config_file: Path
     _debug: bool
 
     # 由 create_task 惰性初始化的任务集合；插件停用时由 cancel_tasks 清空。

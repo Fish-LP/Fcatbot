@@ -12,6 +12,7 @@ import asyncio
 import inspect
 import logging
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +48,7 @@ log = logging.getLogger("fcatbot")
 # fcatbot/app.py —— 常量区（放在 log 定义之后、safe_name 之前）
 
 DEFAULT_APP_CONFIG: dict[str, Any] = {
+    "default_language": " zh-CN",
     "plugins": {
         "dirs": ["plugins"],
         "enabled": [],
@@ -355,6 +357,9 @@ class FcatbotApp:
         opts = dict(app_config.get("plugins") or {})
         plugin._data_dir = (
             Path(opts.get("data_dir", "data")) / "plugins" / safe_name(plugin.name)
+        )
+        plugin._config_file = (
+            self._config_path.parent / "plugins" / f"{plugin.name}.yaml"
         )
         plugin._debug = self._debug
         self._services.register_from_plugin(plugin)
@@ -766,42 +771,93 @@ class FcatbotApp:
 
 
 # ==================== CLI ====================
+#
+# 统一入口: 宿主启动（缺省子命令 ``run``）+ 插件脚手架（``new-plugin``）。
+# 运行参数（webui / transport / api / plugins.dirs）仍全部来自 config/app.yaml。
 
 
-# 除「到哪去找配置文件」外，全部运行参数（webui / transport / api / plugins.dirs）
-# 均来自 config/app.yaml；CLI 不再重复暴露。
+def _run_host(args: argparse.Namespace) -> int:
+    """启动 Fcatbot 宿主（原 ``fcatbot`` 行为，缺省子命令）。"""
+    setup_logging(
+        LogConfig(console_level=logging.DEBUG if args.debug else logging.INFO)
+    )
+    app = FcatbotApp(args.config, debug=args.debug)
+    try:
+        asyncio.run(app.run())
+    except KeyboardInterrupt:
+        log.info("Interrupted")
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="fcatbot", description="Fcatbot CLI")
-    parser.add_argument(
+    parser = argparse.ArgumentParser(
+        prog="fcatbot",
+        description="Fcatbot CLI —— 宿主启动 / 插件脚手架",
+    )
+    sub = parser.add_subparsers(dest="command", metavar="{run,new-plugin}")
+
+    # ---- run（缺省子命令）----
+    run_p = sub.add_parser(
+        "run",
+        help="启动宿主（未指定子命令时的缺省行为）",
+    )
+    run_p.add_argument(
         "-c",
         "--config",
         type=Path,
         default=Path("config/app.yaml"),
         help="设置框架配置文件路径",
     )
-    parser.add_argument(
+    run_p.add_argument(
         "-d",
         "--debug",
         action="store_true",
         help="开启调试模式",
     )
+    run_p.set_defaults(func=_run_host)
+
+    # ---- new-plugin ----
+    # 延迟导入: 避免启动期加载 tools 子包（脚手架不影响宿主启动路径）。
+    from fcatbot.tools.new_plugin import add_cli_arguments, run_cli
+
+    np_p = sub.add_parser(
+        "new-plugin",
+        help="生成 Fcatbot 插件骨架（包 / 单文件）",
+    )
+    add_cli_arguments(np_p)
+    np_p.set_defaults(func=run_cli)
+
     return parser
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> int:
+    """统一 CLI 入口。
+
+    用法::
+
+        fcatbot                                       # 启动宿主（默认）
+        fcatbot run -c config/app.yaml -d             # 显式启动 + 调试
+        fcatbot new-plugin my_plugin                  # 包模式生成插件
+        fcatbot new-plugin my_plugin --mode single --no-config
+        fcatbot -h                                    # 顶层帮助
+    """
+    argv = list(sys.argv[1:] if argv is None else argv)
+
+    # 未给子命令（``fcatbot`` / ``fcatbot -c xxx`` 等）→ 自动补 ``run``；
+    # 保留 ``fcatbot -h`` / ``--help`` 展示**顶层**帮助而非 run 的帮助。
+    if not argv or (argv[0].startswith("-") and argv[0] not in {"-h", "--help"}):
+        argv = ["run", *argv]
 
     parser = _build_parser()
-    args = parser.parse_args()
-    setup_logging(
-        LogConfig(console_level=logging.DEBUG if args.debug else logging.INFO)
-    )
+    args = parser.parse_args(argv)
 
-    app = FcatbotApp(args.config, debug=args.debug)
-    try:
-        asyncio.run(app.run())
-    except KeyboardInterrupt:
-        log.info("Interrupted")
+    func = getattr(args, "func", None)
+    if func is None:  # pragma: no cover - 理论不可达
+        parser.print_help()
+        return 0
+
+    return func(args) or 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -5,8 +5,15 @@ help 渲染特性:
 - 分组渲染: 按插件分组，每组有标题和色条
 - 宽度感知: CJK / Emoji 按 wcwidth 计宽，ANSI 码最后注入
 - 动态对齐: 命令列宽全局统一，跨页不跳动
-- 分页: 默认每页 16 行，可通过 -p N 翻页
+- 分页: 默认按终端高度自适应，可通过 -p N / -pN / N 翻页，-a 展开全部
 - 权限标签右对齐到行尾
+
+参数风格（参考 Unix）:
+- 布尔标志: -a / --all
+- 取值标志: -p N / -pN / --page=N / --page N
+- 短标志合并: -ap2 等价于 -a -p2
+- `--` 之后全部按位置参数处理
+- 未知标志会被报错
 
 统一输出约定（所有非 help 命令走 Out 类）:
 - 标签符号全部为 ASCII: [+][-][ ][!][?][i][>]，无立体感
@@ -58,6 +65,86 @@ def _build_command_context(event: Event) -> CommandContext:
 _GAP = 2
 _MIN_CMD_COL = 18
 _MAX_CMD_COL = 48
+
+
+# ==================== Unix 风格参数解析 ====================
+
+
+def _parse_argv(
+    args: list[str],
+    *,
+    flags: dict[str, str] | None = None,
+    values: dict[str, str] | None = None,
+) -> tuple[dict[str, object], list[str], list[str]]:
+    """极简 Unix 风格参数解析。
+
+    支持形式::
+
+        -a  --all                 布尔标志
+        -p N  -pN  --page=N       取值标志（短标志可合并，如 -ap2）
+        --                        之后全部按位置参数处理
+
+    返回 ``(opts, positional, unknown)``：
+    - ``opts``：标志名 → 值（布尔为 True，取值为 str）
+    - ``positional``：非标志参数，保持原顺序
+    - ``unknown``：未声明的短/长标志
+    """
+    flags = flags or {}
+    values = values or {}
+    opts: dict[str, object] = {}
+    positional: list[str] = []
+    unknown: list[str] = []
+
+    i, n = 0, len(args)
+    while i < n:
+        a = args[i]
+        i += 1
+
+        if a == "--":
+            positional.extend(args[i:])
+            break
+
+        # 长标志：--name 或 --name=value
+        if a.startswith("--") and len(a) > 2:
+            name, eq, inline = a[2:].partition("=")
+            if name in flags:
+                opts[flags[name]] = True
+            elif name in values:
+                if eq:
+                    opts[values[name]] = inline
+                elif i < n:
+                    opts[values[name]] = args[i]
+                    i += 1
+                else:
+                    unknown.append(a)
+            else:
+                unknown.append(a)
+            continue
+
+        # 短标志：-a / -pN / -ap2
+        if a.startswith("-") and len(a) > 1:
+            body, j = a[1:], 0
+            while j < len(body):
+                ch = body[j]
+                j += 1
+                if ch in flags:
+                    opts[flags[ch]] = True
+                elif ch in values:
+                    if j < len(body):  # -pN 合并形式
+                        opts[values[ch]] = body[j:]
+                    elif i < n:  # -p N 分离形式
+                        opts[values[ch]] = args[i]
+                        i += 1
+                    else:
+                        unknown.append("-" + ch)
+                    break
+                else:
+                    unknown.append("-" + ch)
+            continue
+
+        positional.append(a)
+
+    return opts, positional, unknown
 
 
 # ==================== 统一输出格式 ====================
@@ -291,27 +378,49 @@ class AdminCommands:
     @console_command(
         "help",
         help="显示所有命令或命令详情",
-        usage="help [命令|插件] [-p N]",
+        usage="help [命令|插件|页码] [-a] [-p N]",
         aliases=["?"],
     )
     def _cmd_help(self, args: list[str]) -> str:
-        if args and args[0] == "-p":
-            try:
-                page = int(args[1]) if len(args) > 1 else 1
-            except ValueError:
-                page = 1
-            return self._render_list(page=page)
+        opts, pos, unknown = _parse_argv(
+            args,
+            flags={"a": "all", "all": "all"},
+            values={"p": "page", "page": "page"},
+        )
+        if unknown:
+            return Out.err(f"未知参数: {' '.join(unknown)}")
 
-        if args:
-            spec, _ = self._registry.find(args)
+        # 显式 -p / --page
+        page = 1
+        if "page" in opts:
+            try:
+                page = max(1, int(str(opts["page"])))
+            except ValueError:
+                return Out.err(f"页码必须是整数: {opts['page']}")
+
+        # 位置参数：数字 → 页码；其他 → 目标（命令 / 插件）
+        target: str | None = None
+        for tok in pos:
+            if tok.isdigit():
+                page = max(1, int(tok))  # help 1  ≡ help -p 1
+            elif target is None:
+                target = tok
+            else:
+                return Out.err(f"多余的参数: {tok}")
+
+        show_all = bool(opts.get("all"))  # -a：单页全展开，忽略分页
+
+        if target is not None:
+            spec, _ = self._registry.find([target])
             if spec is not None:
                 return self._render_detail(spec)
-            by_plugin = self._filter_by_plugin(args[0])
-            if by_plugin:
-                return self._render_list(filter_plugin=args[0])
-            return Out.err(f"未找到与 '{args[0]}' 相关的命令")
+            if self._filter_by_plugin(target):
+                return self._render_list(
+                    filter_plugin=target, page=page, show_all=show_all
+                )
+            return Out.err(f"未找到与 '{target}' 相关的命令")
 
-        return self._render_list()
+        return self._render_list(page=page, show_all=show_all)
 
     # ---------- 列表渲染 ----------
 
@@ -321,6 +430,7 @@ class AdminCommands:
         page: int = 1,
         filter_plugin: str | None = None,
         page_size: int | None = None,
+        show_all: bool = False,
     ) -> str:
         roots = self._registry.all_roots()
         if filter_plugin:
@@ -336,7 +446,12 @@ class AdminCommands:
             groups.setdefault(row["plugin"], []).append(row)
 
         columns, lines = terminal_size()
-        ps = page_size if page_size is not None else max(6, min(lines - 8, 40))
+        if show_all:
+            ps = 1 << 30  # -a：单页承载全部
+        elif page_size is not None:
+            ps = page_size
+        else:
+            ps = max(6, min(lines - 8, 40))
 
         pages = self._paginate(groups, cmd_col, columns, ps)
         total_pages = len(pages)
@@ -356,7 +471,10 @@ class AdminCommands:
             [
                 "",
                 rule,
-                Theme.dim(" help <命令> 查看详情 · help <插件> 筛选 · help -p N 翻页"),
+                Theme.dim(
+                    " help <命令> 详情 · help <插件> 筛选"
+                    " · help -p N | -pN | N 翻页 · help -a 全展开"
+                ),
                 rule,
             ]
         )
@@ -584,7 +702,14 @@ class AdminCommands:
         usage="plugins [-a|--all]",
     )
     def _cmd_plugins(self, args: list[str]) -> str:
-        show_all = any(a in ("-a", "--all") for a in args)
+        opts, _, unknown = _parse_argv(
+            args,
+            flags={"a": "all", "all": "all"},
+        )
+        if unknown:
+            return Out.err(f"未知参数: {' '.join(unknown)}")
+
+        show_all = bool(opts.get("all"))
         active = {p.name: p for p in self._app._pm.get_active_plugins()}
         discovered = self._app.discovered_plugins
         errors = self._app._pm.get_load_errors()
