@@ -143,8 +143,15 @@ class FcatbotPlugin(BasePlugin):
     """所有 Fcatbot 插件的基类。
 
     直接继承本类并实现需要的异步生命周期钩子即可；无需手动订阅/退订事件——
-    :class:`IntegrationLayer` 会依据插件类上的 ``__event_spec__`` 与命令声明
+    :class:`IntegrationLayer` 会依据插件类上的 ``__event_specs__`` 与命令声明
     完成装配。
+
+    一个方法可叠加多个 :func:`~fcatbot.kernel.decorators.on_event` 订阅多个事件::
+
+        @on_event("napcat.message.group")
+        @on_event("napcat.message.private")
+        async def on_message(self, event) -> None:
+            ...
 
     最小示例::
 

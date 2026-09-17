@@ -28,6 +28,7 @@ from fcatbot.kernel.commands import (
     CommandConflict,
     scan_plugin_commands,
 )
+from fcatbot.kernel.decorators import has_event_specs, iter_event_specs
 from fcatbot.kernel.events import Event
 
 log = logging.getLogger("fcatbot.integration")
@@ -203,18 +204,22 @@ class IntegrationLayer:
         tokens: list[str] = []
         for attr_name in dir(type(plugin)):
             attr = getattr(type(plugin), attr_name, None)
-            if attr is None or not hasattr(attr, "__event_spec__"):
+            if attr is None or not has_event_specs(attr):
                 continue
+            # 同一方法可叠加多个 @on_event —— 每个声明独立订阅。
+            # 每个声明各自包一个 wrapper，避免处理器被同一事件重复触发时
+            # 共享状态（如 once 计数）互相干扰。
             bound = getattr(plugin, attr_name)
-            tokens.append(
-                self._bus.subscribe(
-                    attr.__event_spec__,
-                    self._make_wrapper(bound),
-                    priority=attr.__event_priority__,
-                    once=attr.__event_once__,
-                    filter=attr.__event_filter__,
+            for spec in iter_event_specs(attr):
+                tokens.append(
+                    self._bus.subscribe(
+                        spec.spec,
+                        self._make_wrapper(bound),
+                        priority=spec.priority,
+                        once=spec.once,
+                        filter=spec.filter,
+                    )
                 )
-            )
         return tokens
 
     def _register_commands(self, plugin: BasePlugin) -> int:

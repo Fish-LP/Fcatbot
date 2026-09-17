@@ -6,6 +6,7 @@ import asyncio
 from typing import Any
 
 from fcatbot.kernel.commands import CommandRegistry, console_command
+from fcatbot.kernel.decorators import EventSpec, iter_event_specs, on_event
 from fcatbot.kernel.events import Event, EventBus
 from fcatbot.kernel.integration import IntegrationLayer
 from fcatbot.kernel.plugins import FcatbotPlugin
@@ -284,3 +285,111 @@ def test_has_permission_for_derives_subject_and_context() -> None:
         await bus2.close()
 
     asyncio.run(scenario())
+
+
+# ---------------------------------------------------------------------------
+# @on_event 叠加: 一个方法订阅多个事件
+# ---------------------------------------------------------------------------
+
+
+class _MultiEvent(FcatbotPlugin):
+    """在同一个方法上叠加多个 @on_event，各自保留自己的 priority / filter。"""
+
+    name = "multi"
+    version = "1.0.0"
+    description = "multi-event plugin"
+    target_application = "fcatbot"
+    min_app_version = "1.0.0"
+
+    def __init__(self) -> None:
+        self.seen: list[tuple[str, Any]] = []
+
+    @on_event("napcat.message.group")
+    @on_event("napcat.message.private", filter=lambda e: e.data.startswith("!"))
+    async def on_message(self, event: Event) -> None:
+        self.seen.append((event.name, event.data))
+
+    @on_event("raw.a")
+    @on_event("raw.b", priority=90)
+    @on_event("raw.c", once=True)
+    async def on_raw(self, event: Event) -> None:
+        self.seen.append((event.name, event.data))
+
+
+def test_on_event_can_be_stacked_on_one_method() -> None:
+    async def scenario() -> None:
+        plugin = _MultiEvent()
+        layer, bus, _, _ = _build([plugin])
+        layer.attach(plugin)
+
+        # 两个声明都生效
+        await bus.publish(Event(name="napcat.message.group", data="plain"))
+        await bus.publish(Event(name="napcat.message.private", data="!cmd"))
+        assert plugin.seen == [
+            ("napcat.message.group", "plain"),
+            ("napcat.message.private", "!cmd"),
+        ]
+
+        # 每个声明独立的 filter（不只是作用于第一条）
+        await bus.publish(Event(name="napcat.message.private", data="no-prefix"))
+        assert plugin.seen[-1] == ("napcat.message.private", "!cmd")
+
+        # 三条 raw 声明全部生效；once 只作用于声明它的那条
+        await bus.publish(Event(name="raw.a", data=1))
+        await bus.publish(Event(name="raw.b", data=2))
+        await bus.publish(Event(name="raw.c", data=3))
+        await bus.publish(Event(name="raw.c", data=4))
+        await bus.publish(Event(name="raw.b", data=5))
+        assert plugin.seen[-4:] == [
+            ("raw.a", 1),
+            ("raw.b", 2),
+            ("raw.c", 3),
+            ("raw.b", 5),
+        ]
+
+        # detach 退订全部声明
+        layer.detach(plugin)
+        await bus.publish(Event(name="napcat.message.group", data="gone"))
+        await bus.publish(Event(name="raw.a", data=9))
+        assert plugin.seen[-4:] == [
+            ("raw.a", 1),
+            ("raw.b", 2),
+            ("raw.c", 3),
+            ("raw.b", 5),
+        ]
+
+        await bus.close()
+
+    asyncio.run(scenario())
+
+
+def test_iter_event_specs_preserves_declarations_and_legacy_attr() -> None:
+    specs = list(iter_event_specs(_MultiEvent.on_message))
+    # 自下而上: 离方法最近的装饰器先生效
+    assert [s.spec for s in specs] == [
+        "napcat.message.private",
+        "napcat.message.group",
+    ]
+    assert specs[0].filter is not None and specs[0].priority == 50
+
+    raw_specs = list(iter_event_specs(_MultiEvent.on_raw))
+    assert [(s.spec, s.priority, s.once) for s in raw_specs] == [
+        ("raw.c", 50, True),
+        ("raw.b", 90, False),
+        ("raw.a", 50, False),
+    ]
+
+    # 向后兼容: 单数形式属性指向最先声明的那条
+    assert _MultiEvent.on_raw.__event_spec__ == "raw.c"
+    assert _MultiEvent.on_raw.__event_priority__ == 50
+    assert _MultiEvent.on_raw.__event_once__ is True
+
+    # 无声明的方法不产出任何 spec
+    assert list(iter_event_specs(_MultiEvent.on_load)) == []
+
+    # 旧式手工设置单个 __event_spec__ 的对象仍然被识别
+    class Legacy:
+        __event_spec__ = "raw.legacy"
+        __event_priority__ = 70
+
+    assert list(iter_event_specs(Legacy)) == [EventSpec(spec="raw.legacy", priority=70)]

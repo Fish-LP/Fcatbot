@@ -178,6 +178,21 @@ init(同步) → activate(同步) → on_load → [装配：事件订阅 + 命�
         self.create_task(self._poll(), name="poll")   # 停用时自动取消
 ```
 
+### 事件订阅：`@on_event` 可叠加
+
+一个方法可以叠加多个 `@on_event` 来复用同一处理逻辑；每个声明**独立生效**，
+可各自携带 `priority` / `once` / `filter`：
+
+```python
+    @on_event("napcat.message.group")
+    @on_event("napcat.message.private", priority=40, filter=lambda e: e.data.startswith("!"))
+    async def on_message(self, event: Event) -> None:
+        ...
+```
+
+叠加顺序为“离方法最近的装饰器先生效”（Python 装饰器自下而上应用）。
+插件停用时这些订阅会被一起退订。
+
 权限检查有两层：
 
 | 场景 | 用法 |
