@@ -133,7 +133,7 @@ class Transport(ABC):
 
     # ---------- 帧级直通（旁路总线） ----------
 
-    def add_raw_listener(self, listener: RawListener) -> Callable[[], None]:
+    def add_raw_listener(self, listener: RawListener) -> Callable[[], bool]:
         """注册**帧级直通**监听器，返回注销函数。
 
         用途: 协议层需要在总线派发**之外**拿到原始帧时使用（典型场景是
@@ -143,18 +143,23 @@ class Transport(ABC):
 
         - 监听器在**收帧任务**中被调用，不经过单 worker 总线队列；
         - 因此**不会**与正在执行的事件处理器互相等待——若改用事件订阅做应答
-          路由，当调用方本身就处于事件处理器内时会死锁（worker 正被占用，
-          应答事件永远排不到）；
+        路由，当调用方本身就处于事件处理器内时会死锁（worker 正被占用，
+        应答事件永远排不到）；
         - 监听器应当是**快速、非阻塞**的: 同步函数直接调用；返回可等待对象时
-          会以 ``ensure_future`` 调度（fire-and-forget）。异常被隔离，不影响收帧。
+        会以 ``ensure_future`` 调度（fire-and-forget）。异常被隔离，不影响收帧。
+
+        Returns:
+            注销函数 ``() -> bool``: 首次调用返回 ``True``（已移除），
+            重复调用返回 ``False``（本就未注册 / 已被移除）。
         """
         self._raw_listeners.append(listener)
 
-        def _remove() -> None:
+        def _remove() -> bool:
             try:
                 self._raw_listeners.remove(listener)
+                return True
             except ValueError:
-                pass
+                return False
 
         return _remove
 

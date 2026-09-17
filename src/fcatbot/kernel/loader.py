@@ -59,7 +59,9 @@ class PluginLoader:
         """扫描所有插件目录，返回所有插件类。
 
         每个目录下的每个 entry 独立加载。加载失败的 entry 记录日志并跳过，
-        不影响其他插件。同名插件（跨目录）只保留第一个。
+        不影响其他插件。同名 entry（跨目录）只保留第一个。
+        一个 entry 内可声明多个插件类（__plugins__ / __all__ / 自动扫描），
+        全部都会被返回。
         """
         classes: list[type[BasePlugin]] = []
         seen: set[str] = set()
@@ -79,7 +81,16 @@ class PluginLoader:
                 seen.add(name)
 
                 try:
-                    cls = self._load_class_by_name(name)
+                    loaded = self._load_classes_by_name(name)
+                except Exception:
+                    log.exception("Failed to load plugin from %s", entry)
+                    continue
+
+                if not loaded:
+                    log.warning("No BasePlugin subclass found in %s", entry)
+                    continue
+
+                for cls in loaded:
                     classes.append(cls)
                     log.info(
                         "Discovered plugin: %s -> %s (from %s)",
@@ -87,14 +98,24 @@ class PluginLoader:
                         cls.__name__,
                         entry,
                     )
-                except Exception:
-                    log.exception("Failed to load plugin from %s", entry)
 
         return classes
 
     def load_class(self, name: str) -> type[BasePlugin]:
-        """按名称加载单个插件类（用于热重载）。"""
-        return self._load_class_by_name(name)
+        """按名称加载单个插件类（用于热重载）。
+
+        若 entry 声明了多个插件类，优先返回 name 属性等于 entry 名的那个，
+        否则返回第一个。
+        """
+        classes = self._load_classes_by_name(name)
+        for cls in classes:
+            if getattr(cls, "name", None) == name:
+                return cls
+        return classes[0]
+
+    def load_classes(self, name: str) -> list[type[BasePlugin]]:
+        """按名称加载该 entry 下的全部插件类（热重载多插件场景用）。"""
+        return self._load_classes_by_name(name)
 
     def clear_cache(self, name: str) -> None:
         """清理 sys.modules 中的旧模块及子模块（供 reload 使用）。"""
@@ -157,7 +178,7 @@ class PluginLoader:
 
     # ---------- 内部: 加载 ----------
 
-    def _load_class_by_name(self, name: str) -> type[BasePlugin]:
+    def _load_classes_by_name(self, name: str) -> list[type[BasePlugin]]:
         found = self._find_source(name)
         if found is None:
             raise PluginLoadError(name, "source not found")
@@ -167,12 +188,7 @@ class PluginLoader:
         classes = self._extract_plugin_classes(name, module)
         if not classes:
             raise PluginLoadError(name, "no BasePlugin subclass found")
-
-        # 多候选时优先 name 匹配的
-        for cls in classes:
-            if getattr(cls, "name", None) == name:
-                return cls
-        return classes[0]
+        return classes
 
     def _load_module(self, name: str, path: Path, kind: str) -> ModuleType:
         if kind == "zip":
@@ -251,7 +267,18 @@ class PluginLoader:
                     f"__plugins__ must be list or tuple, "
                     f"got {type(explicit).__name__}",
                 )
-            return [c for c in explicit if cls._is_plugin_class(c, allow_base=True)]
+            result = []
+            for c in explicit:
+                if cls._is_plugin_class(c):
+                    result.append(c)
+                else:
+                    log.warning(
+                        "Plugin '%s': __plugins__ entry %r is not a valid "
+                        "BasePlugin subclass, ignored",
+                        name,
+                        c,
+                    )
+            return result
 
         # 2) __all__ 过滤
         all_names = getattr(module, "__all__", None)
