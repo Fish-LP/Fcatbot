@@ -1,0 +1,114 @@
+"""$description"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from fcatbot import Event, FcatbotPlugin, console_command, on_event
+from fcatbot.utils import Color
+
+
+class $class_name(FcatbotPlugin):
+    """$description"""
+
+    # ---- 元信息（由 PluginLoader 在发现阶段读取）----
+    name = "$name"
+    version = "$version"
+    description = "$description"
+    author = "$author"
+    # 当前框架版本限制
+    api_version = "$api_version"
+    min_app_version = "$app_version"
+
+    # ---- 依赖 ----
+    # 按此顺序加载；被依赖插件失败时本插件不加载。
+    depends_on: list[str] = []
+
+    # ---- 配置 ----
+    # 宿主启动时若 config/plugins/$name.yaml 缺失，会用 default_config 自动落盘；
+    # config_schema 用于启动前进行类型检查
+    config_schema = {"greeting": str, "prefix": str}
+    default_config = {"greeting": "hello from $name", "prefix": "$prefix"}
+
+    # ---- 对外服务 ----
+    # 值语义: None=插件实例自身 / "attr"=实例属性名 / 类型 / 实例。
+    # 其他插件用 get_service("$name.api") 获取。
+    provides = {"$name.api": None}
+
+    # ==================== 生命周期（异步入口）====================
+    #
+    # 调用顺序（由 IntegrationLayer 编排）:
+    #   init(同步) → activate(同步) → on_load → [装配: 订阅 + 命令] → on_enable
+    #   停用: on_disable → [取消后台任务] → [拆卸: 退订/注销] → on_unload → deactivate(同步)
+    #
+    # 这四个钩子可安全 await 权限检查 / 服务查询 / 事件发布。
+
+    def init(self, app_config: dict[str, Any], plugin_config: dict[str, Any]) -> None:
+        super().init(app_config, plugin_config)
+        self._greeting: str = self.config.get("greeting", "hello")
+        self._prefix: str = self.config.get("prefix", "$prefix")
+        self.log.info(
+            "%s%s v%s 已加载%s", Color.Green, self.name, self.version, Color.Reset
+        )
+
+
+    async def on_load(self) -> None:
+        """已加载并注入配置；此时尚未订阅事件 / 注册命令。"""
+        self.log.info("$name loaded")
+
+    async def on_enable(self) -> None:
+        """已订阅事件并注册命令，插件正式生效；适合启动后台任务。"""
+        self.log.info("$name enabled (prefix=%s)", self._prefix)
+        # 常驻后台任务（插件停用时自动取消）:
+        # self.create_task(self._worker(), name="worker")
+
+    async def on_disable(self) -> None:
+        """即将退订（还在接收事件）；先收敛内部状态。后台任务随后由框架统一取消。"""
+        self.log.info("$name disabled")
+
+    async def on_unload(self) -> None:
+        """已退订并注销服务；释放外部资源。"""
+
+    # ==================== 事件订阅 ====================
+    #
+    # 事件源（适配器）插件可覆盖 permission_subject / permission_context，
+    # 把平台语义注入权限上下文；业务插件一般无需关心。
+
+    @on_event("raw.*")
+    async def on_raw_frame(self, event: Event) -> None:
+        """示例: 观察原始连接帧 ``raw.<transport>.<kind>``（载荷未解析）。
+
+        业务插件通常应改为订阅**平台事件**（如 ``napcat.message.group``）
+        或内核契约类型（如 ``MessageEvent``）；这里用 ``raw.*`` 只是为了让
+        生成的骨架不依赖任何具体适配器。权限节点 ``$name.use``。
+        """
+        if not isinstance(event.data, dict):
+            return
+        text = str(event.data.get("raw_message", "")).strip()
+        if not text.startswith(self._prefix):
+            return
+        if not await self.has_permission_for(event, "use"):
+            return
+        payload = text[len(self._prefix):].strip()
+        self.log.info("echo: %s", payload or self._greeting)
+
+    # ==================== 控制台命令 ====================
+
+    @console_command(
+        "$name",
+        help="$description",
+        usage="$name [text]",
+    )
+    def cmd_$name(self, args: list[str]) -> str:
+        """未显式声明权限节点时自动派生为 ``$name:command.$name``。"""
+        return f"{self._greeting} {' '.join(args)}".strip()
+
+    # ==================== 对外 API（供其他插件 / 服务调用）====================
+
+    async def greet(self, text: str = "") -> str:
+        return f"{self._greeting} {text}".strip()
+
+    # ==================== 健康检查（可选）====================
+
+    def health(self) -> dict[str, Any]:
+        return {"status": "ok"}

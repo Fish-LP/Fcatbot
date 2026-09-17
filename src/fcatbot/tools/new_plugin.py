@@ -13,6 +13,29 @@
     └── plugin.py                   # 插件实现（生命周期 + 事件订阅 + 控制台命令）
     config/plugins/<name>.yaml      # 默认配置（--no-config 可关闭）
 
+模板文件
+--------
+
+本工具使用的模板**不内嵌在代码里**，而是独立存放在::
+
+    fcatbot/tools/templates/plugin/
+    ├── plugin.py.tmpl          # 插件主模块
+    ├── package_init.py.tmpl    # 包模式 __init__.py
+    ├── single_tail.py.tmpl     # 单文件模式追加的 __plugins__ 声明
+    └── config.yaml.tmpl        # 默认 config/plugins/<name>.yaml
+
+模板语法为 :class:`string.Template`（占位符形如 ``$name``）。渲染上下文由
+:meth:`PluginSpec.context` 提供，键集固定:
+
+    name / class_name / description / author / version /
+    prefix / app_version / api_version
+
+这样模板文件可以直接被文本编辑器 / 翻译工具处理，也便于下游 fork 做本地化。
+
+    打包注意：请把 ``templates/`` 目录纳入 package_data（setuptools 的
+    ``package_data``、hatch 的 ``include``、poetry 的 ``include``），否则
+    安装后找不到模板会抛 :class:`ScaffoldError`。
+
 约定（与框架一致）:
 
 - 插件名用作 ``FcatbotPlugin.name`` 与权限节点前缀；建议小写下划线命名；
@@ -28,6 +51,7 @@ import keyword
 import re
 import sys
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from string import Template
 from typing import Iterable
@@ -36,165 +60,73 @@ from fcatbot import __api_version__, __version__
 
 __all__ = ["PluginSpec", "ScaffoldError", "create_plugin", "main"]
 
-_NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+_NAME_RE = re.compile(r"^[a-z][a-z0-9_]*\Z", re.ASCII | re.IGNORECASE)
 _MODES = ("package", "single")
 
 DEFAULT_PLUGIN_DIR = Path("plugins")
 DEFAULT_CONFIG_DIR = Path("config") / "plugins"
 
+# 模板目录：与代码同级的 ``templates/plugin/``。
+# 使用 ``resolve()`` 以避免在相对路径 / 符号链接场景下出现意外。
+_TEMPLATE_DIR = Path(__file__).resolve().parent / "templates" / "plugin"
+
+# 逻辑名 → 模板文件名。
+# 集中在一处，便于后续新增模板（如 tests / README）时统一管理。
+_TEMPLATE_FILES: dict[str, str] = {
+    "plugin": "plugin.py.tmpl",
+    "package_init": "package_init.py.tmpl",
+    "single_tail": "single_tail.py.tmpl",
+    "config": "config.yaml.tmpl",
+}
+
+
 # ---------------------------------------------------------------------------
-# 模板
+# 模板加载
 # ---------------------------------------------------------------------------
 
-_PLUGIN_TEMPLATE = Template(
-    '''"""$description"""
 
-from __future__ import annotations
-
-from typing import Any
-
-from fcatbot import Event, FcatbotPlugin, console_command, on_event
+class ScaffoldError(Exception):
+    """脚手架错误（参数非法 / 目标已存在 / 模板缺失等）。"""
 
 
-class $class_name(FcatbotPlugin):
-    """$description"""
+@lru_cache(maxsize=None)
+def _load_template(name: str) -> Template:
+    """按逻辑名加载模板（带缓存）。
 
-    # ---- 元信息（由 PluginLoader 在发现阶段读取）----
-    name = "$name"
-    version = "$version"
-    description = "$description"
-    author = "$author"
-    # 当前框架版本限制
-    api_version = "$api_version"
-    min_app_version = "$app_version"
+    Args:
+        name: ``_TEMPLATE_FILES`` 中的键，如 ``"plugin"``。
 
-    # ---- 依赖 ----
-    # 按此顺序加载；被依赖插件失败时本插件不加载。
-    depends_on: list[str] = []
+    Raises:
+        ScaffoldError: 逻辑名未知，或磁盘上找不到对应文件。
 
-    # ---- 配置 ----
-    # 宿主启动时若 config/plugins/$name.yaml 缺失，会用 default_config 自动落盘；
-    # config_schema 用于启动前进行类型检查
-    config_schema = {"greeting": str, "prefix": str}
-    default_config = {"greeting": "hello from $name", "prefix": "$prefix"}
-
-    # ---- 对外服务 ----
-    # 值语义: None=插件实例自身 / "attr"=实例属性名 / 类型 / 实例。
-    # 其他插件用 get_service("$name.api") 获取。
-    provides = {"$name.api": None}
-
-    # ==================== 生命周期（异步入口）====================
-    #
-    # 调用顺序（由 IntegrationLayer 编排）:
-    #   init(同步) → activate(同步) → on_load → [装配: 订阅 + 命令] → on_enable
-    #   停用: on_disable → [取消后台任务] → [拆卸: 退订/注销] → on_unload → deactivate(同步)
-    #
-    # 这四个钩子可安全 await 权限检查 / 服务查询 / 事件发布。
-
-    def init(self, app_config: dict[str, Any], plugin_config: dict[str, Any]) -> None:
-        super().init(app_config, plugin_config)
-        self._greeting: str = self.config.get("greeting", "hello")
-        self._prefix: str = self.config.get("prefix", "$prefix")
-
-    async def on_load(self) -> None:
-        """已加载并注入配置；此时尚未订阅事件 / 注册命令。"""
-        self.log.info("$name loaded")
-
-    async def on_enable(self) -> None:
-        """已订阅事件并注册命令，插件正式生效；适合启动后台任务。"""
-        self.log.info("$name enabled (prefix=%s)", self._prefix)
-        # 常驻后台任务（插件停用时自动取消）:
-        # self.create_task(self._worker(), name="worker")
-
-    async def on_disable(self) -> None:
-        """即将退订（还在接收事件）；先收敛内部状态。后台任务随后由框架统一取消。"""
-        self.log.info("$name disabled")
-
-    async def on_unload(self) -> None:
-        """已退订并注销服务；释放外部资源。"""
-
-    # ==================== 事件订阅 ====================
-    #
-    # 事件源（适配器）插件可覆盖 permission_subject / permission_context，
-    # 把平台语义注入权限上下文；业务插件一般无需关心。
-
-    @on_event("raw.*")
-    async def on_raw_frame(self, event: Event) -> None:
-        """示例: 观察原始连接帧 ``raw.<transport>.<kind>``（载荷未解析）。
-
-        业务插件通常应改为订阅**平台事件**（如 ``napcat.message.group``）
-        或内核契约类型（如 ``MessageEvent``）；这里用 ``raw.*`` 只是为了让
-        生成的骨架不依赖任何具体适配器。权限节点 ``$name.use``。
-        """
-        if not isinstance(event.data, dict):
-            return
-        text = str(event.data.get("raw_message", "")).strip()
-        if not text.startswith(self._prefix):
-            return
-        if not await self.has_permission_for(event, "use"):
-            return
-        payload = text[len(self._prefix):].strip()
-        self.log.info("echo: %s", payload or self._greeting)
-
-    # ==================== 控制台命令 ====================
-
-    @console_command(
-        "$name",
-        help="$description",
-        usage="$name [text]",
-    )
-    def cmd_$name(self, args: list[str]) -> str:
-        """未显式声明权限节点时自动派生为 ``$name:command.$name``。"""
-        return f"{self._greeting} {' '.join(args)}".strip()
-
-    # ==================== 对外 API（供其他插件 / 服务调用）====================
-
-    async def greet(self, text: str = "") -> str:
-        return f"{self._greeting} {text}".strip()
-
-    # ==================== 健康检查（可选）====================
-
-    def health(self) -> dict[str, Any]:
-        return {"status": "ok"}
-'''
-)
-
-_PACKAGE_INIT_TEMPLATE = Template(
-    '''"""$name 插件（包模式）。"""
-
-from __future__ import annotations
-
-from .plugin import $class_name
-
-# PluginLoader 通过 __plugins__ 发现插件类。
-__plugins__ = [$class_name]
-'''
-)
-
-_SINGLE_TAIL_TEMPLATE = Template(
+    Note:
+        用 :func:`functools.lru_cache` 缓存已解析的 :class:`Template` 对象——
+        模板内容在进程生命周期内不会改变。读取失败不会写入缓存，
+        因此重复失败每次都会重新尝试读取磁盘（便于用户即时修复）。
     """
+    filename = _TEMPLATE_FILES.get(name)
+    if filename is None:
+        raise ScaffoldError(f"未知模板: {name!r}")
+    path = _TEMPLATE_DIR / filename
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise ScaffoldError(
+            f"模板文件缺失: {path}\n"
+            f"  · 若从源码运行，请确认 {_TEMPLATE_DIR} 存在；\n"
+            f"  · 若从已安装的包运行，请确认打包时包含 templates/ 目录。"
+        ) from exc
+    return Template(text)
 
-__plugins__ = [$class_name]
-"""
-)
 
-_CONFIG_TEMPLATE = Template(
-    """# $name 插件配置
-# 宿主启动时若本文件缺失，会用插件 default_config 自动生成；
-# 此处填写的值会覆盖 default_config 中的同名键。
-greeting: hello from $name
-prefix: "$prefix"
-"""
-)
+def _clear_template_cache() -> None:
+    """清空模板缓存（供测试 / 热更新调用）。"""
+    _load_template.cache_clear()
 
 
 # ---------------------------------------------------------------------------
 # 规格与校验
 # ---------------------------------------------------------------------------
-
-
-class ScaffoldError(Exception):
-    """脚手架错误（参数非法 / 目标已存在等）。"""
 
 
 @dataclass
@@ -207,6 +139,7 @@ class PluginSpec:
     version: str = "1.0.0"
     mode: str = "package"  # package | single
     prefix: str = ""  # 聊天触发前缀（默认 "!<name>"）
+    # 类属性（非 dataclass 字段）：模板渲染上下文用，跟随当前框架版本。
     app_version = __version__
     api_version = __api_version__
 
@@ -214,9 +147,7 @@ class PluginSpec:
         """补齐默认值并校验，返回规范化后的新规格。"""
         name = self.name.strip()
         if not _NAME_RE.match(name):
-            raise ScaffoldError(
-                f"插件名 '{self.name}' 非法: 要求小写字母开头，仅含 [a-z0-9_]"
-            )
+            raise ScaffoldError(f"插件名 '{self.name}' 非法: {_NAME_RE}")
         if keyword.iskeyword(name):
             raise ScaffoldError(f"插件名 '{name}' 是 Python 关键字，请换一个")
         mode = self.mode.strip().lower()
@@ -241,6 +172,7 @@ class PluginSpec:
         return class_name
 
     def context(self) -> dict[str, str]:
+        """模板渲染上下文——与 ``templates/plugin/*.tmpl`` 中的占位符一一对应。"""
         return {
             "name": self.name,
             "class_name": self.class_name,
@@ -259,9 +191,10 @@ class PluginSpec:
 
 
 def _render_plugin_module(spec: PluginSpec) -> str:
-    module = _PLUGIN_TEMPLATE.substitute(spec.context())
+    """渲染插件主模块；单文件模式额外追加 ``__plugins__`` 声明。"""
+    module = _load_template("plugin").substitute(spec.context())
     if spec.mode == "single":
-        module += _SINGLE_TAIL_TEMPLATE.substitute(spec.context())
+        module += _load_template("single_tail").substitute(spec.context())
     return module
 
 
@@ -299,7 +232,7 @@ def create_plugin(
         force: 目标已存在时是否覆盖。
 
     Raises:
-        ScaffoldError: 名称/模式非法，或目标已存在且未指定 ``force``。
+        ScaffoldError: 名称/模式非法，目标已存在且未指定 ``force``，或模板缺失。
     """
     spec = spec.normalized()
     plugin_dir = Path(plugin_dir)
@@ -323,7 +256,8 @@ def create_plugin(
         written.append(plugin_file)
         init_file = package_dir / "__init__.py"
         init_file.write_text(
-            _PACKAGE_INIT_TEMPLATE.substitute(spec.context()), encoding="utf-8"
+            _load_template("package_init").substitute(spec.context()),
+            encoding="utf-8",
         )
         written.append(init_file)
     else:
@@ -335,7 +269,8 @@ def create_plugin(
         config_dir_path.mkdir(parents=True, exist_ok=True)
         config_file = config_dir_path / f"{spec.name}.yaml"
         config_file.write_text(
-            _CONFIG_TEMPLATE.substitute(spec.context()), encoding="utf-8"
+            _load_template("config").substitute(spec.context()),
+            encoding="utf-8",
         )
         written.append(config_file)
 

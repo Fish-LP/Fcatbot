@@ -1,0 +1,8 @@
+"""$name 插件（包模式）。"""
+
+from __future__ import annotations
+
+from .plugin import $class_name
+
+# PluginLoader 通过 __plugins__ 发现插件类。
+__plugins__ = [$class_name]

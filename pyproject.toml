@@ -103,6 +103,11 @@ include = [
     "CHANGELOG.md",
 ]
 
+[tool.setuptools.package-data]
+"fcatbot.tools" = [
+    "templates/plugin/*.tmpl"
+]
+
 # -------------------------
 # 测试
 # -------------------------

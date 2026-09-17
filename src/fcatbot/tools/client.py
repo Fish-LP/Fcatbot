@@ -3,7 +3,7 @@ import inspect
 import typing
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Dict, Generic, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Awaitable, Dict, Generic, Optional, TypeVar
 
 T = TypeVar("T")
 
@@ -103,36 +103,52 @@ class ApiMeta(ABCMeta):
             return wrapper
 
 
-class APIClient(ABC, Generic[T], metaclass=ApiMeta):
-    @abstractmethod
-    async def invoke(self, request: ApiRequest) -> T:
-        pass
+if TYPE_CHECKING:
+    # 静态分析：元类就是普通 ABCMeta，不做任何动态事情
+    class APIClient(ABC, Generic[T], metaclass=ApiMeta):
+        @abstractmethod
+        async def invoke(self, request: ApiRequest) -> T:
+            pass
 
-    async def call(
-        self,
-        activity: str,
-        data: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> T:
-        return await self.invoke(ApiRequest(activity, data or {}, headers))
+        async def call(
+            self,
+            activity: str,
+            data: Optional[Dict[str, Any]] = None,
+            headers: Optional[Dict[str, str]] = None,
+        ) -> T: ...
 
-    async def _dispatch_result(self, result: Any) -> T:
-        if isinstance(result, ApiRequest):
-            return await self.invoke(result)
-        elif isinstance(result, str):
-            return await self.invoke(ApiRequest(result))
-        elif isinstance(result, tuple) and 1 <= len(result) <= 3:
-            return await self.invoke(ApiRequest(*result))
-        else:
-            return result  # type: ignore[return-value]
+else:
 
-        # def __getattr__(self, name: str) -> Any:
-        #     if name.startswith("_"):
-        #         raise AttributeError(
-        #             f"{self.__class__.__name__!r} object has no attribute {name!r}"
-        #         )
+    class APIClient(ABC, Generic[T], metaclass=ApiMeta):
+        @abstractmethod
+        async def invoke(self, request: ApiRequest) -> T:
+            pass
 
-        #     async def method(**kwargs) -> T:
-        #         return await self.invoke(ApiRequest(name, kwargs))
+        async def call(
+            self,
+            activity: str,
+            data: Optional[Dict[str, Any]] = None,
+            headers: Optional[Dict[str, str]] = None,
+        ) -> T:
+            return await self.invoke(ApiRequest(activity, data or {}, headers))
 
-        # return types.MethodType(method, self)
+        async def _dispatch_result(self, result: Any) -> T:
+            if isinstance(result, ApiRequest):
+                return await self.invoke(result)
+            elif isinstance(result, str):
+                return await self.invoke(ApiRequest(result))
+            elif isinstance(result, tuple) and 1 <= len(result) <= 3:
+                return await self.invoke(ApiRequest(*result))
+            else:
+                return result  # type: ignore[return-value]
+
+            # def __getattr__(self, name: str) -> Any:
+            #     if name.startswith("_"):
+            #         raise AttributeError(
+            #             f"{self.__class__.__name__!r} object has no attribute {name!r}"
+            #         )
+
+            #     async def method(**kwargs) -> T:
+            #         return await self.invoke(ApiRequest(name, kwargs))
+
+            # return types.MethodType(method, self)
