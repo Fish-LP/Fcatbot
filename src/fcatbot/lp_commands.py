@@ -3,7 +3,7 @@
 命令面与官方 `Command Usage <https://luckperms.net/wiki/Command-Usage>`_ 对齐，
 同时保留旧版插件参考实现中的增强项（``lp check`` / ``lp root`` / ``me`` / 继承树 / Web Editor）。
 
-官方结构: :
+官方结构: ::
 
     lp [help] / info / sync
     lp editor [type] [filter] / applyedits <code>
@@ -59,10 +59,11 @@
 
 - 顶层命令用 ``@console_command(name, ...)`` 声明，得到 ``CommandNode``；
 - 子命令通过父 ``CommandNode`` 的 ``.sub_command(...)`` 挂载（推荐），
-  或在扫描期用字符串 ``parent="lp"`` 声明（兼容，见文件 2 的 ``scan_plugin_commands``）；
+  或在扫描期用字符串 ``parent="lp"`` 声明（兼容，见 ``scan_plugin_commands``）；
 - 处理器声明 ``context: CommandContext | None`` 形参以获得来源感知；
 - 异步处理器（如 ``cmd_editor`` / ``cmd_applyedits``）直接声明 ``async def``，分发器按
-  ``Awaitable`` 调度（见文件 2 的 ``dispatch_command``）。
+  ``Awaitable`` 调度（见 ``dispatch_command``）；
+- 参数值解析统一走 :class:`fcatbot.kernel.args.CommandArgs`（流式消费 + 静态纯函数）。
 """
 
 from __future__ import annotations
@@ -73,6 +74,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+from fcatbot.kernel.args import ArgParseError, CommandArgs
 from fcatbot.kernel.commands import CommandContext, console_command
 from fcatbot.kernel.permissions import LuckPermsAdapter
 
@@ -130,115 +132,18 @@ _TRACK_USAGE = (
 
 
 # ---------------------------------------------------------------------------
-# 参数解析辅助
+# 参数解析别名（旧调用点零改动；全部迁到流式 API 后可整体删除）
 # ---------------------------------------------------------------------------
 
 
-def _parse_context(tokens: List[str]) -> tuple[Dict[str, str], List[str]]:
-    """从 tokens 中分离 ``key=value`` 上下文与未识别参数。"""
-    context: Dict[str, str] = {}
-    rest: List[str] = []
-    for token in tokens:
-        if "=" in token and not token.startswith("="):
-            key, _, value = token.partition("=")
-            if key:
-                context[key] = value
-                continue
-        rest.append(token)
-    return context, rest
-
-
-def _parse_bool(token: str) -> Optional[bool]:
-    """``true/t/yes/1`` → True；``false/f/no/0`` → False；其他返回 None。"""
-    lowered = token.strip().lower()
-    if lowered in ("true", "t", "yes", "y", "1", "allow"):
-        return True
-    if lowered in ("false", "f", "no", "n", "0", "deny"):
-        return False
-    return None
-
-
-def _parse_duration(text: str) -> Optional[int]:
-    """``1d2h30m`` → 秒数；支持 s/m/h/d/w；纯数字视为秒。"""
-    text = text.strip().lower()
-    if not text:
-        return None
-    if text.isdigit():
-        return int(text)
-    units = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
-    total = 0
-    number = ""
-    for ch in text:
-        if ch.isdigit():
-            number += ch
-            continue
-        unit = units.get(ch)
-        if unit is None or not number:
-            return None
-        total += int(number) * unit
-        number = ""
-    if number:  # 结尾裸数字: 视为秒
-        total += int(number)
-    return total or None
-
-
-def _fmt_duration(seconds: int) -> str:
-    for unit, size in (("w", 604800), ("d", 86400), ("h", 3600), ("m", 60), ("s", 1)):
-        if seconds % size == 0:
-            return f"{seconds // size}{unit}"
-    return f"{seconds}s"
-
-
-def _fmt_remain(seconds: int) -> str:
-    """剩余时长的近似展示（取最大可用单位）。"""
-    for unit, size in (("w", 604800), ("d", 86400), ("h", 3600), ("m", 60)):
-        if seconds >= size:
-            return f"~{seconds // size}{unit}"
-    return f"{seconds}s"
-
-
-def _fmt_ctx(context: Dict[str, Any]) -> str:
-    """节点上下文 → `` ctx={k=v, ...}``（空上下文返回空串）。"""
-    if not context:
-        return ""
-    parts: List[str] = []
-    for key, value in context.items():
-        if isinstance(value, (list, tuple, set)):
-            rendered = ",".join(str(item) for item in value)
-        else:
-            rendered = str(value)
-        parts.append(f"{key}={rendered}")
-    return " ctx={" + ", ".join(parts) + "}"
-
-
-def _normalize_ctx(context: Dict[str, str]) -> Dict[str, List[str]]:
-    """与 ``Node.normalize_context`` 对齐的简化归一化（用于 clear 过滤）。"""
-    normalized: Dict[str, List[str]] = {}
-    for key, value in context.items():
-        if isinstance(value, bool):
-            rendered = "true" if value else "false"
-        else:
-            rendered = str(value)
-        if rendered:
-            normalized[key] = [rendered]
-    return normalized
-
-
-def _match_verbose_filter(expr: str, user_id: str, node: str) -> bool:
-    """Verbose 过滤器子集: ``!term`` 取反；``|`` 分隔为"或"；term 按节点/用户前缀匹配。"""
-    for term in expr.split("|"):
-        term = term.strip()
-        if not term:
-            continue
-        negate = term.startswith("!")
-        if negate:
-            term = term[1:].strip()
-        hit = node.startswith(term) or user_id.startswith(term)
-        if negate:
-            hit = not hit
-        if hit:
-            return True
-    return False
+_parse_context = CommandArgs.parse_context
+_parse_bool = CommandArgs.parse_bool
+_parse_duration = CommandArgs.parse_duration
+_fmt_duration = CommandArgs.fmt_duration
+_fmt_remain = CommandArgs.fmt_remain
+_fmt_ctx = CommandArgs.fmt_context
+_normalize_ctx = CommandArgs.normalize_context
+_match_verbose_filter = CommandArgs.match_verbose_filter
 
 
 # ---------------------------------------------------------------------------
@@ -531,7 +436,7 @@ class LuckPermsCommands:
         uid = self._resolve_user(args[0], context)
         if uid is None:
             return _NO_IDENTITY
-        ctx, extra = _parse_context(args[2:])
+        ctx, extra = CommandArgs.parse_context(args[2:])
         if extra:
             return f"[lp] 无法识别的参数: {' '.join(extra)}（上下文格式: key=value）"
         result = self._check_with_verbose(manager, uid, args[1], ctx)
@@ -592,14 +497,20 @@ class LuckPermsCommands:
     def cmd_tree(
         self, args: List[str], context: Optional[CommandContext] = None
     ) -> str:
-        if not args:
+        a = CommandArgs(args)
+        if a.is_empty():
             return "[lp] 用法: lp tree <用户|组> [depth]"
+        holder_token = a.require("用户或组")
+
         depth = 5
-        if len(args) > 1:
-            if not args[1].lstrip("-").isdigit():
-                return f"[lp] depth 必须是整数: {args[1]}"
-            depth = int(args[1])
-        holder = self._resolve_user(args[0], context)
+        if a.remaining_count() > 0:
+            token = a.require("depth")
+            parsed = CommandArgs.parse_int(token)
+            if parsed is None:
+                return f"[lp] depth 必须是整数: {token}"
+            depth = parsed
+
+        holder = self._resolve_user(holder_token, context)
         if holder is None:
             return _NO_IDENTITY
         manager = self._manager()
@@ -939,23 +850,28 @@ class LuckPermsCommands:
             return _PlainFormatter.track_info(track)
 
         if action in ("append", "insert"):
-            if not rest:
+            a = CommandArgs(rest)
+            if a.is_empty():
                 return f"[lp] 用法: lp track {name} {action} <组> [position]"
             err = self._authorize(context, f"luckperms.track.{action}")
             if err:
                 return err
-            group_name = rest[0]
+            group_name = a.require("组")
             if manager.get_group(group_name) is None:
                 return f"[lp] 组 '{group_name}' 不存在"
+
             if action == "append":
                 track.append_group(group_name)
                 manager.save_all()
                 return f"[lp] 轨道 {name}: 已追加组 {group_name}"
+
             index = len(track.groups)
-            if len(rest) > 1:
-                if not rest[1].lstrip("-").isdigit():
-                    return f"[lp] position 必须是整数: {rest[1]}"
-                index = int(rest[1]) - 1  # 与官方一致: 1-based 展示
+            if a.remaining_count() > 0:
+                token = a.require("position")
+                pos = CommandArgs.parse_int(token, allow_negative=False)
+                if pos is None or pos < 1:
+                    return f"[lp] position 必须是整数: {token}"
+                index = pos - 1  # 与官方一致: 1-based 展示
             if not track.insert_group(index, group_name):
                 return "[lp] 插入失败: position 超出范围"
             manager.save_all()
@@ -1104,28 +1020,22 @@ class LuckPermsCommands:
         rest = args[1:]
 
         if action in ("set", "settemp"):
-            if not rest:
+            a = CommandArgs(rest)
+            if a.is_empty():
                 return (
                     f"[lp] 用法: lp {kind} {holder_id} permission {action} "
                     "<节点> [true|false] [时长] [key=value ...]"
                 )
-            node = rest[0]
-            index = 1
-            value = True
-            if index < len(rest):
-                parsed = _parse_bool(rest[index])
-                if parsed is not None:
-                    value = parsed
-                    index += 1
-            duration: Optional[int] = None
-            if action == "settemp":
-                if index >= len(rest):
-                    return "[lp] settemp 需要时长，如: 30m / 2h / 7d"
-                duration = _parse_duration(rest[index])
-                if duration is None:
-                    return f"[lp] 无效时长: {rest[index]}（示例: 30s / 10m / 2h / 7d）"
-                index += 1
-            ctx, extra = _parse_context(rest[index:])
+            node = a.require("权限节点")
+            value = a.take_bool(default=True)
+            try:
+                duration = a.take_duration(
+                    required=(action == "settemp"),
+                    missing_msg="settemp 需要时长，如: 30m / 2h / 7d",
+                )
+            except ArgParseError as exc:
+                return f"[lp] {exc}"
+            ctx, extra = a.split_context()
             if extra:
                 return (
                     f"[lp] 无法识别的参数: {' '.join(extra)}（上下文格式: key=value）"
@@ -1344,15 +1254,19 @@ class LuckPermsCommands:
         rest = args[1:]
         if action not in ("setprefix", "setsuffix"):
             return _USER_USAGE if kind == "user" else _GROUP_USAGE
-        if not rest:
+
+        a = CommandArgs(rest)
+        if a.is_empty():
             return f"[lp] 用法: lp {kind} {holder_id} meta {action} [priority] <值>"
 
         priority = 100
-        if len(rest) > 1 and rest[0].lstrip("-").isdigit():
-            priority = int(rest[0])
-            value = " ".join(rest[1:])
-        else:
-            value = " ".join(rest)
+        if a.remaining_count() > 1:  # 后面还有值 → 前面的数字才算 priority
+            maybe = a.take_int()
+            if maybe is not None:
+                priority = maybe
+        value = a.rest_join()
+        if not value:
+            return f"[lp] 用法: lp {kind} {holder_id} meta {action} [priority] <值>"
 
         err = self._authorize(context, f"luckperms.{kind}.meta.{action}")
         if err:
