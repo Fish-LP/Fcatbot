@@ -560,6 +560,15 @@ class FcatbotApp:
 
         self._bus.start()
         self._admin.register()  # 先注册框架命令
+        self._console = ConsoleApp(
+            self._bus,
+            self._request_shutdown,
+            commands=self._commands,
+        )
+        console_task = asyncio.create_task(self._console.run(), name="console")
+        self.ws_ready = asyncio.Event()
+        ws_task = asyncio.create_task(self._ws_loop(), name="ws")
+        await self.ws_ready.wait()
 
         plugin_classes = self._loader.discover()
         self._discovered_plugins = {
@@ -587,14 +596,6 @@ class FcatbotApp:
             "Registered commands: %s",
             [s.name for s in self._commands.all_roots()],
         )
-
-        self._console = ConsoleApp(
-            self._bus,
-            self._request_shutdown,
-            commands=self._commands,
-        )
-        console_task = asyncio.create_task(self._console.run(), name="console")
-        ws_task = asyncio.create_task(self._ws_loop(), name="ws")
 
         try:
             # WebUI 启动放在 try 内: 任何异常都不会泄漏上面的两个任务，
@@ -758,6 +759,8 @@ class FcatbotApp:
             # 无意义地重试只会刷日志。
             log.exception("连接后端启动失败: %s", transport)
             return
+        finally:
+            self.ws_ready.set()
 
         log.info("连接后端已启动: %s", transport)
         try:

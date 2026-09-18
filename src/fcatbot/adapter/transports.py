@@ -31,12 +31,48 @@ import json
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any, Callable, ClassVar
+from urllib.parse import urlparse
 
 import aiohttp
 from aiohttp import web
 
 from fcatbot.kernel.events import EventBus, RawEvent
+
+
+def _split_host_port(host: str | None, default_port: int) -> tuple[str, int, str]:
+    """把用户输入的 host 统一解析为 (host, port)。
+
+    接受形式::
+
+        "127.0.0.1"           -> ("127.0.0.1", default_port)
+        "0.0.0.0"             -> ("0.0.0.0",   default_port)
+        "localhost"           -> ("localhost", default_port)
+        "127.0.0.1:8080"      -> ("127.0.0.1", 8080)
+        "http://127.0.0.1"    -> ("127.0.0.1", default_port)
+        "http://127.0.0.1:80" -> ("127.0.0.1", 80)
+        "https://example.com" -> ("example.com", default_port)
+        "ws://[::1]:9000"     -> ("::1", 9000)
+    """
+    if not host:
+        return "127.0.0.1", default_port, "http"
+    # 无 scheme 时补 "//"，让 urlparse 正确识别 netloc
+    normalized = host if "://" in host else f"//{host}"
+    try:
+        parsed = urlparse(normalized, allow_fragments=False)
+    except ValueError:
+        return host, default_port, "http"
+
+    scheme = parsed.scheme or "http"
+    new_host = parsed.hostname or host
+    try:
+        new_port = parsed.port if parsed.port is not None else default_port
+    except ValueError:
+        # host 里带了非法端口（例如 "127.0.0.1:abc"）
+        new_port = default_port
+    return new_host, new_port, scheme
+
 
 log = logging.getLogger("fcatbot.transport")
 
@@ -100,6 +136,7 @@ class Transport(ABC):
         self._name = name or self.transport or type(self).__name__
         self._running = False
         self._raw_listeners: list[RawListener] = []
+        self._started = asyncio.Event()
 
     # ---------- 只读属性 ----------
 
@@ -130,6 +167,34 @@ class Transport(ABC):
     @abstractmethod
     async def send(self, payload: Any) -> Any:
         """向外部平台发送一帧；返回平台应答（无应答时为 ``None``）。"""
+
+    # ---------- 等待启动协议 ----------
+
+    async def wait_started(self, timeout: float | None = None) -> bool:
+        """等待连接件完成启动握手。
+
+        「就绪」的定义由各子类决定：
+
+        - :class:`ForwardWebSocketTransport` —— WS 连接已建立（首次 connect 成功）；
+        - :class:`HttpTransport` —— HTTP 服务器已监听端口（``start()`` 返回即就绪）。
+
+        Returns:
+            - 已就绪 / 在 ``timeout`` 秒内就绪 → ``True``；
+            - 未启动（``running`` 为 ``False`` 且尚未就绪）→ ``False``；
+            - 在 ``timeout`` 秒内未就绪 → ``False``。
+
+        ``timeout=None`` 表示无限等待。若等待期间调用 :meth:`stop`，
+        无限等待会一直挂起——因此**建议总是传入超时**。
+        """
+        if self._started.is_set():
+            return True
+        if not self._running:
+            return False
+        try:
+            await asyncio.wait_for(self._started.wait(), timeout=timeout)
+            return True
+        except asyncio.TimeoutError:
+            return False
 
     # ---------- 帧级直通（旁路总线） ----------
 
@@ -290,8 +355,10 @@ class ForwardWebSocketTransport(Transport):
     async def start(self) -> None:
         if self._running:
             return
+        self._started.clear()
         self._running = True
         self._stop_event.clear()
+        # 先把 session 准备好再起后台任务，避免 _run 抢跑时看到 None。
         if self._session is None or self._session.closed:
             self._session = aiohttp.ClientSession()
             self._owns_session = True
@@ -368,6 +435,7 @@ class ForwardWebSocketTransport(Transport):
                     self._ws = ws
                     connected = True
                     delay = self._reconnect_delay
+                    self._started.set()  # ← 启动握手完成
                     await self.publish_raw(
                         "connected", None, metadata={"url": self._url}
                     )
@@ -430,6 +498,32 @@ class ForwardWebSocketTransport(Transport):
 # ---------------------------------------------------------------------------
 # HTTP（回调服务器 + 可选出站 API）
 # ---------------------------------------------------------------------------
+@dataclass(slots=True)
+class HttpRequest:
+    """HTTP 出站请求描述，供 :meth:`HttpTransport.send` / :meth:`HttpTransport.request` 使用。
+
+    未使用本对象时（直接 ``send(payload)``），沿用旧行为: 把 ``payload``
+    作为 JSON ``POST`` 到 ``api_base_url``——即 OneBot 式「动作名 + 参数」。
+
+    字段含义::
+
+        method:  HTTP 方法（默认 ``"POST"``），大小写不敏感。
+        path:    相对于 ``api_base_url`` 的路径片段，可带前导 ``/``；
+                 ``None`` 表示直接打 ``api_base_url``。
+        params:  URL 查询参数（交给 aiohttp 编码）。
+        json:    作为 JSON body 发送的对象（优先级高于 ``data``）。
+        data:    原始 body（bytes / str / form 等，交给 aiohttp 处理）。
+        headers: 本次请求附带的额外头部（与连接件级 header 合并）。
+        timeout: 覆盖本次请求的 total 超时（秒）。
+    """
+
+    method: str = "POST"
+    path: str | None = None
+    params: Mapping[str, Any] | None = None
+    json: Any = None
+    data: Any = None
+    headers: Mapping[str, str] | None = None
+    timeout: float | None = None
 
 
 class HttpTransport(Transport):
@@ -466,8 +560,7 @@ class HttpTransport(Transport):
         name: str | None = None,
     ) -> None:
         super().__init__(bus, name=name)
-        self._host = host
-        self._port = port
+        self._bind_host, self._port, self._scheme = _split_host_port(host, port)
         self._path = path if path.startswith("/") else f"/{path}"
         self._api_base_url = api_base_url.rstrip("/") if api_base_url else None
         self._headers = dict(headers or {})
@@ -491,18 +584,19 @@ class HttpTransport(Transport):
 
     @property
     def url(self) -> str:
-        return f"http://{self._host}:{self.port}{self._path}"
+        return f"{self._scheme}://{self._bind_host}:{self.port}{self._path}"
 
     # ---------- 生命周期 ----------
 
     async def start(self) -> None:
         if self._running:
             return
+        self._started.clear()
         app = web.Application()
         app.router.add_post(self._path, self._handle_request)
         self._runner = web.AppRunner(app)
         await self._runner.setup()
-        self._site = web.TCPSite(self._runner, self._host, self._port)
+        self._site = web.TCPSite(self._runner, self._bind_host, self._port)
         await self._site.start()
         addresses = getattr(self._runner, "addresses", None) or []
         if addresses:
@@ -512,6 +606,7 @@ class HttpTransport(Transport):
                 headers=self._headers or None,
             )
         self._running = True
+        self._started.set()  # ← 服务器已监听
         log.info("%s 监听 %s", self._name, self.url)
 
     async def stop(self) -> None:
@@ -564,21 +659,75 @@ class HttpTransport(Transport):
     # ---------- 出站 ----------
 
     async def send(self, payload: Any) -> Any:
-        """把 ``payload`` 作为 JSON 发送到 ``api_base_url``，返回平台响应。
+        """向外部平台发送一帧；返回平台应答。
 
-        「动作 / 信封」语义属于适配器，连接件只负责发送；
-        响应为 JSON 时返回解析结果，否则返回文本。
+        两种形态:
+
+        - ``payload`` 为 :class:`HttpRequest`: 按描述发起完整 HTTP 调用；
+        - 其他类型: 保持向后兼容——作为 JSON ``POST`` 到 ``api_base_url``
+          （典型用法是 OneBot 式的「动作名 + 参数」信封，由适配器决定语义）。
+
+        未配置 ``api_base_url`` 时抛 :class:`TransportNotConnected`
+        （纯回调模式，出站由适配器自备客户端）。
+        """
+        if isinstance(payload, HttpRequest):
+            return await self.request(payload)
+        return await self.request(HttpRequest(json=payload))
+
+    async def request(self, req: HttpRequest) -> Any:
+        """按 :class:`HttpRequest` 描述发起出站 HTTP 调用并返回响应。
+
+        响应解析规则（与 :meth:`send` 默认路径一致）:
+
+        - ``Content-Type`` 含 ``json`` → 返回解析后的 Python 对象；
+        - 否则 → 返回文本。
+
+        HTTP 4xx/5xx 会抛 :class:`aiohttp.ClientResponseError`；
+        连接层错误抛 :class:`aiohttp.ClientError`——由调用方决定是否重试 /
+        包装为适配器层异常。
         """
         if self._session is None or self._session.closed or not self._api_base_url:
             raise TransportNotConnected(
                 f"{self._name} 未配置 api_base_url，无法出站（纯回调模式）"
             )
-        async with self._session.post(self._api_base_url, json=payload) as resp:
-            resp.raise_for_status()
-            content_type = resp.headers.get("Content-Type", "")
-            if "json" in content_type:
-                return await resp.json()
-            return await resp.text()
+
+        url = self._resolve_url(req.path)
+        headers = dict(self._headers)
+        if req.headers:
+            headers.update(req.headers)
+
+        kwargs: dict[str, Any] = {
+            "method": req.method.upper(),
+            "url": url,
+            "headers": headers or None,
+        }
+        if req.params is not None:
+            kwargs["params"] = req.params
+        if req.json is not None:
+            kwargs["json"] = req.json
+        if req.data is not None:
+            kwargs["data"] = req.data
+        if req.timeout is not None:
+            kwargs["timeout"] = aiohttp.ClientTimeout(total=req.timeout)
+
+        async with self._session.request(**kwargs) as resp:
+            return await self._consume_response(resp)
+
+    def _resolve_url(self, path: str | None) -> str:
+        """把 ``HttpRequest.path`` 拼到 ``api_base_url`` 上。"""
+        base = (self._api_base_url or "").rstrip("/")
+        if not path:
+            return base
+        return f"{base}/{path.lstrip('/')}"
+
+    @staticmethod
+    async def _consume_response(resp: aiohttp.ClientResponse) -> Any:
+        """统一响应解析: JSON 优先，否则文本。"""
+        resp.raise_for_status()
+        content_type = resp.headers.get("Content-Type", "")
+        if "json" in content_type.lower():
+            return await resp.json()
+        return await resp.text()
 
 
 # ---------------------------------------------------------------------------
