@@ -256,6 +256,7 @@ class ForwardWebSocketTransport(Transport):
         url: str,
         *,
         token: str | None = None,
+        token_type: str | None = "Bearer",
         headers: Mapping[str, str] | None = None,
         reconnect: bool = True,
         reconnect_delay: float = 1.0,
@@ -269,7 +270,9 @@ class ForwardWebSocketTransport(Transport):
         self._url = url
         self._headers = dict(headers or {})
         if token:
-            self._headers.setdefault("Authorization", f"Bearer {token}")
+            self._headers.setdefault(
+                "Authorization", f"{token_type or 'Bearer'} {token}"
+            )
         self._reconnect = reconnect
         self._reconnect_delay = max(0.0, reconnect_delay)
         self._max_reconnect_delay = max(self._reconnect_delay, max_reconnect_delay)
@@ -457,6 +460,7 @@ class HttpTransport(Transport):
         path: str = "/",
         api_base_url: str | None = None,
         token: str | None = None,
+        token_type: str | None = "Bearer",
         headers: Mapping[str, str] | None = None,
         kind_extractor: KindExtractor | None = None,
         name: str | None = None,
@@ -468,7 +472,9 @@ class HttpTransport(Transport):
         self._api_base_url = api_base_url.rstrip("/") if api_base_url else None
         self._headers = dict(headers or {})
         if token:
-            self._headers.setdefault("Authorization", f"Bearer {token}")
+            self._headers.setdefault(
+                "Authorization", f"{token_type or 'Bearer'} {token}"
+            )
         self._kind_extractor = kind_extractor or default_kind_extractor
 
         self._runner: web.AppRunner | None = None

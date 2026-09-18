@@ -65,6 +65,7 @@ DEFAULT_APP_CONFIG: dict[str, Any] = {
         "forward_ws": {
             "url": "",
             "token": "",
+            "token_type": "Bearer",
             "reconnect": True,
             "reconnect_delay": 1.0,
             "max_reconnect_delay": 30.0,
@@ -76,6 +77,7 @@ DEFAULT_APP_CONFIG: dict[str, Any] = {
             "path": "/",
             "api_base_url": "",
             "token": "",
+            "token_type": "Bearer",
         },
     },
     "webui": {
@@ -323,6 +325,7 @@ class FcatbotApp:
                 self._bus,
                 url,
                 token=_opt_str(opts.get("token")),
+                token_type=_opt_str(opts.get("token_type")),
                 headers=opts.get("headers") or None,
                 reconnect=bool(opts.get("reconnect", True)),
                 reconnect_delay=float(opts.get("reconnect_delay", 1.0)),
