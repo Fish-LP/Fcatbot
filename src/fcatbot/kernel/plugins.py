@@ -1,107 +1,150 @@
 """Fcatbot 插件基类。
 
-在 PluginForge 的 :class:`pluginforge.BasePlugin` 之上扩展四类能力：
+本基类横跨两套独立调度的生命周期系统。请先理解"对称性"这一核心结构，
+再看具体钩子。
 
-**1. 异步生命周期入口**
+────────────────────────────────────────────────────────────────
+双架构总览
+────────────────────────────────────────────────────────────────
 
-:meth:`on_load` / :meth:`on_enable` / :meth:`on_disable` / :meth:`on_unload`
-由 :class:`~fcatbot.kernel.integration.IntegrationLayer` 在装配/停用前后 ``await`` 调用。
+插件由两个系统共同驱动，两条链**互不等待、职责正交**：
 
-之所以与 PluginForge 的 :meth:`init` / :meth:`activate` / :meth:`deactivate`
-并存，是因为 PluginForge 基于 pluggy，**钩子链是同步的**——`hook()` 里拿到协程
-对象也无法帮你 ``await``。同步钩子因此无法安全地做 ``await self.has_permission_for(...)``
-/ ``await self.wait_for_service(...)`` / 打开异步连接等初始化。
+┌─ PluginForge 层（同步，pluggy 钩子链）─────────────────────┐
+│  钩子: init / activate / deactivate / on_config_changed     │
+│  调度: PluginManager                                        │
+│  为何同步: pluggy 的钩子链本身不支持 await。                │
+└─────────────────────────────────────────────────────────────┘
+┌─ Fcatbot 层（异步，本类声明）──────────────────────────────┐
+│  钩子: on_load / on_enable / on_disable / on_unload         │
+│  调度: IntegrationLayer（由 FcatbotApp 编排）               │
+│  为何异步: 权限查询 / 服务等待 / 异步连接都必须 await。     │
+└─────────────────────────────────────────────────────────────┘
 
-**2. 极简任务作用域**
+────────────────────────────────────────────────────────────────
+对称性（重要，先看这张表）
+────────────────────────────────────────────────────────────────
 
-:meth:`create_task` / :meth:`cancel_tasks` 提供"随插件停用而取消"的后台任务管理。
-这是 ``PluginScope`` 的过渡实现（M3 起并入）。框架会在 ``on_disable`` 之后、
-``detach`` 之前自动调用 :meth:`cancel_tasks`，子类**不需要**自己取消任务。
+**Fcatbot 层内部是对称的**——四个钩子按插件"是否已装配"的状态镜像：
 
-**3. 权限模型**
+    状态               进入侧              离开侧
+    ───────────────────────────────────────────────
+    detached(未订阅)   on_load      ←→    on_unload
+    attached(已订阅)   on_enable    ←→    on_disable
+    装配动作           attach       ←→    detach
 
-本基类**不猜任何平台**。事件 → ``(主体, 上下文)`` 的翻译由适配器插件实现
-:class:`~fcatbot.kernel.permissions.EventTranslator` 协议，并以服务形式注册在
+**PluginForge 层内部不对称**——进入 3 步、离开 1 步：
 
-    f"translator.{event.source}"
+    进入:  _pre_activate → init → activate
+    离开:  deactivate
 
-基类的 :meth:`has_permission_for` 按 ``event.source`` 查找翻译器，再委托
-:attr:`_permissions` 做实际判定。**找不到翻译器时一律拒绝**（fail-closed），
-避免误放行。
+    不对称是刻意的：Fcatbot 把大部分"准备"职责迁到了异步层，
+    同步层只保留最小必要的装配 / 反注册。
 
-**4. 便捷方法**
+**跨层时间序是镜像的**——进入"同步→异步"，离开"异步→同步"：
 
-日志、事件发布、服务查询、数据目录管理，均以属性 / 方法形式提供。
+    进入:  [同步 _pre_activate/init/activate]  →  [异步 on_load/attach/on_enable]
+    离开:  [异步 on_disable/cancel/detach/on_unload]  →  [同步 deactivate]
 
-生命周期总览
-------------
+    离开时异步先跑，是为了让异步清理看到"活着的"事件订阅与命令。
 
-两个层级的钩子由不同组件调度，**不要混用**：
+────────────────────────────────────────────────────────────────
+完整时间线（由 FcatbotApp 编排）
+────────────────────────────────────────────────────────────────
 
-- **PluginForge 层**（同步，pluggy 钩子链）：
-  ``init`` → ``activate`` → …… → ``deactivate``，由 :class:`PluginManager` 调度。
-- **Fcatbot 层**（异步，本类声明）：
-  ``on_load`` → ``on_enable`` → ``on_disable`` → ``on_unload``，
-  由 :class:`IntegrationLayer` 调度。
+**启动（FcatbotApp.run）** —— 与运行时启用的序列完全一致::
 
-实际执行顺序（由 :class:`FcatbotApp` 编排）::
+    # ── 同步侧 ──
+    _pre_activate(plugin)     # 注入 _bus/_permissions/_services/...
+                              # 注册 provides 声明的服务
+    init(app_config, cfg)     # 配置注入（子类应在此解析 config）
+    activate()                # 空实现；异步初始化请放 on_load/on_enable
 
-    # 启动时 (FcatbotApp.run → pm.register_plugins)
-    _pre_activate(plugin)          # 注入依赖 + 注册 provides 声明的服务
-    init(app_config, plugin_config)
-    activate()
-    # 随后 (FcatbotApp.run → integration.start_all)
-    on_load()
-    attach()                       # 扫描并订阅事件 + 注册命令
-    on_enable()
+    # ── 异步侧 ──
+    on_load()                 # 服务已注册，事件尚未订阅
+    attach()                  # 扫描 __event_specs__ 订阅事件
+                              # 扫描命令声明注册命令
+    on_enable()               # 事件/命令已生效，可启动后台任务
 
-    # 运行时停用 (FcatbotApp.disable_plugin)
-    on_disable()
-    cancel_tasks()                 # 取消 create_task 建的任务
-    detach()                       # 退订事件 + 注销命令 + 注销服务
-    on_unload()
-    deactivate()                   # PluginForge 反注册
+**停用（FcatbotApp.disable_plugin）**::
 
-    # 运行时启用 (FcatbotApp.enable_plugin)
-    与启动时相同的序列——每次启用都是全新实例
+    # ── 异步侧 ──
+    on_disable()              # 事件仍有效；收敛状态，勿启动新任务
+    cancel_tasks()            # 取消 create_task 建的任务（框架自动调用）
+    detach()                  # 退订事件 + 注销命令 + 注销服务
+    on_unload()               # 已退订；最终持久化、释放外部资源
 
-    # 运行时重载 (FcatbotApp.reload_plugin)
-    disable 序列 → PluginManager 重新导入并实例化 → enable 序列
+    # ── 同步侧 ──
+    deactivate()              # 纯同步最终释放
 
-要点：
+**重载（FcatbotApp.reload_plugin）**::
 
-- ``on_load`` 时服务已注册（在 ``_pre_activate`` 里完成），其他插件的
-  ``on_load`` / ``on_enable`` 可以查询到本插件 ``provides`` 的服务。
-- ``on_enable`` 时事件订阅与命令注册已完成，插件对外正式生效。
-- 停用时**先跑异步层再跑同步层**，异步清理能看到活的资源。
-- 钩子抛异常会被 :meth:`IntegrationLayer._run_hook` 捕获并记日志，
-  不会中断其他插件；失败隔离是设计意图。
+    disable 序列 → PluginManager 重新导入 + 实例化 → enable 序列
 
-注意事项
---------
+**运行时启用（FcatbotApp.enable_plugin）**::
 
-- **不要直接调** ``IntegrationLayer.enable/disable`` 或
+    与启动序列相同——每次启用都是全新实例，init 会重跑。
+
+────────────────────────────────────────────────────────────────
+钩子速查：各自看到的"世界"
+────────────────────────────────────────────────────────────────
+
+    ┌────────────┬────────┬──────────┬──────────────────────────┐
+    │ 钩子        │ 同步?  │ 已装配?  │ 典型用途                 │
+    ├────────────┼────────┼──────────┼──────────────────────────┤
+    │ init       │  是    │ 服务已注册│ 解析配置（纯同步）       │
+    │ activate   │  是    │ 同上      │ 几乎不用                 │
+    │ on_load    │  否    │ 未订阅    │ 打开连接、预热、一次性校验│
+    │ on_enable  │  否    │ 已订阅    │ 启动后台任务              │
+    │ on_disable │  否    │ 仍订阅    │ 刷盘、向下线通知          │
+    │ on_unload  │  否    │ 已退订    │ 最终持久化、关句柄        │
+    │ deactivate │  是    │ 全清完成  │ 关闭同步句柄              │
+    └────────────┴────────┴──────────┴──────────────────────────┘
+
+────────────────────────────────────────────────────────────────
+使用注意
+────────────────────────────────────────────────────────────────
+
+· **不要直接调** ``IntegrationLayer.enable/disable`` 或
   ``PluginManager.activate_plugin/deactivate_plugin``。前者绕过服务注册与
-  ``init`` / ``activate``；后者不碰内核的事件订阅/命令注册，停用后会残留资源。
-  统一走 :meth:`FcatbotApp.enable_plugin` / :meth:`disable_plugin` / :meth:`reload_plugin`。
-- **插件的 ``name`` 是类属性**（如 ``"NapcatAdapter"``），与插件目录名无关。
-  查找、启停、重载都以 ``name`` 为准。
-- **运行时启用是全新实例**。每次 ``cls()`` 都重新构造，``init`` 也会重跑，
+  ``init`` / ``activate``；后者不碰事件订阅/命令注册，停用后会残留资源。
+  统一走 :meth:`FcatbotApp.enable_plugin` / :meth:`disable_plugin` /
+  :meth:`reload_plugin`。
+
+· **插件的 name 是类属性**（如 ``"NapcatAdapter"``），与插件目录名无关。
+  查找、启停、重载都以 name 为准。
+
+· **运行时启用是全新实例**。每次 ``cls()`` 都重新构造，``init`` 也会重跑，
   不要假设实例字段在停用/启用之间存活。
 
+· **失败隔离**：钩子抛异常会被 :meth:`IntegrationLayer._run_hook` 捕获并
+  记日志，不会中断其他插件。因此**不要依赖"钩子失败会整体回滚"**——
+  重要状态收敛请显式写在 ``on_disable`` 里。
 
----- 持久化工具 ----
+  各失败点的语义::
+
+      on_load 失败     → 不 attach、不跑 on_enable
+      on_enable 失败   → detach 回滚已完成的装配
+      on_disable 失败  → 中止拆卸，保留已挂载状态
+      on_unload 失败   → 仅记日志（拆卸已执行，无法回滚）
+
+· **异步钩子里可以安全 await**：权限检查、服务查询、事件发布。
+  同步钩子里**不要** ``run_until_complete``——事件循环通常已在运行，
+  会直接抛 :class:`RuntimeError`。
+
+────────────────────────────────────────────────────────────────
+持久化工具
+────────────────────────────────────────────────────────────────
 
 插件不需要自己写 YAML/JSON 读写。两件工具，各管一件事：
 
-* :class:`~src.protocol.data.PluginConfig`
+· :class:`~src.protocol.data.PluginConfig`
     —— 用户可编辑的配置（强 schema、禁动态字段、支持版本迁移）。
     多数情况下**只用它的校验能力**：框架已把 YAML 解析成 dict 通过
     ``init(app_config, plugin_config)`` 交给你，用
     ``MyConfig.model_validate(plugin_config or {})`` 变成强类型对象即可，
     **不要**再 ``bind()`` 到同一份 YAML，否则会出现两份真相。
 
-* :class:`~src.protocol.data.PluginData`
+· :class:`~src.protocol.data.PluginData`
     —— 运行时状态（声明字段 + 任意动态字段）。绑定到本插件专属目录::
 
         self.state = (
@@ -113,15 +156,15 @@
         self.state.tick_count = 0             # 动态字段，随便加
         self.state.save()                     # 落盘
 
-典型时机::
+    典型时机::
 
-    init()         → MyConfig.model_validate(plugin_config or {})
-    on_load()      → PluginData().bind(self.ensure_data_dir())
-    on_disable()   → self.state.save()        # 最后能可靠收事件的机会
-    on_unload()    → 最终持久化
+        init()         → MyConfig.model_validate(plugin_config or {})
+        on_load()      → PluginData().bind(self.ensure_data_dir())
+        on_disable()   → self.state.save()    # 最后能可靠收事件的机会
+        on_unload()    → 最终持久化
 
-注意：``self.data_dir`` **未必存在**；绑定前先 ``self.ensure_data_dir()``，
-否则 ``bind()`` 会把不存在的目录当成文件，生成 ``.../echo.json`` 这种路径。
+    注意：``self.data_dir`` **未必存在**；绑定前先 ``self.ensure_data_dir()``，
+    否则 ``bind()`` 会把不存在的目录当成文件，生成 ``.../echo.json`` 这种路径。
 """
 
 from __future__ import annotations
@@ -146,14 +189,31 @@ class FcatbotPlugin(BasePlugin):
     :class:`IntegrationLayer` 会依据插件类上的 ``__event_specs__`` 与命令声明
     完成装配。
 
-    一个方法可叠加多个 :func:`~fcatbot.kernel.decorators.on_event` 订阅多个事件::
+    ── 生命周期一句话概括 ─────────────────────────────────────
+
+        进入:  同步 (init/activate)  →  异步 (on_load → attach → on_enable)
+        离开:  异步 (on_disable → cancel_tasks → detach → on_unload)
+                                     →  同步 (deactivate)
+
+    **异步四钩子按状态镜像对称**：
+
+        on_load     ←→  on_unload      （detached：事件未订阅）
+        on_enable   ←→  on_disable     （attached：事件已订阅）
+
+    完整时间线、失败语义、各钩子用途见模块 docstring。
+
+    ── 一个方法订阅多个事件 ──────────────────────────────────
+
+    同一方法可叠加多个 :func:`~fcatbot.kernel.decorators.on_event` 订阅多个事件::
 
         @on_event("napcat.message.group")
         @on_event("napcat.message.private")
         async def on_message(self, event) -> None:
             ...
 
-    最小示例::
+    ── 最小示例 ─────────────────────────────────────────────
+
+    ::
 
         from fcatbot.kernel.events import Event
 
@@ -161,19 +221,20 @@ class FcatbotPlugin(BasePlugin):
             name = "echo"
 
             async def on_load(self) -> None:
-                # 配置已注入；服务尚未被其他插件依赖
+                # 同步侧已就绪：配置已注入，服务已注册
+                # 事件尚未订阅 —— 适合打开文件/连接、做一次性校验
                 self.log.info("echo: data_dir = %s", self.data_dir)
 
             async def on_enable(self) -> None:
-                # 事件/命令已装配；可以启动后台任务
+                # 事件/命令已装配 —— 适合启动后台任务
                 self.create_task(self._poll_loop(), name="poll")
 
             async def on_disable(self) -> None:
-                # 即将退订；收敛内部状态（不要在这里启动新任务）
-                pass
+                # 事件仍有效 —— 收敛状态，勿在此启动新任务
+                await self.publish("echo.stopping")
 
             async def on_unload(self) -> None:
-                # 已退订/注销；释放外部资源
+                # 已退订/注销 —— 释放外部资源
                 pass
 
             async def _poll_loop(self) -> None:
@@ -181,7 +242,9 @@ class FcatbotPlugin(BasePlugin):
                     await asyncio.sleep(60)
                     await self.publish("echo.tick")
 
-    ``provides`` 声明格式（类属性）::
+    ── provides 声明格式 ─────────────────────────────────────
+
+    ::
 
         provides = {
             "myplugin.cache": None,            # 注册 self 自身
@@ -189,9 +252,12 @@ class FcatbotPlugin(BasePlugin):
             "myplugin.api": MyApi,             # 类型标注（不参与运行时）
             "myplugin.raw": some_instance,     # 直接注册该实例
         }
+
+    注册发生在 ``_pre_activate``（即 ``init`` 之前、``on_load`` 之前）；
+    注销发生在 ``detach``（即 ``on_unload`` 之前）。
     """
 
-    # ---- 类型声明（运行时由 FcatbotApp._pre_activate 注入）----
+    # ==================== 类型声明（运行时由 FcatbotApp._pre_activate 注入）====================
     #
     # 这些属性在插件被装配之前不存在；声明它们是为了：
     #   · IDE 补全 / 类型检查通过；
@@ -208,7 +274,7 @@ class FcatbotPlugin(BasePlugin):
     # 由 create_task 惰性初始化的任务集合；插件停用时由 cancel_tasks 清空。
     _tasks: set[asyncio.Task]
 
-    # ---- 由 init() 注入 ----
+    # ==================== 由 init() 注入 ====================
     #
     # 装配阶段被赋值；子类应通过 self.config / self.app_config 读取。
     # 每次运行时启用都会重跑 init（全新实例），因此可以放心在 init 里做
@@ -221,7 +287,7 @@ class FcatbotPlugin(BasePlugin):
     # 目标主机标识：PluginForge 用它区分不同宿主的插件。
     target_application = "fcatbot"
 
-    # ---- 子类可覆盖: 声明本插件提供的服务 ----
+    # ==================== 子类可覆盖：provides ====================
     #
     # 格式: {"service.name": None | "attr_name" | SomeType | instance}
     #   · None         → 注册 self 自身
@@ -233,16 +299,22 @@ class FcatbotPlugin(BasePlugin):
     # 注销发生在 detach（即 on_unload 之前）。
     provides: ClassVar[dict[str, Any]] = {}
 
-    # ==================== 生命周期（异步入口） ====================
-    #
-    # 这四个钩子可以安全地 await 权限检查 / 服务查询 / 事件发布。
-    # 钩子抛异常会被 IntegrationLayer 捕获并记日志，不会中断其他插件。
-    # 因此不要依赖"钩子失败会整体回滚"——重要状态收敛请在 on_disable 里做。
-
     def __init__(self) -> None:
         super().__init__()
         if hasattr(self, "default_config") and not hasattr(self, "config_schema"):
             self.config_schema = {k: type(v) for k, v in self.default_config.items()}
+
+    # ==================== 异步侧 · 生命周期钩子 ====================
+    #
+    # 下面四个钩子按状态镜像对称：
+    #
+    #     on_load     ←→  on_unload      （detached：事件未订阅）
+    #     on_enable   ←→  on_disable     （attached：事件已订阅）
+    #
+    # 抛异常由 IntegrationLayer._run_hook 捕获；失败隔离是设计意图。
+    # 因此不要依赖"钩子失败会整体回滚"——重要状态收敛请在 on_disable 里做。
+    #
+    # 这四钩子可以安全地 await 权限检查 / 服务查询 / 事件发布。
 
     async def on_load(self) -> None:
         """已加载并完成配置注入；此时尚未订阅事件 / 注册命令。
@@ -286,7 +358,7 @@ class FcatbotPlugin(BasePlugin):
         服务——它们的卸载顺序不由本插件控制。
         """
 
-    # ==================== 后台任务（过渡版作用域） ====================
+    # ==================== 异步侧 · 后台任务作用域 ====================
 
     def create_task(self, coro: Any, *, name: str | None = None) -> asyncio.Task:
         """创建随插件停用而取消的后台任务（M3 起并入 ``PluginScope``）。
@@ -337,7 +409,7 @@ class FcatbotPlugin(BasePlugin):
             self._tasks = registry
         return registry
 
-    # ---- 便捷: 日志 ----
+    # ==================== 通用 · 便捷方法（日志 / 事件 / 调试）====================
 
     @property
     def log(self) -> logging.Logger:
@@ -347,8 +419,6 @@ class FcatbotPlugin(BasePlugin):
         不要用 ``logging.getLogger(__name__)``——热重载时会丢失命名空间。
         """
         return logging.getLogger(f"plugin.{self.name}")
-
-    # ---- 便捷: 事件 ----
 
     async def publish(self, name: str, data: Any = None, **metadata: Any) -> None:
         """以本插件为 source 发布一个事件到事件总线。
@@ -362,14 +432,12 @@ class FcatbotPlugin(BasePlugin):
             Event(name=name, data=data, source=self.name, metadata=metadata)
         )
 
-    # ---- 调试 ----
-
     @property
     def debug(self) -> bool:
         """当前是否处于调试模式（由应用配置注入）。"""
         return self._debug
 
-    # ==================== 权限 ====================
+    # ==================== 通用 · 权限（原语 + 事件感知）====================
     #
     # 两个层次：
     #   · 原语:     has_permission(user_id, node, ctx)   —— 平台无关
@@ -566,7 +634,7 @@ class FcatbotPlugin(BasePlugin):
         """任意用户元数据。键不存在时返回 None（与空字符串区分）。"""
         return await self._permissions.get_meta(str(user_id), key)
 
-    # ---- 便捷: 服务 ----
+    # ==================== 通用 · 服务查询 ====================
 
     def get_service(self, name: str) -> Any | None:
         """宽松查询：不存在返回 None。
@@ -605,6 +673,8 @@ class FcatbotPlugin(BasePlugin):
         """
         return await self._services.wait_for(name, timeout=timeout)
 
+    # ==================== 通用 · 数据目录 ====================
+
     @property
     def data_dir(self) -> Path:
         """当前插件的专属可写数据目录。
@@ -632,11 +702,11 @@ class FcatbotPlugin(BasePlugin):
         self._data_dir.mkdir(parents=True, exist_ok=True)
         return self._data_dir
 
-    # ==================== PluginForge 生命周期（同步） ====================
+    # ==================== 同步侧 · PluginForge 钩子 ====================
     #
-    # 以下方法来自 PluginForge 的同步钩子链。异步逻辑请写在 on_load /
-    # on_enable / on_disable / on_unload 里，不要在同步钩子中 run_until_complete——
-    # 事件循环通常已在运行，会直接抛 RuntimeError。
+    # 以下方法来自 PluginForge 的同步钩子链。异步逻辑请写在上面四个钩子
+    # （on_load / on_enable / on_disable / on_unload）里，不要在同步钩子中
+    # run_until_complete——事件循环通常已在运行，会直接抛 RuntimeError。
     #
     # 调用时机（由 FcatbotApp._enable_plugin_locked / run 触发）：
     #     _pre_activate → init → activate → …… → deactivate
@@ -693,6 +763,8 @@ class FcatbotPlugin(BasePlugin):
             new: 新的应用配置字典。在调用此方法之前，
                 已由管理器赋值给 ``self.app_config``。
         """
+
+    # ==================== 可选 · Web / 前端 / 健康检查 / 迁移 ====================
 
     def get_routes(self) -> list:
         """返回要挂载的 FastAPI 路由器。可选。
