@@ -237,3 +237,4 @@ NapCat/steam_api.pyi
 NapCat/steam_api.pyi.txt
 plugkit*.zip
 AIdocs
+tests/adapter/*
