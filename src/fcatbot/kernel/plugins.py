@@ -299,6 +299,22 @@ class FcatbotPlugin(BasePlugin):
     # 注销发生在 detach（即 on_unload 之前）。
     provides: ClassVar[dict[str, Any]] = {}
 
+    # ==================== 子类可覆盖：依赖声明 ====================
+    #
+    # PluginForge 用 ``depends_on`` 表达插件间依赖；Fcatbot 沿用该名称。
+    # WebUI 依赖检查、PluginManager 拓扑排序都读这个属性。
+    #
+    # 支持三种写法（与 PluginForge 一致）:
+    #     depends_on = ["foo", "bar"]                   # list / tuple / set
+    #     depends_on = {"foo": ">=1.0", "bar": None}    # dict: 键为依赖名
+    #     depends_on = None                             # 无依赖（默认）
+    #
+    # 注意: 请不要使用已弃用的 ``dependencies`` 别名；见 WebUI 的
+    # ``_read_depends_on`` 兼容逻辑，下个大版本将移除。
+    depends_on: ClassVar[
+        list[str] | tuple[str, ...] | set[str] | dict[str, Any] | None
+    ] = None
+
     def __init__(self) -> None:
         super().__init__()
         if hasattr(self, "default_config") and not hasattr(self, "config_schema"):

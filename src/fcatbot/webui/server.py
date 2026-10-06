@@ -43,6 +43,7 @@ import secrets
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 import yaml
 from aiohttp import WSMsgType, web
@@ -65,6 +66,53 @@ _PLUGIN_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.\-]{0,63}$")
 # 登录限速: 每 IP 在滑动窗口内最多失败多少次
 _LOGIN_MAX_ATTEMPTS = 10
 _LOGIN_WINDOW_SECONDS = 60
+
+
+# ==================== 依赖字段读取 ====================
+#
+# 统一规则: **``depends_on`` 是唯一权威字段**（PluginForge BasePlugin 原生）。
+# ``dependencies`` 仅作历史兼容别名，读到即发一次性警告，下个大版本移除。
+#
+# 支持声明形态（与 PluginForge 一致）:
+#     depends_on = ["foo", "bar"]                # list / tuple / set
+#     depends_on = {"foo": ">=1.0", "bar": None} # dict: 键为依赖名
+#     depends_on = None                          # 显式无依赖
+#
+# 已按插件名去重的警告集合（同一插件只警告一次，避免日志刷屏）。
+_DEPRECATED_DEPS_WARNED: set[str] = set()
+
+
+def _read_depends_on(obj: Any, *, plugin_name: str) -> list[str]:
+    """从插件实例/类读取依赖名列表；统一到 PluginForge 的 ``depends_on``。
+
+    优先取 ``depends_on``；为 ``None`` 时尝试读 ``dependencies``（弃用别名，
+    发一次性警告）。显式空列表 ``[]`` **不会**被视为"未声明"，因此不会
+    回退到别名 —— 这修掉了原 `or` 短路写法的误判。
+
+    Returns:
+        依赖名列表；未声明或非法形态时返回空列表。
+    """
+    raw = getattr(obj, "depends_on", None)
+
+    if raw is None:
+        legacy = getattr(obj, "dependencies", None)
+        if legacy is not None:
+            if plugin_name not in _DEPRECATED_DEPS_WARNED:
+                _DEPRECATED_DEPS_WARNED.add(plugin_name)
+                log.warning(
+                    "插件 %r 使用已弃用的 ``dependencies`` 属性；"
+                    "请改用 PluginForge 原生的 ``depends_on``（下个大版本将移除兼容）",
+                    plugin_name,
+                )
+            raw = legacy
+
+    if raw is None:
+        return []
+    if isinstance(raw, dict):
+        return list(raw.keys())
+    if isinstance(raw, (list, tuple, set)):
+        return list(raw)
+    return []
 
 
 # ==================== 路由表 ====================
@@ -548,31 +596,22 @@ class WebUI:
     def _get_plugin_dependencies(self, name: str) -> list[str]:
         """获取插件声明的依赖名列表（可能为空）。
 
-        PluginForge ``BasePlugin`` 使用 ``depends_on``；为兼容第三方子类
-        也接受 ``dependencies``。优先读活跃实例（实例属性可能被运行时覆盖），
-        再退回已发现的类。
+        唯一权威字段是 PluginForge 的 ``depends_on``。历史别名
+        ``dependencies`` 仍可读，但会触发一次性弃用警告（见模块级
+        :func:`_read_depends_on`）。
+
+        优先读活跃实例（实例属性可能被运行时覆盖），再退回已发现的类。
         """
         pm = self._app._pm
 
         for p in pm.get_active_plugins():
             if p.name == name:
-                deps = getattr(p, "depends_on", None) or getattr(
-                    p, "dependencies", None
-                )
-                return list(deps or [])
+                return _read_depends_on(p, plugin_name=name)
 
         cls = self._app.discovered_plugins.get(name)
         if cls is None:
             return []
-
-        deps = getattr(cls, "depends_on", None) or getattr(cls, "dependencies", None)
-        if not deps:
-            return []
-        if isinstance(deps, dict):
-            return list(deps.keys())
-        if isinstance(deps, (list, tuple, set)):
-            return list(deps)
-        return []
+        return _read_depends_on(cls, plugin_name=name)
 
     def _unmet_dependencies(self, name: str) -> list[str]:
         """返回尚未启用/激活的依赖名。"""
