@@ -231,10 +231,6 @@ doc.txt
 .vscode
 digest.txt
 old
-NapCat/base.py
-NapCat/steam_api.py
-NapCat/steam_api.pyi
-NapCat/steam_api.pyi.txt
 plugkit*.zip
 AIdocs
 tests/adapter/*

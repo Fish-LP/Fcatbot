@@ -2,7 +2,7 @@
 
 - Tab 补全: CommandCompleter
 - exit / quit 本地处理
-- 其余命令走 EventBus → AdminCommands → CommandRegistry
+- 其余命令走 EventBus → CommandRouter → CommandRegistry；AdminCommands 只负责注册内置命令
 - patch_stdout() 确保日志在提示符上方
 """
 

@@ -438,7 +438,7 @@ async def dispatch_command(
     tokens: list[str],
     *,
     context: CommandContext,
-    is_allowed: Callable[[CommandContext, str], bool],
+    is_allowed: Callable[[CommandContext, str], bool | Awaitable[bool]],
 ) -> str | None:
     """解析、鉴权、调度一条命令。返回 None 表示未命中。
 
@@ -451,7 +451,10 @@ async def dispatch_command(
         return None
 
     node = spec.resolved_permission()
-    if not is_allowed(context, node):
+    allowed = is_allowed(context, node)
+    if inspect.isawaitable(allowed):
+        allowed = await allowed
+    if not allowed:
         return f"[命令] 权限不足: 需要 {node}"
 
     handler = spec.handler

@@ -30,35 +30,17 @@ from fcatbot.frontend.term import width as term_width
 from fcatbot.frontend.theme import Theme
 from fcatbot.kernel.commands import (
     CommandConflict,
-    CommandContext,
     CommandRegistry,
     CommandSpec,
-    accepts_context,
     console_command,
     scan_plugin_commands,
 )
-from fcatbot.kernel.events import Event
 from fcatbot.lp_commands import LuckPermsCommands
 from fcatbot.utils import Color
 
 log = logging.getLogger("fcatbot.admin")
 
 FRAMEWORK_PLUGIN = "Core"
-
-
-def _as_str(value: object) -> str | None:
-    return None if value is None else str(value)
-
-
-def _build_command_context(event: Event) -> CommandContext:
-    """从命令事件构建执行上下文（M3 ``CommandSender`` 之前的过渡桥）。"""
-    metadata = dict(event.metadata)
-    return CommandContext(
-        source=str(event.source or ""),
-        user_id=_as_str(metadata.get("user_id")),
-        group_id=_as_str(metadata.get("group_id")),
-        metadata=metadata,
-    )
 
 
 # 渲染常量
@@ -301,17 +283,17 @@ def _health_marker(status: str) -> str:
 
 
 class AdminCommands:
-    PRIORITY = 100
+    """注册框架管理命令；命令查找、鉴权与执行由 CommandRouter 负责。"""
 
     def __init__(self, app):
-        self._app = app
         self._registry: CommandRegistry = app._commands
         self._lp = LuckPermsCommands(app)
-        self._token: str | None = None
+        self._app = app
+        self._registered = False
 
-    # ---------- 生命周期 ----------
+    # ---------- 命令注册生命周期 ----------
     def register(self) -> None:
-        if self._token is not None:
+        if self._registered:
             return
         for component in (self, self._lp):
             specs = scan_plugin_commands(component, FRAMEWORK_PLUGIN)
@@ -320,58 +302,11 @@ class AdminCommands:
                     self._registry.register(spec)
                 except CommandConflict:
                     log.exception("Framework command conflict: %s", spec.name)
-        self._token = self._app._bus.subscribe(
-            "console.command", self._handle, priority=self.PRIORITY
-        )
+        self._registered = True
 
     def unregister(self) -> None:
-        if self._token is not None:
-            self._app._bus.unsubscribe(self._token)
-            self._token = None
         self._registry.unregister_by_plugin(FRAMEWORK_PLUGIN)
-
-    # ---------- 分发 ----------
-    async def _handle(self, event: Event) -> None:
-        text = str(event.data).strip()
-        if not text:
-            return
-        tokens = text.split()
-        spec, args = self._registry.find(tokens)
-        if spec is None:
-            return
-        event.cancel()
-
-        if spec.handler is None:
-            _print(self._render_detail(spec))
-            return
-
-        if not await self._check_permission(spec, event):
-            _print(Out.err(f"权限不足: {spec.resolved_permission()}"))
-            return
-
-        context = _build_command_context(event)
-        try:
-            if accepts_context(spec.handler):
-                result = spec.handler(args, context)
-            else:
-                result = spec.handler(args)
-            if inspect.isawaitable(result):
-                result = await result
-            if result:
-                _print(str(result))
-        except Exception as exc:
-            log.exception("Command '%s' failed", spec.full_name())
-            _print(Out.err(str(exc)))
-
-    async def _check_permission(self, spec: CommandSpec, event: Event) -> bool:
-        if event.source == "console":
-            return True
-        user_id = event.metadata.get("user_id")
-        if not user_id:
-            return False
-        return await self._app._permissions.has_permission(
-            str(user_id), spec.resolved_permission()
-        )
+        self._registered = False
 
     # ==================== help ====================
 

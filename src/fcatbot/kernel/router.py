@@ -18,7 +18,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable, Optional
+from typing import Awaitable, Callable, Optional
 
 from fcatbot.kernel.commands import (
     CommandContext,
@@ -50,20 +50,23 @@ class CommandRouter:
         tokenizer: 覆盖默认分词。签名 ``(raw: str) -> list[str]``。
         prefix: 若给出，仅处理以此前缀开头的输入；命中后剥离该前缀。
             便于聊天场景（如 ``/lp info``）。
+        allow_without_prefix: 在前缀检查模式下允许无前缀命令进入。
     """
 
     def __init__(
         self,
         registry: CommandRegistry,
         *,
-        is_allowed: Callable[[CommandContext, str], bool],
+        is_allowed: Callable[[CommandContext, str], bool | Awaitable[bool]],
         tokenizer: Optional[Callable[[str], list[str]]] = None,
         prefix: Optional[str] = None,
+        allow_without_prefix: bool = False,
     ) -> None:
         self._registry = registry
         self._is_allowed = is_allowed
         self._tokenize = tokenizer or default_tokenizer
         self._prefix = prefix
+        self._allow_without_prefix = allow_without_prefix
 
     # ------------------------------------------------------------------
     # 对外唯一方法
@@ -88,9 +91,10 @@ class CommandRouter:
             return None
 
         if self._prefix is not None:
-            if not raw.startswith(self._prefix):
+            if raw.startswith(self._prefix):
+                raw = raw[len(self._prefix) :].strip()
+            elif not self._allow_without_prefix:
                 return None
-            raw = raw[len(self._prefix) :].strip()
             if not raw:
                 return None
 

@@ -26,11 +26,11 @@ from fcatbot.adapter.transports import (
     Transport,
 )
 from fcatbot.builtin import AdminCommands
-from fcatbot.frontend.console import ConsoleApp
-from fcatbot.kernel.commands import CommandRegistry
+from fcatbot.frontend.console import ConsoleApp, console_print
+from fcatbot.kernel.commands import CommandContext, CommandRegistry
 
 # Event 同时作为 ``fcatbot.app.Event`` 对外可见（宿主模块沿用旧引用习惯）
-from fcatbot.kernel.events import EventBus
+from fcatbot.kernel.events import Event, EventBus
 from fcatbot.kernel.integration import IntegrationLayer
 from fcatbot.kernel.loader import PluginLoader
 from fcatbot.kernel.permissions import (
@@ -39,6 +39,7 @@ from fcatbot.kernel.permissions import (
     NullPermissionService,
     PermissionService,
 )
+from fcatbot.kernel.router import CommandRouter
 from fcatbot.kernel.services import ServiceRegistry
 from fcatbot.utils import LogConfig, setup_logging
 from fcatbot.webui.server import WebUI
@@ -49,6 +50,10 @@ log = logging.getLogger("fcatbot")
 
 DEFAULT_APP_CONFIG: dict[str, Any] = {
     "default_language": " zh-CN",
+    "console": {
+        "prefix": "/",
+        "allow_without_prefix": True,
+    },
     "plugins": {
         "dirs": ["plugins"],
         "enabled": [],
@@ -156,6 +161,19 @@ class FcatbotApp:
         # 启动时发现的插件（插件名 → 插件类）；供前端展示，避免用目录名冒充插件名
         self._discovered_plugins: dict[str, type] = {}
         self._admin = AdminCommands(self)
+        _console_cfg = self._app_config.get("console") or {}
+        self._command_router = CommandRouter(
+            self._commands,
+            is_allowed=self._is_command_allowed,
+            prefix=str(
+                _console_cfg.get("prefix") or DEFAULT_APP_CONFIG["console"]["prefix"]
+            ).strip(),
+            allow_without_prefix=bool(
+                _console_cfg.get("allow_without_prefix")
+                or DEFAULT_APP_CONFIG["console"]["allow_without_prefix"]
+            ),
+        )
+        self._command_token: str | None = None
 
         self._console: ConsoleApp | None = None
         self._stop_event = asyncio.Event()
@@ -560,6 +578,10 @@ class FcatbotApp:
 
         self._bus.start()
         self._admin.register()  # 先注册框架命令
+        command_subscription = self._bus.subscribe(
+            "console.command", self._dispatch_console_command, priority=100
+        )
+        self._command_token = command_subscription.token
         self._console = ConsoleApp(
             self._bus,
             self._request_shutdown,
@@ -660,6 +682,35 @@ class FcatbotApp:
     def _request_shutdown(self) -> None:
         self._stop_event.set()
 
+    async def _dispatch_console_command(self, event: Event) -> None:
+        context = CommandContext(
+            source=str(event.source or ""),
+            user_id=(
+                str(event.metadata["user_id"])
+                if event.metadata.get("user_id") is not None
+                else None
+            ),
+            group_id=(
+                str(event.metadata["group_id"])
+                if event.metadata.get("group_id") is not None
+                else None
+            ),
+            metadata=dict(event.metadata),
+        )
+        result = await self._command_router.handle(str(event.data), context=context)
+        if result is None:
+            return
+        event.cancel()
+        if result:
+            console_print(str(result))
+
+    async def _is_command_allowed(self, context: CommandContext, node: str) -> bool:
+        if context.is_console:
+            return True
+        if not context.user_id:
+            return False
+        return await self._permissions.has_permission(context.user_id, node)
+
     def _ensure_plugin_configs(self, plugin_classes: list[type]) -> None:
         """为每个插件创建默认配置文件（如果不存在）。
 
@@ -699,6 +750,10 @@ class FcatbotApp:
             except Exception:
                 log.exception("webui.stop failed")
             self._webui = None
+
+        if self._command_token is not None:
+            self._bus.unsubscribe(self._command_token)
+            self._command_token = None
 
         try:
             self._admin.unregister()
