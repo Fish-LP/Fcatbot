@@ -45,6 +45,7 @@ dependencies = [
     "prompt-toolkit>=3.0",
     "pyyaml>=6.0",
     "packaging>=23.0",
+    "pydantic>=2.13.5",
 ]
 
 [project.optional-dependencies]

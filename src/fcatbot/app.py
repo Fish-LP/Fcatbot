@@ -574,6 +574,14 @@ class FcatbotApp:
 
     async def run(self) -> None:
         log.info("Fcatbot starting ...")
+        for plugin_dir in self._plugin_dirs:
+            if not plugin_dir:
+                continue
+            path = Path(plugin_dir)
+            try:
+                path.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                log.exception("创建插件目录失败: %s", path)
         log.info("Plugin dirs: %s", self._plugin_dirs)
 
         self._bus.start()
