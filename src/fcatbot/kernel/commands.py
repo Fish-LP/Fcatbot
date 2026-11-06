@@ -36,12 +36,14 @@ from __future__ import annotations
 
 import inspect
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Mapping
 
 log = logging.getLogger("fcatbot.commands")
 
 CommandHandler = Callable[..., Any | Awaitable[Any]]
+CommandCompletionProvider = Callable[[list[str]], Iterable[str]]
 
 
 class CommandError(RuntimeError):
@@ -91,6 +93,7 @@ class CommandSpec:
     permission: str = ""
     parent: "CommandSpec | None" = None
     subcommands: dict[str, "CommandSpec"] = field(default_factory=dict)
+    completer: CommandCompletionProvider | None = None
 
     def resolved_permission(self) -> str:
         if self.permission:
@@ -149,6 +152,7 @@ class CommandNode:
         "usage",
         "aliases",
         "permission",
+        "completer",
         "parent",
         "subcommands",
         "_children",
@@ -164,6 +168,7 @@ class CommandNode:
         usage: str = "",
         aliases: list[str] | None = None,
         permission: str = "",
+        completer: CommandCompletionProvider | None = None,
         parent: "CommandNode | str | None" = None,
     ) -> None:
         self.func = func
@@ -172,6 +177,7 @@ class CommandNode:
         self.usage = usage
         self.aliases = list(aliases or [])
         self.permission = permission
+        self.completer = completer
         self.parent: "CommandNode | str | None" = parent
         self.subcommands: dict[str, CommandNode] = {}
         self._children: list[CommandNode] = []
@@ -237,7 +243,11 @@ class CommandNode:
 
 
 def console_command(func=None, *, name: str | None = None, **kwargs):
-    """把一个方法声明为控制台命令。"""
+    """把一个方法声明为控制台命令。
+
+    ``completer`` 可选，接收当前参数之前已输入的参数列表并返回候选项。
+    若传入类中的实例方法，会在注册时绑定到命令所属实例。
+    """
 
     if callable(func):
         return CommandNode(func, name=name, **kwargs)
@@ -412,6 +422,9 @@ def scan_plugin_commands(plugin: Any, plugin_name: str) -> list[CommandSpec]:
 def _node_to_spec(node: CommandNode, plugin: Any, plugin_name: str) -> CommandSpec:
     attr_name = node._attr_name or node.name
     bound = getattr(plugin, attr_name)
+    completer = node.completer
+    if inspect.isfunction(completer):
+        completer = completer.__get__(plugin, type(plugin))
     spec = CommandSpec(
         name=node.name,
         help=node.help,
@@ -420,6 +433,7 @@ def _node_to_spec(node: CommandNode, plugin: Any, plugin_name: str) -> CommandSp
         plugin=plugin_name,
         handler=bound,
         permission=node.permission,
+        completer=completer,
     )
     for child in node._children:
         child_spec = _node_to_spec(child, plugin, plugin_name)

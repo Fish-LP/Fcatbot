@@ -308,6 +308,20 @@ class AdminCommands:
         self._registry.unregister_by_plugin(FRAMEWORK_PLUGIN)
         self._registered = False
 
+    def _plugin_names(self, args: list[str], *, enabled: bool) -> list[str]:
+        if args:
+            return []
+        active = {plugin.name for plugin in self._app._pm.get_active_plugins()}
+        return sorted(
+            name for name in self._app.discovered_plugins if (name in active) is enabled
+        )
+
+    def _complete_enable(self, args: list[str]) -> list[str]:
+        return self._plugin_names(args, enabled=False)
+
+    def _complete_disable(self, args: list[str]) -> list[str]:
+        return self._plugin_names(args, enabled=True)
+
     # ==================== help ====================
 
     @console_command(
@@ -605,7 +619,12 @@ class AdminCommands:
 
     # ==================== 启停 ====================
 
-    @console_command("enable", help="启用插件", usage="enable <name>")
+    @console_command(
+        "enable",
+        help="启用插件",
+        usage="enable <name>",
+        completer=_complete_enable,
+    )
     async def _cmd_enable(self, args: list[str]) -> str:
         if not args:
             return Out.hint("用法: enable <name>")
@@ -617,7 +636,12 @@ class AdminCommands:
             return Out.err(f"启用失败: {exc}")
         return Out.ok(msg) if ok else Out.err(msg)
 
-    @console_command("disable", help="禁用插件", usage="disable <name>")
+    @console_command(
+        "disable",
+        help="禁用插件",
+        usage="disable <name>",
+        completer=_complete_disable,
+    )
     async def _cmd_disable(self, args: list[str]) -> str:
         if not args:
             return Out.hint("用法: disable <name>")

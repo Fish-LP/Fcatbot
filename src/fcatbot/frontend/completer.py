@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterator
 
 from prompt_toolkit.completion import CompleteEvent, Completer, Completion
@@ -13,14 +14,17 @@ from prompt_toolkit.document import Document
 
 from fcatbot.kernel.commands import CommandRegistry
 
+log = logging.getLogger("fcatbot.completer")
+
 
 class CommandCompleter(Completer):
     """命令补全器。
 
     补全规则:
     - 输入首词时补全所有顶层命令（含别名）；
-    - 只有当前词仍匹配已知命令/子命令时才补全，进入参数位置后停止补全。
-    - 补全项附带 help 文本作为显示元数据
+    - 先补全已知子命令；遇到参数时由命令的自定义 completer 提供候选；
+    - 无命令级补全器的参数位置不提供建议。
+    - 补全项附带 help 文本作为显示元数据。
     """
 
     def __init__(self, registry: CommandRegistry):
@@ -44,14 +48,33 @@ class CommandCompleter(Completer):
                 )
             return
 
-        parent, args = self._registry.find(parts)
-        if parent is None or args:
+        spec, args = self._registry.find(parts)
+        if spec is None:
             return
 
-        for name, spec in sorted(parent.subcommands.items()):
-            if name.startswith(current):
+        subcommands = {
+            name: child
+            for name, child in spec.subcommands.items()
+            if name.startswith(current)
+        }
+        if not args and subcommands:
+            for name, child in sorted(subcommands.items()):
                 yield Completion(
                     name,
                     start_position=-len(current),
-                    display_meta=spec.help,
+                    display_meta=child.help,
                 )
+            return
+
+        if spec.completer is None:
+            return
+        try:
+            candidates = spec.completer(args)
+            for candidate in candidates:
+                if candidate.startswith(current):
+                    yield Completion(
+                        candidate,
+                        start_position=-len(current),
+                    )
+        except Exception:
+            log.exception("命令参数补全失败: command=%s", spec.full_name())
