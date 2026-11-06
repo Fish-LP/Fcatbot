@@ -567,7 +567,7 @@ class EventBus:
                     if cost >= threshold:
                         log.warning(
                             "事件处理器耗时过长: %.2fs (>= %.2fs) handler=%r event=%r；"
-                            "请将耗时操作移入 PluginScope 任务（ADR-0004）",
+                            "请将耗时操作移入后台任务",  # ADR-0004
                             cost,
                             threshold,
                             sub.handler,
