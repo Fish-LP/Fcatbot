@@ -14,47 +14,30 @@ dynamic = ["version"]
 description = "Fcatbot —— 一个可插拔、多平台的聊天机器人框架。"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.13"
-
-[tool.hatch.version]
-path = "src/fcatbot/__init__.py"
-
-# 许可证：SPDX 表达式（PEP 639，推荐）
 license = "MIT"
 license-files = ["LICENSE"]
-
 authors = [
     { name = "Fish-LP", email = "Fish.zh@outlook.com" },
 ]
 maintainers = [
     { name = "Fish-LP", email = "Fish.zh@outlook.com" },
 ]
-
 keywords = [
-    "qqbot",
-    "bot",
-    "framework",
-    "plugin",
-    "qq",
-    "onebot",
-    "adapter",
-    "async",
+    "qqbot", "bot", "framework", "plugin",
+    "qq", "onebot", "adapter", "async",
 ]
-
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Internet",
     "Topic :: Software Development :: Libraries :: Application Frameworks",
     "Typing :: Typed",
     "Framework :: AsyncIO",
 ]
-
 dependencies = [
     "pluginforge>=0.10.0",
     "luckperms-python>=1.0.6",
@@ -88,9 +71,9 @@ Issues = "https://github.com/Fish-LP/fcatbot/issues"
 Changelog = "https://github.com/Fish-LP/fcatbot/blob/main/CHANGELOG.md"
 Documentation = "https://fcatbot.readthedocs.io/"
 
-# -------------------------
-# 打包
-# -------------------------
+[tool.hatch.version]
+path = "src/fcatbot/__init__.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/fcatbot"]
 
@@ -103,14 +86,6 @@ include = [
     "CHANGELOG.md",
 ]
 
-[tool.setuptools.package-data]
-"fcatbot.tools" = [
-    "templates/plugin/*.tmpl"
-]
-
-# -------------------------
-# 测试
-# -------------------------
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
