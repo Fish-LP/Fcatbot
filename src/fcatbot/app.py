@@ -138,7 +138,7 @@ class FcatbotApp:
         self._plugin_dirs = self._resolve_plugin_dirs(plugin_dirs)
 
         # 基础设施
-        self._bus = EventBus()
+        self._bus = EventBus(slow_handler_warn=1)
         self._permissions = self._build_permissions()
         self._services = ServiceRegistry()
         self._commands = CommandRegistry()
