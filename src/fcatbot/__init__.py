@@ -113,5 +113,5 @@ __all__ = [
     "PluginData",
 ]
 
-__version__ = "4.2.1"
+__version__ = "4.2.2"
 __api_version__ = "1"
