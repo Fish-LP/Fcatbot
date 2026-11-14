@@ -41,7 +41,7 @@ from fcatbot.kernel.permissions import (
 )
 from fcatbot.kernel.router import CommandRouter
 from fcatbot.kernel.services import ServiceRegistry
-from fcatbot.utils import LogConfig, setup_logging
+from fcatbot.utils import LogConfig, setup_logging, shutdown_logging
 from fcatbot.webui.server import WebUI
 
 log = logging.getLogger("fcatbot")
@@ -636,15 +636,32 @@ class FcatbotApp:
             log.info("Fcatbot started. Type 'help' for available commands.")
             await self._stop_event.wait()
         finally:
-            console_task.cancel()
-            ws_task.cancel()
-            for t in (console_task, ws_task):
+            # stop() 会唤醒阻塞在 prompt_async 上的控制台循环，
+            # 让它自己收尾（还原日志 handler）而不是被 cancel 打断。
+            self._console.stop()
+            if self._transport:
+                await self._transport.stop()
+            try:
+                await asyncio.wait_for(console_task, timeout=5)
+            except TimeoutError:
+                log.warning("控制台未能优雅退出，强制取消")
+                console_task.cancel()
                 try:
-                    await t
+                    await console_task
                 except asyncio.CancelledError:
                     pass
-                except Exception:
-                    log.exception("Task cleanup failed")
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                log.exception("Console task cleanup failed")
+
+            ws_task.cancel()
+            try:
+                await ws_task
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                log.exception("Task cleanup failed")
             await self._cleanup()
 
     async def _start_webui(self) -> None:
@@ -808,35 +825,33 @@ class FcatbotApp:
           连接件内部的重连逻辑负责其运行期恢复。
         """
         transport = self._transport
-        if transport is None:
-            log.info("未配置连接件（transport.mode = none），连接后端未启动")
-            return
-
         try:
-            await transport.start()
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            # 启动失败: 记录并退出 ws_task。不做自动重启——连接件自身的
-            # reconnect 逻辑负责运行期重连；启动期失败多为配置错误，
-            # 无意义地重试只会刷日志。
-            log.exception("连接后端启动失败: %s", transport)
-            return
-        finally:
-            self.ws_ready.set()
+            if transport is None:
+                log.info("未配置连接件（transport.mode = none），连接后端未启动")
+                return
 
-        log.info("连接后端已启动: %s", transport)
-        try:
-            await self._stop_event.wait()
-        finally:
             try:
-                await transport.stop()
+                await transport.start()
             except asyncio.CancelledError:
                 raise
             except Exception:
-                log.exception("连接件停止失败: %s", transport)
-            else:
-                log.info("连接后端已停止: %s", transport)
+                log.exception("连接后端启动失败: %s", transport)
+                return
+
+            log.info("连接后端已启动: %s", transport)
+            try:
+                await self._stop_event.wait()
+            finally:
+                try:
+                    await transport.stop()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    log.exception("连接件停止失败: %s", transport)
+                else:
+                    log.info("连接后端已停止: %s", transport)
+        finally:
+            self.ws_ready.set()
 
 
 # ==================== CLI ====================
@@ -855,6 +870,8 @@ def _run_host(args: argparse.Namespace) -> int:
         asyncio.run(app.run())
     except KeyboardInterrupt:
         log.info("Interrupted")
+    finally:
+        shutdown_logging()
     return 0
 
 

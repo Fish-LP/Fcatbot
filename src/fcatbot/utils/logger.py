@@ -31,8 +31,11 @@ __version__ = "3.1.0"
 RequestId: ContextVar[Optional[str]] = ContextVar("request_id", default=None)
 TraceId: ContextVar[Optional[str]] = ContextVar("trace_id", default=None)
 
-# handler 的"本模块管理"标记，用于安全替换/清理
+# handler 的"本模块管理"标记，用于安全替换/清理。
+# 公开别名 MANAGED_FLAG 供其它模块（如 frontend.console）给自建 handler 打标，
+# 保证 setup_logging / shutdown_logging 能一起清理。
 _MANAGED_FLAG = "_fcatbot_managed"
+MANAGED_FLAG = _MANAGED_FLAG
 
 
 def set_request_id(rid: str) -> None:
@@ -448,6 +451,38 @@ def get_logger(
     logger = logging.getLogger(name)
     # 拷贝一份，避免调用方后续修改污染
     return logging.LoggerAdapter(logger, dict(extra) if extra else {})
+
+
+def shutdown_logging() -> None:
+    """停止 QueueListener 并关闭所有由本模块管理的 handler。
+    应在程序退出前（如 app.main() 的 finally 中）调用。
+    """
+    global _listener
+    if _listener is not None:
+        try:
+            _listener.stop()
+        except Exception:
+            # 兜底：队列满时 put_nowait 会抛 queue.Full，直接 join 线程
+            try:
+                _listener._thread.join(timeout=5)
+            except Exception:
+                pass
+        # 关闭 listener 持有的文件 handler，释放文件句柄
+        for h in getattr(_listener, "handlers", ()):
+            try:
+                h.close()
+            except Exception:
+                pass
+        _listener = None
+
+    # 清理 root 及重定向 logger 上本模块挂载的 handler
+    root = logging.getLogger()
+    _remove_managed_handlers(root)
+    for name in _redirect_logger_names:
+        _remove_managed_handlers(logging.getLogger(name))
+    _redirect_logger_names.clear()
+
+    logging.shutdown()
 
 
 # ---------- 示例 ----------
